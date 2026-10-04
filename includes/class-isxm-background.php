@@ -29,6 +29,8 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+class ISXM_Lease_Lost extends RuntimeException {}
+
 class ISXM_Background {
 
     /** Shared secret proving a loopback request came from this site. */
@@ -44,6 +46,8 @@ class ISXM_Background {
 
     /** Only one runner may hold this at a time. */
     const RUNNER_LOCK = 'isxs_bg_lock';
+    /** Exact lease values acquired by THIS request, including a random owner. */
+    private static $leases = [];
 
     /**
      * Serialises the "is anything running? then claim the slot" step of
@@ -231,7 +235,7 @@ class ISXM_Background {
 
         $url = admin_url( 'admin-ajax.php' );
 
-        wp_remote_post( $url, [
+        $response = wp_remote_post( $url, [
             'timeout'   => 0.01,
             'blocking'  => false,
             'body'      => [
@@ -244,6 +248,12 @@ class ISXM_Background {
             'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
         ] );
 
+        if ( is_wp_error( $response ) ) {
+            isxm_log_error( 'Background dispatch failed: ' . $response->get_error_message() );
+            set_transient( self::LOOPBACK_TRANSIENT, 'no', 60 );
+            return false;
+        }
+        set_transient( 'isxs_bg_dispatched', time(), self::LOCK_TTL );
         return true;
     }
 
@@ -353,6 +363,12 @@ class ISXM_Background {
                     return false;
                 }
 
+                self::renew_runner_lock();
+                if ( $job->is_stalled() ) {
+                    $job->activity['restarts'] = (int) ( $job->activity['restarts'] ?? 0 ) + 1;
+                    $job->save();
+                }
+
                 // A stop the UI asked for while the previous batch was in
                 // flight. Checked before spending another batch's worth of
                 // work on a run the user has already walked away from.
@@ -361,7 +377,16 @@ class ISXM_Background {
                 }
 
                 $batch_started = microtime( true );
+                $processed_before = $job->processed;
                 $result        = ISXM_Tools::execute_batch( $job->tool, $job->cursor );
+
+                self::renew_runner_lock();
+                // Migration commits each item and rewrite window itself.
+                // Reload even on failure so an old runner snapshot cannot
+                // roll back the checkpoints it just wrote.
+                $fresh = ISXM_Job::get( $job->tool );
+                if ( ! $fresh || $fresh->run_id !== $job->run_id ) return false;
+                $job = $fresh;
 
                 if ( is_wp_error( $result ) ) {
                     // A run-level failure (storage not configured, source
@@ -370,6 +395,13 @@ class ISXM_Background {
                     // able to pick up exactly here once it's fixed.
                     $job->finish( ISXM_Job::STATE_ERROR, $result->get_error_message() );
                     return false;
+                }
+
+                // Checkpointed migrations already committed their counts,
+                // but still contribute throughput samples for the ETA.
+                if ( ! empty( $result['checkpointed'] ) && $job->processed > $processed_before ) {
+                    $job->batch_rates[] = ( $job->processed - $processed_before ) / max( 0.001, microtime( true ) - $batch_started );
+                    $job->batch_rates = array_slice( $job->batch_rates, -ISXM_Job::MAX_BATCH_SAMPLES );
                 }
 
                 $job->record_batch(
@@ -414,6 +446,23 @@ class ISXM_Background {
                     return true;
                 }
             }
+        } catch ( ISXM_Lease_Lost $e ) {
+            isxm_log_error( 'Background worker lost its lease; stopping without changing the checkpoint.' );
+            return false;
+        } catch ( \Throwable $e ) {
+            isxm_log_error( 'Background worker failed: ' . $e->getMessage() );
+            if ( isset( $job ) && $job ) {
+                $fresh = ISXM_Job::get( $job->tool );
+                if ( $fresh && $fresh->run_id === $job->run_id ) {
+                    try {
+                        self::renew_runner_lock();
+                    } catch ( ISXM_Lease_Lost $lost ) {
+                        return false;
+                    }
+                    $fresh->finish( ISXM_Job::STATE_ERROR, 'The worker stopped unexpectedly. The last checkpoint was retained; resume to retry.' );
+                }
+            }
+            return false;
         } finally {
             self::unlock();
         }
@@ -782,6 +831,8 @@ class ISXM_Background {
             // actually pending, instead of only until the next poll repaints
             // over the optimistic label the click set.
             $payload['signal'] = ISXM_Job::signal( $tool );
+            $payload['worker_waiting'] = $job->is_stalled() && self::runner_lock_held();
+            $payload['restart_sent'] = $job->is_stalled() && (int) get_transient( 'isxs_bg_dispatched' ) > (int) $job->updated;
             $jobs[ $tool ]     = $payload;
         }
         if ( $just_started instanceof ISXM_Job && ! isset( $jobs[ $just_started->tool ] ) ) {
@@ -899,15 +950,17 @@ class ISXM_Background {
         global $wpdb;
 
         $now = time();
+        $value = $now . '|' . wp_generate_password( 24, false, false );
 
         // The unique index on option_name makes this the atomic step: of N
         // requests racing here, exactly one INSERT affects a row.
         $inserted = $wpdb->query( $wpdb->prepare(
             "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
             $key,
-            (string) $now
+            $value
         ) );
         if ( $inserted ) {
+            self::$leases[ $key ] = $value;
             wp_cache_delete( $key, 'options' );
             return true;
         }
@@ -925,12 +978,40 @@ class ISXM_Background {
         // correctly report failure rather than both proceeding.
         $swapped = $wpdb->query( $wpdb->prepare(
             "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s",
-            (string) $now,
+            $value,
             $key,
             $held
         ) );
         wp_cache_delete( $key, 'options' );
+        if ( $swapped ) self::$leases[ $key ] = $value;
         return (bool) $swapped;
+    }
+
+    /** Renew before every network operation/checkpoint. Standalone CLI calls
+     * have no runner lease; background calls must still own theirs. */
+    public static function renew_runner_lock() {
+        global $wpdb;
+        $key = self::RUNNER_LOCK;
+        if ( ! isset( self::$leases[ $key ] ) ) return;
+        $old = self::$leases[ $key ];
+        $parts = explode( '|', $old, 2 );
+        $value = time() . '|' . $parts[1];
+        $changed = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s",
+            $value, $key, $old
+        ) );
+        if ( ! $changed ) {
+            $held = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $key ) );
+            if ( $held !== $value ) throw new ISXM_Lease_Lost( 'Runner lease belongs to another worker.' );
+        }
+        self::$leases[ $key ] = $value;
+        wp_cache_delete( $key, 'options' );
+    }
+
+    public static function runner_lock_age() {
+        global $wpdb;
+        $value = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::RUNNER_LOCK ) );
+        return $value === null ? null : max( 0, time() - (int) $value );
     }
 
     /**
@@ -954,7 +1035,9 @@ class ISXM_Background {
     private static function release( $key ) {
         global $wpdb;
 
-        $wpdb->delete( $wpdb->options, [ 'option_name' => $key ] );
+        if ( ! isset( self::$leases[ $key ] ) ) return;
+        $wpdb->delete( $wpdb->options, [ 'option_name' => $key, 'option_value' => self::$leases[ $key ] ] );
+        unset( self::$leases[ $key ] );
         wp_cache_delete( $key, 'options' );
     }
 
@@ -964,7 +1047,7 @@ class ISXM_Background {
      *
      * @return bool
      */
-    private static function memory_exceeded() {
+    public static function memory_exceeded() {
         $limit = self::memory_limit();
         if ( $limit <= 0 ) {
             return false;

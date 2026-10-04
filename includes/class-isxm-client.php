@@ -592,6 +592,7 @@ class ISXM_Client {
      * @return array|WP_Error wp_remote_request()-shaped result.
      */
     private function request( $method, $key, array $args = [] ) {
+        ISXM_Background::renew_runner_lock();
         $body      = isset( $args['body'] ) ? $args['body'] : '';
         $body_file = isset( $args['body_file'] ) ? $args['body_file'] : '';
         $stream_to = isset( $args['stream_to'] ) ? $args['stream_to'] : '';

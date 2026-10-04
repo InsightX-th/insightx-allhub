@@ -90,7 +90,9 @@ class ISXM_Admin {
                 // A run whose driver went quiet (loopback killed, PHP fatal,
                 // server restart). Nothing is lost — the cursor is in the
                 // database and the healthcheck picks it back up.
-                'stalled'       => __( 'Stalled — resuming automatically', 'insightx-offload' ),
+                'stalled'       => __( 'Stalled — waiting for a worker', 'insightx-offload' ),
+                'workerWaiting' => __( 'Stalled — waiting for the current worker lease', 'insightx-offload' ),
+                'restartSent'   => __( 'Stalled — restart request sent', 'insightx-offload' ),
                 'resume'        => __( 'Resume', 'insightx-offload' ),
                 'connecting'    => __( 'Connecting…', 'insightx-offload' ),
                 'retrying'      => __( 'Connection hiccup — retrying', 'insightx-offload' ),

@@ -692,7 +692,7 @@
     const statusLabel = done
       ? cfg.i18n.done
       : job.stalled
-        ? cfg.i18n.stalled
+        ? (job.worker_waiting ? cfg.i18n.workerWaiting : job.restart_sent ? cfg.i18n.restartSent : cfg.i18n.stalled)
         : job.state === "paused"
           ? cfg.i18n.stopped
           : job.state === "error"
@@ -945,10 +945,10 @@
       running && (!loopbackOk || Object.keys(jobs).some((t) => jobs[t].stalled));
 
     jobRequestInFlight = true;
-    $.post(cfg.ajaxUrl, {
+    $.ajax({ url: cfg.ajaxUrl, method: "POST", timeout: needsDriving ? 130000 : 30000, data: {
       action: needsDriving ? "isxs_job_tick" : "isxs_job_status",
       nonce: cfg.nonce,
-    })
+    } })
       .done((res) => {
         pollFailures = 0;
         applyJobPayload(res);

@@ -83,8 +83,14 @@ msgid "Cancel this job?\n\nWork already done stays intact, but the saved checkpo
 msgstr "ยกเลิกงานนี้?\n\nงานที่ทำไปแล้วยังอยู่ครบ แต่จุดที่ค้างไว้จะถูกลบ — เริ่มใหม่ครั้งหน้าจะไล่หาตั้งแต่ต้น"
 
 #: includes/class-isxm-admin.php:93
-msgid "Stalled — resuming automatically"
-msgstr "สะดุด — กำลังเริ่มทำต่อให้อัตโนมัติ"
+msgid "Stalled — waiting for a worker"
+msgstr "สะดุด — กำลังรอตัวประมวลผลงาน"
+
+msgid "Stalled — waiting for the current worker lease"
+msgstr "สะดุด — กำลังรอตัวประมวลผลเดิมปล่อยสิทธิ์ทำงาน"
+
+msgid "Stalled — restart request sent"
+msgstr "สะดุด — ส่งคำขอเริ่มทำต่อแล้ว"
 
 #: includes/class-isxm-admin.php:94
 msgid "Resume"

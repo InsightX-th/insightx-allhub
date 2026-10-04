@@ -21,8 +21,12 @@ jobs:
       - name: Build zip
         run: git archive --format=zip --prefix=insightx-offload/ -o "insightx-offload-${GITHUB_REF_NAME}.zip" "${GITHUB_REF_NAME}"
 
+      - name: Prepare release notes
+        run: awk '/^\*\*\[?[0-9]/ { if (seen++) exit } { print }' CHANGELOG.md > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: insightx-offload-${{ github.ref_name }}.zip
           name: 'insightx-offload ${{ github.ref_name }}'
+          body_path: release-notes.md

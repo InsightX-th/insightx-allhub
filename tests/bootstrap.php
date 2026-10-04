@@ -158,7 +158,11 @@ function is_serialized( $data, $strict = true ) {
 function get_option( $key, $default = false ) {
 	return array_key_exists( $key, $GLOBALS['isxm_t']['options'] ) ? $GLOBALS['isxm_t']['options'][ $key ] : $default;
 }
-function update_option( $key, $value, $autoload = null ) { $GLOBALS['isxm_t']['options'][ $key ] = $value; return true; }
+function update_option( $key, $value, $autoload = null ) {
+    $GLOBALS['isxm_t']['options'][ $key ] = $value;
+    if ( isset( $GLOBALS['isxm_t']['on_option_write'] ) ) call_user_func( $GLOBALS['isxm_t']['on_option_write'], $key, $value );
+    return true;
+}
 function delete_option( $key ) { unset( $GLOBALS['isxm_t']['options'][ $key ] ); return true; }
 function get_transient( $key ) { return get_option( '_transient_' . $key ); }
 function set_transient( $key, $value ) { return update_option( '_transient_' . $key, $value ); }
@@ -174,6 +178,7 @@ function isxm_test_add_post( $id, array $fields ) {
 function get_post( $id ) { return isset( $GLOBALS['isxm_t']['posts'][ $id ] ) ? $GLOBALS['isxm_t']['posts'][ $id ] : null; }
 function get_post_mime_type( $id ) { $p = get_post( $id ); return $p ? $p->post_mime_type : false; }
 function get_post_meta( $id, $key, $single = false ) {
+    if ( isset( $GLOBALS['isxm_t']['meta_provider'] ) ) return call_user_func( $GLOBALS['isxm_t']['meta_provider'], $id, $key );
 	return isset( $GLOBALS['isxm_t']['meta'][ $id ][ $key ] ) ? $GLOBALS['isxm_t']['meta'][ $id ][ $key ] : '';
 }
 function update_post_meta( $id, $key, $value ) { $GLOBALS['isxm_t']['meta'][ $id ][ $key ] = $value; return true; }
@@ -186,6 +191,7 @@ function isxm_test_queue_response( $code, $body = '' ) {
 	$GLOBALS['isxm_t']['responses'][] = array( 'response' => array( 'code' => $code ), 'body' => $body );
 }
 function wp_remote_request( $url, $args = array() ) {
+    if ( isset( $GLOBALS['isxm_t']['http_provider'] ) ) return call_user_func( $GLOBALS['isxm_t']['http_provider'], $url, $args );
 	$GLOBALS['isxm_t']['http'][] = array( 'url' => $url, 'args' => $args );
 	$response = empty( $GLOBALS['isxm_t']['responses'] )
 		? array( 'response' => array( 'code' => 200 ), 'body' => '' )
@@ -202,6 +208,7 @@ function wp_remote_retrieve_body( $r ) { return is_array( $r ) ? (string) $r['bo
 
 // ---------- $wpdb (only what loading/record writes touch) ----------
 class ISXM_Test_WPDB {
+    public $last_error = '';
 	public $prefix   = 'wp_';
 	public $posts    = 'wp_posts';
 	public $postmeta = 'wp_postmeta';
@@ -223,7 +230,7 @@ define( 'ISXM_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 function isxm_log_error( $message ) {}
 foreach ( array(
 	'crypto', 'connections', 'settings', 'client', 'db-rewriter', 'offload', 'migrate',
-	'sync', 'items', 'job', 'tools', 'assets', 'wc-downloads', 'background',
+	'sync', 'items', 'job', 'tools', 'assets', 'wc-downloads', 'background', 'migrate-queue',
 ) as $isxm_class ) {
 	require_once ISXM_PLUGIN_DIR . 'includes/class-isxm-' . $isxm_class . '.php';
 }

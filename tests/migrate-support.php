@@ -1,0 +1,102 @@
+<?php
+/** Real bounded SQL windows in SQLite, WordPress/storage boundaries faked. */
+class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
+    public $db;
+    public $queries = 0;
+    public $fail_read = false;
+    public $fail_write = false;
+    public $fail_guid = false;
+    public $max_rows = 0;
+    public function __construct() {
+        $this->db = new PDO( 'sqlite::memory:' );
+        $this->db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
+        $this->db->exec( 'CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT)' );
+        $this->db->exec( 'CREATE TABLE wp_postmeta (meta_id INTEGER PRIMARY KEY, post_id INTEGER, meta_key TEXT, meta_value TEXT)' );
+        $this->db->exec( 'CREATE INDEX attached_files ON wp_postmeta(meta_key,meta_value)' );
+        $this->db->exec( 'CREATE TABLE wp_options (option_id INTEGER PRIMARY KEY, option_name TEXT UNIQUE, option_value TEXT, autoload TEXT)' );
+    }
+    public function prepare( $sql, ...$args ) {
+        if ( isset( $args[0] ) && is_array( $args[0] ) ) $args = $args[0];
+        return preg_replace_callback( '/%[sdf]/', function ( $m ) use ( &$args ) {
+            $v = array_shift( $args );
+            return $m[0] === '%s' ? $this->db->quote( (string) $v ) : (string) (int) $v;
+        }, $sql );
+    }
+    public function get_results( $sql = '' ) {
+        $this->queries++;
+        $this->last_error = '';
+        if ( $this->fail_read ) { $this->last_error = 'injected read failure'; return null; }
+        $rows = $this->db->query( $sql )->fetchAll( PDO::FETCH_OBJ );
+        $this->max_rows = max( $this->max_rows, count( $rows ) );
+        return $rows;
+    }
+    public function get_var( $sql ) {
+        $this->last_error = '';
+        if ( strpos( $sql, 'SHOW ' ) === 0 ) return null;
+        $value = $this->db->query( $sql )->fetchColumn();
+        return $value === false ? null : $value;
+    }
+    public function query( $sql ) {
+        $this->last_error = '';
+        return $this->db->exec( str_replace( 'INSERT IGNORE', 'INSERT OR IGNORE', $sql ) );
+    }
+    public function update( $table, $data, $where ) {
+        $this->last_error = '';
+        if ( $this->fail_write || ( $this->fail_guid && isset( $data['guid'] ) ) ) { $this->last_error = 'injected write failure'; return false; }
+        $set = []; $conditions = [];
+        foreach ( $data as $k => $v ) $set[] = $k . '=' . $this->db->quote( (string) $v );
+        foreach ( $where as $k => $v ) $conditions[] = $k . '=' . $this->db->quote( (string) $v );
+        return $this->db->exec( 'UPDATE ' . $table . ' SET ' . implode( ',', $set ) . ' WHERE ' . implode( ' AND ', $conditions ) );
+    }
+    public function delete( $table, $where ) {
+        $conditions = [];
+        foreach ( $where as $k => $v ) $conditions[] = $k . '=' . $this->db->quote( (string) $v );
+        return $this->db->exec( 'DELETE FROM ' . $table . ' WHERE ' . implode( ' AND ', $conditions ) );
+    }
+}
+function clean_post_cache( $id ) {
+    $GLOBALS['isxm_t']['purged_posts'][] = $id;
+    // Core cache invalidation may query the post and clear the last SQL error.
+    $GLOBALS['wpdb']->last_error = '';
+}
+function wp_cache_get( $key, $group = '' ) { return false; }
+function wp_remote_post( $url, $args ) { return wp_remote_request( $url, $args ); }
+function admin_url( $path ) { return 'https://example.com/wp-admin/' . $path; }
+function wp_next_scheduled( $hook ) { return false; }
+function wp_schedule_event() { return true; }
+function wp_clear_scheduled_hook() {}
+
+function migration_fixture( $count = 3, $persist = true ) {
+    isxm_test_reset();
+    ISXM_Offload::clear_pending_deletions();
+    $GLOBALS['wpdb'] = new ISXM_Migration_Test_DB();
+    isxm_test_configure( [], [ 'source_provider' => 'custom', 'source_prefix' => '', 'source_use_year_month' => false,
+        'use_prefix' => false, 'use_year_month' => false, 'persist_urls' => $persist, 'remove_local' => true, 'deliver_enabled' => true ] );
+    for ( $id = 1; $id <= $count; $id++ ) {
+        isxm_test_add_post( $id, [] );
+        update_post_meta( $id, '_wp_attached_file', 'm' . $id . '.jpg' );
+        update_post_meta( $id, ISXM_Offload::META_KEY, [ 'bucket' => 'media', 'endpoint' => 'https://s3.example.test',
+            'base_key' => '', 'files' => [ 'm' . $id . '.jpg' ] ] );
+        $GLOBALS['wpdb']->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES ($id,'_wp_attached_file','m$id.jpg')" );
+    }
+    $GLOBALS['isxm_t']['http_provider'] = function ( $url ) use ( $count ) {
+        parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q );
+        $keys = isset( $q['prefix'] ) && $q['prefix'] !== '' ? [ $q['prefix'] ] : array_map( function ( $id ) { return 'm' . $id . '.jpg'; }, range( 1, $count ) );
+        return migration_listing( $keys );
+    };
+    return ISXM_Job::start( 'migrate', $count, 'run|' );
+}
+function migration_listing( array $keys, $next = '' ) {
+    $xml = '<ListBucketResult><IsTruncated>' . ( $next === '' ? 'false' : 'true' ) . '</IsTruncated>';
+    foreach ( $keys as $key ) $xml .= '<Contents><Key>' . htmlspecialchars( $key, ENT_XML1 ) . '</Key></Contents>';
+    if ( $next !== '' ) $xml .= '<NextContinuationToken>' . htmlspecialchars( $next, ENT_XML1 ) . '</NextContinuationToken>';
+    return [ 'response' => [ 'code' => 200 ], 'body' => $xml . '</ListBucketResult>' ];
+}
+function migration_step( $budget = 15 ) { return ISXM_Migrate_Queue::step( ISXM_Job::get( 'migrate' ), $budget ); }
+function migration_drain( $max = 100 ) {
+    for ( $i = 0; $i < $max; $i++ ) {
+        $result = migration_step();
+        if ( is_wp_error( $result ) || $result['done'] ) return $result;
+    }
+    throw new RuntimeException( 'Migration did not settle.' );
+}

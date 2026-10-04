@@ -136,10 +136,9 @@ class ISXM_Sync {
         $client = ISXM_Offload::client_for_info( $info );
         $token  = '';
         do {
-            // A bucket-root record has an empty base_key, so this degrades
-            // to an unprefixed listing. Correct, but it walks the whole
-            // bucket — keep an eye on it if root objects become common.
-            $page = $client->list_objects_keys_page( $token, 1000, $info['base_key'] );
+            // Prefix by the full primary key, not its directory. Otherwise
+            // each verified item can walk an entire 500k-object bucket.
+            $page = $client->list_objects_keys_page( $token, 1000, $primary );
             if ( is_wp_error( $page ) ) {
                 return false;
             }

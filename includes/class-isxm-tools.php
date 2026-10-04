@@ -2395,6 +2395,11 @@ class ISXM_Tools {
             ];
         }
 
+        $job = ISXM_Job::get( 'migrate' );
+        if ( $job && $job->state === ISXM_Job::STATE_RUNNING ) {
+            return ISXM_Migrate_Queue::step( $job, self::time_budget() );
+        }
+
         $result = $this->run_migrate_batch( $token, true );
 
         if ( ! empty( $result['stalled'] ) ) {
@@ -2555,6 +2560,7 @@ class ISXM_Tools {
             'Loopback: ' . ( get_transient( 'isxs_bg_loopback' ) === 'no' ? 'unavailable (browser-driven fallback)' : ( get_transient( 'isxs_bg_loopback' ) === 'yes' ? 'available' : '(not checked yet)' ) ),
             'Healthcheck cron: ' . ( wp_next_scheduled( ISXM_Background::CRON_HOOK ) ? gmdate( 'Y-m-d H:i:s', wp_next_scheduled( ISXM_Background::CRON_HOOK ) ) . ' UTC' : '(not scheduled)' ),
             'Runner lock: ' . ( ISXM_Background::runner_lock_held() ? 'held' : 'free' ),
+            'Runner lease age: ' . ( ISXM_Background::runner_lock_age() === null ? '(none)' : ISXM_Background::runner_lock_age() . ' seconds' ),
             'Tracking ledger: ' . ( ISXM_Items::ready()
                 ? 'active (indexed table)'
                 : sprintf( 'not built — using postmeta path, %d legacy records to copy (wp isxm backfill)', ISXM_Items::count_legacy_records() ) ),
@@ -2572,6 +2578,13 @@ class ISXM_Tools {
                 gmdate( 'Y-m-d H:i:s', (int) $job->updated ),
                 $job->error_count > 0 ? sprintf( ', %d errors', $job->error_count ) : ''
             );
+            if ( $job->activity ) {
+                $lines[] = sprintf( '    stage=%s, attachment=%d, durable=%d, provisional=%d, restarts=%d, last progress=%s UTC, rewrite=%s',
+                    $job->activity['stage'] ?? '', (int) ( $job->activity['attachment'] ?? 0 ),
+                    $job->processed, $job->batch_progress, (int) ( $job->activity['restarts'] ?? 0 ),
+                    gmdate( 'Y-m-d H:i:s', (int) ( $job->activity['last_progress'] ?? $job->updated ) ),
+                    wp_json_encode( $job->migration['rewrite'] ?? [] ) );
+            }
         }
         if ( ! ISXM_Job::all() ) {
             $lines[] = '  (no runs recorded)';

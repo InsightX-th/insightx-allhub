@@ -130,6 +130,11 @@ class ISXM_Job {
      *  pause (the list is cleared on resume). */
     public $batch_rates;
 
+    /** Durable, bounded migration page + pending rewrite, owned by this run. */
+    public $migration;
+    /** Small diagnostic record; never contains credentials or URL maps. */
+    public $activity;
+
     private function __construct( array $data ) {
         $this->tool           = isset( $data['tool'] ) ? (string) $data['tool'] : '';
         $this->run_id         = isset( $data['run_id'] ) ? (string) $data['run_id'] : '';
@@ -152,6 +157,8 @@ class ISXM_Job {
             ? array_values( array_filter( $data['batch_rates'], 'is_numeric' ) )
             : [];
         $this->batch_rates = array_slice( $rates, -self::MAX_BATCH_SAMPLES );
+        $this->migration = isset( $data['migration'] ) && is_array( $data['migration'] ) ? $data['migration'] : [];
+        $this->activity = isset( $data['activity'] ) && is_array( $data['activity'] ) ? $data['activity'] : [];
     }
 
     /**
@@ -384,6 +391,8 @@ class ISXM_Job {
             'updated'        => $this->updated,
             'message'        => $this->message,
             'batch_rates'    => $this->batch_rates,
+            'migration'      => $this->migration,
+            'activity'       => $this->activity,
         ];
     }
 

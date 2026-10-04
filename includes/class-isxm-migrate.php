@@ -192,6 +192,9 @@ class ISXM_Migrate {
              WHERE meta_key = '_wp_attached_file' AND meta_value IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array
             $candidates
         ) );
+        if ( $wpdb->last_error ) {
+            return new WP_Error( 'isxs_source_resolve', 'Could not resolve source files in the database; checkpoint retained.' );
+        }
 
         $by_candidate = [];
         foreach ( $rows as $row ) {

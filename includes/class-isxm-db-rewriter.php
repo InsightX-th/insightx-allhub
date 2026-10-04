@@ -83,6 +83,72 @@ class ISXM_DB_Rewriter {
     }
 
     /**
+     * Rewrite one primary-key window for a durable migration batch.
+     * Cursor is {table: 0..3, after: row ID}; callers persist it only on success.
+     * @return array{cursor:array,done:bool}|WP_Error
+     */
+    public static function replace_urls_window( array $pairs, array $cursor, $deadline = 0 ) {
+        global $wpdb;
+        $tables = [
+            [ $wpdb->posts, 'ID', 'post_content', 'ID', 'posts' ],
+            [ $wpdb->postmeta, 'meta_id', 'meta_value', 'post_id', 'postmeta' ],
+            [ $wpdb->options, 'option_id', 'option_value', 'option_name', 'options' ],
+        ];
+        $index = (int) $cursor['table'];
+        if ( $index >= count( $tables ) ) return [ 'cursor' => $cursor, 'done' => true ];
+        list( $table, $id, $value, $ref, $kind ) = $tables[ $index ];
+        ISXM_Background::renew_runner_lock();
+        // Bound the PRIMARY KEY range first. A LIKE ... LIMIT still scans
+        // millions of non-matching rows before it finds its next window.
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT {$id} AS id, {$value} AS val, {$ref} AS ref FROM {$table} WHERE {$id} > %d ORDER BY {$id} ASC LIMIT %d",
+            (int) $cursor['after'], ISXM_Tools::REWRITE_WINDOW
+        ) );
+        if ( $wpdb->last_error ) return new WP_Error( 'isxs_rewrite_read', 'Could not read the next URL rewrite window; checkpoint retained.' );
+        $map = self::pairs_to_map( $pairs );
+        $replay_map = array_fill_keys( array_values( $map ), '' );
+        $probes = [];
+        foreach ( array_merge( array_keys( $map ), array_values( $map ) ) as $url ) {
+            $probes[ substr( $url, 0, 12 ) ] = true;
+        }
+        foreach ( $rows as $row ) {
+            if ( ( $deadline && microtime( true ) >= $deadline ) || ISXM_Background::memory_exceeded() ) {
+                return [ 'cursor' => $cursor, 'done' => false ];
+            }
+            // Never rewrite our own settings, checkpoints, logs or cached
+            // state: these intentionally still contain the SOURCE URL map.
+            $internal = $kind === 'options' && preg_match( '/^(isxs_|isxm_|_transient_|_site_transient_)/', $row->ref );
+            $candidate = false;
+            if ( ! $internal ) {
+                foreach ( $probes as $probe => $unused ) {
+                    if ( strpos( $row->val, (string) $probe ) !== false ) { $candidate = true; break; }
+                }
+            }
+            if ( ! $candidate ) { $cursor['after'] = (int) $row->id; continue; }
+            $replaced = $internal ? $row->val : self::recursive_replace_pairs( $row->val, $map );
+            if ( $replaced !== $row->val ) {
+                ISXM_Background::renew_runner_lock();
+                // Do not overwrite an editor's concurrent change. Retry the
+                // same window against fresh values if the comparison fails.
+                $written = $wpdb->update( $table, [ $value => $replaced ], [ $id => $row->id, $value => $row->val ] );
+                if ( $written === false || $written === 0 ) {
+                    return new WP_Error( 'isxs_rewrite_write', 'A URL rewrite could not be committed; checkpoint retained for retry.' );
+                }
+            }
+            // Invalidate changed/replayed rows only. Purging every unrelated
+            // post causes another get_post query plus cache hooks per row.
+            if ( ! $internal && ( $replaced !== $row->val || strtr( $row->val, $replay_map ) !== $row->val ) ) {
+                self::purge_cache( $kind, [ $row->ref ] );
+            }
+            $cursor['after'] = (int) $row->id;
+        }
+        if ( count( $rows ) < ISXM_Tools::REWRITE_WINDOW ) {
+            $cursor = [ 'table' => $index + 1, 'after' => 0 ];
+        }
+        return [ 'cursor' => $cursor, 'done' => $cursor['table'] >= count( $tables ) ];
+    }
+
+    /**
      * One LIKE pattern that matches every row of a table whose value could
      * hold a local upload URL of THIS site, in either scheme — the broad
      * probe the one-pass rewrite pages through.
@@ -222,7 +288,7 @@ class ISXM_DB_Rewriter {
      *
      * @param int   $attachment_id Attachment post ID.
      * @param array $url_pairs     List of [ 'old' => string, 'new' => string ].
-     * @return int 1 when the guid was rewritten, 0 otherwise.
+     * @return int|WP_Error 1 when rewritten, 0 when unchanged, error on failed SQL.
      */
     public static function update_attachment_guid( $attachment_id, array $url_pairs ) {
         global $wpdb;
@@ -233,10 +299,15 @@ class ISXM_DB_Rewriter {
         }
 
         $current = $wpdb->get_var( $wpdb->prepare( "SELECT guid FROM {$wpdb->posts} WHERE ID = %d", $attachment_id ) );
+        if ( $wpdb->last_error ) return new WP_Error( 'isxs_guid_read', 'Could not read the attachment GUID; checkpoint retained.' );
         if ( $current === null || ! isset( $map[ $current ] ) ) {
+            // Replay after UPDATE succeeded but the request died before
+            // cache invalidation must clear the stale post as well.
+            if ( in_array( $current, $map, true ) ) clean_post_cache( (int) $attachment_id );
             return 0;
         }
-        $wpdb->update( $wpdb->posts, [ 'guid' => $map[ $current ] ], [ 'ID' => $attachment_id ] );
+        $written = $wpdb->update( $wpdb->posts, [ 'guid' => $map[ $current ] ], [ 'ID' => $attachment_id, 'guid' => $current ] );
+        if ( $written === false || $written === 0 ) return new WP_Error( 'isxs_guid_write', 'Could not update the attachment GUID; checkpoint retained.' );
         // Writing straight to the table leaves the cached post object holding
         // the old guid — on a site with a persistent object cache (Redis/
         // Memcached) that stale copy is what everything reads until the cache

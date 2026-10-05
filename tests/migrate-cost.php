@@ -63,8 +63,11 @@ $GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( $total, $si
     return $kind === 'LIST-probe' ? migration_listing( [] ) : cost_listing_page( (int) ( $q['continuation-token'] ?? 0 ), $total, $six );
 };
 $job_writes = 0; $job_bytes = 0;
+$GLOBALS['page_items'] = 0;
 $GLOBALS['isxm_t']['on_option_write'] = function ( $key, $value ) use ( &$job_writes, &$job_bytes ) {
     if ( $key !== 'isxs_job_migrate' ) return;
+    // Attachments on the page being transferred (the step may finish it at once).
+    $GLOBALS['page_items'] = max( $GLOBALS['page_items'], count( $value['migration']['items'] ?? [] ) );
     $job_writes++; $job_bytes += strlen( serialize( $value ) );
 };
 
@@ -93,14 +96,14 @@ function cost_transfer_page( $offset ) {
     $job->cursor = 'run|' . ( $offset ? (string) $offset : '' );
     $job->save();
     $http = []; $job_writes = 0; $job_bytes = 0; $q0 = $GLOBALS['wpdb']->queries; $p0 = $job->processed; $f0 = fixture_calls();
-    $started = microtime( true ); $steps = 0; $n = 1;
+    $started = microtime( true ); $steps = 0; $GLOBALS['page_items'] = 0;
     do {
         $r = ISXM_Migrate_Queue::step( ISXM_Job::get( 'migrate' ) ); $steps++;
         if ( is_wp_error( $r ) ) throw new RuntimeException( $r->get_error_message() );
         $m = ISXM_Job::get( 'migrate' )->migration;
-        if ( $steps === 1 && isset( $m['items'] ) ) $n = count( $m['items'] );
     } while ( isset( $m['items'] ) && $steps < 100 );
     $job = ISXM_Job::get( 'migrate' );
+    $n = max( 1, $GLOBALS['page_items'] );
     $f1 = fixture_calls();
     foreach ( [ 'GET', 'PUT' ] as $m ) $http[ $m ] = ( $f1[ $m ] ?? 0 ) - ( $f0[ $m ] ?? 0 );
     $objects = $job->processed - $p0;
@@ -128,12 +131,30 @@ t( 'Per-attachment SQL does not grow with position', $last['sql'] <= $first['sql
 t( 'Job checkpoint size does not grow with position', $last['bytes'] <= $first['bytes'] * 1.1 );
 t( 'Fresh destination is not probed per file before uploading', $first['probe'] < 1, sprintf( '%.1f probes', $first['probe'] ) );
 
+// A worker that died after the prefetch but before any commit: the resumed
+// page must reuse the staged downloads and upload receipts, not resend.
+$mid = 200 * 1000;
+$page = ISXM_Migrate::scan_source_batch( (string) $mid, true );
+$entries = [];
+foreach ( $page['items'] as $id => $keys ) $entries[] = [ 'id' => $id, 'keys' => $keys ];
+$f0 = fixture_calls();
+ISXM_Migrate::prefetch( array_slice( $entries, 0, 4 ), ISXM_Job::get( 'migrate' )->run_id );
+$f1 = fixture_calls();
+$sent = ( $f1['PUT'] ?? 0 ) - ( $f0['PUT'] ?? 0 );
+$replay = cost_transfer_page( $mid );
+t( 'Prefetch sent the first 4 attachments\' files', $sent > 0, (string) $sent );
+$stats = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), true );
+$twice = array_keys( array_filter( $stats['calls'], function ( $n, $k ) { return $n > 1 && strpos( $k, 'PUT ' ) === 0; }, ARRAY_FILTER_USE_BOTH ) );
+t( 'Resume after a crash post-prefetch never uploads an object twice', ! $twice && $replay['errors'] === 0, json_encode( array_slice( $twice, 0, 5 ) ) );
+t( 'Several attachments in flight at once (peak > 4)', $stats['peak'] > 4, (string) $stats['peak'] );
+t( 'Every request correctly signed', $stats['invalid'] === 0 );
+
 // Fixture answers every GET/PUT in 120 ms, a fair stand-in for a
 // cross-region S3. Projection assumes one continuous runner.
 $hours = ( $first['ms'] + $last['ms'] ) / 2 / 1000 * $attachments / 3600;
 printf( "  projection: %.1f h for %s attachments with a continuous runner; %.0f h with the old 25s-on / 300s-stall gap\n",
     $hours, number_format( $attachments ), $hours * 325 / 25 );
-t( 'Continuous migration projects under 24 hours', $hours < 24, sprintf( '%.1f h', $hours ) );
+t( 'Continuous migration projects under 8 hours (attachments transfer in parallel)', $hours < 8, sprintf( '%.1f h', $hours ) );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

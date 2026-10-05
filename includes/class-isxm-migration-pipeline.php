@@ -41,7 +41,14 @@ class ISXM_Migration_Pipeline {
                 $m['unmatched'] = $page['scanned_keys'] - $matched;
                 self::save( $job );
             }
+            $group = max( 1, (int) apply_filters( 'isxm_migrate_parallel_items', 4 ) ); $prefetched = $m['index'];
             while ( $m['index'] < count( $m['items'] ) && ! self::stop( $job, $deadline ) ) {
+                // Move the next few attachments' bytes together; each is still
+                // committed and checkpointed on its own below.
+                if ( $m['index'] >= $prefetched ) {
+                    ISXM_Migrate::prefetch( array_slice( $m['items'], $m['index'], $group ), $job->run_id );
+                    $prefetched = $m['index'] + $group;
+                }
                 $entry = $m['items'][ $m['index'] ]; $id = $entry['id'];
                 $job->activity['attachment'] = $id;
                 self::save( $job, false );

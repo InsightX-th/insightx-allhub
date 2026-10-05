@@ -247,8 +247,13 @@ class ISXM_Migrate {
      *                             ISXM_DB_Rewriter::replace_urls_bulk().
      * @return true|WP_Error
      */
-    /** Private staging keeps downloads separate from pre-existing local media. */
-    public static function migrate_staged( $id, array $keys, $run ) {
+    /**
+     * Where each of an attachment's files will come from: the existing local
+     * copy, or a download into this run's private staging dir.
+     *
+     * @return array{dir:string,local:string,primary:string,paths:array<string,string>,downloads:array}|WP_Error
+     */
+    public static function plan_staged( $id, array $keys, $run ) {
         $local = ISXM_Offload::local_path( $id );
         if ( $local === '' ) return new WP_Error( 'isxs_no_path', 'Unknown attachment path.' );
         $uploads = wp_get_upload_dir();
@@ -269,7 +274,63 @@ class ISXM_Migrate {
             if ( ! is_file( $paths[ $name ] ) ) $downloads[ $name ] = [ 'key' => $key, 'path' => $paths[ $name ] ];
         }
         if ( is_file( $local ) ) $paths[ $primary ] = $local;
-        foreach ( self::source_client()->transfer_many( 'GET', $downloads ) as $result ) if ( is_wp_error( $result ) ) return $result;
+        return [ 'dir' => $dir, 'local' => $local, 'primary' => $primary, 'paths' => $paths, 'downloads' => $downloads ];
+    }
+
+    /**
+     * Fetch and upload the files of several attachments at once, ahead of
+     * their one-by-one commit. Attachments are otherwise moved strictly in
+     * sequence, so a run spent most of its time waiting on round trips with
+     * only one item's handful of files in flight.
+     *
+     * Nothing is committed here. migrate_staged() then finds the downloads
+     * already staged and offload_attachment() finds an upload receipt for
+     * every object, so each item's own pass only writes its record — and a
+     * crash anywhere in between just repeats skipped work. Failures are
+     * left for that pass to retry and report.
+     *
+     * @param array  $entries [ [ 'id' => int, 'keys' => [ key => filename ] ], … ]
+     * @param string $run     Job run id (owns the staging dirs).
+     */
+    public static function prefetch( array $entries, $run ) {
+        $per = (int) apply_filters( 'isxm_migrate_concurrency', 4 );
+        if ( $per <= 1 || count( $entries ) < 2 ) return; // parallel transfers switched off
+        $s = ISXM_Settings::all();
+        $plans = []; $gets = [];
+        foreach ( $entries as $entry ) {
+            $id   = (int) $entry['id'];
+            $info = ISXM_Offload::get_record( $id );
+            // Items already on this destination take transfer()'s verified path.
+            if ( ISXM_Offload::is_protected_download( $id ) || ( is_array( $info ) && ( $info['bucket'] ?? '' ) === $s['bucket'] && ( $info['endpoint'] ?? '' ) === $s['endpoint'] ) ) continue;
+            $plan = self::plan_staged( $id, $entry['keys'], $run );
+            if ( is_wp_error( $plan ) ) continue;
+            $plans[ $id ] = [ $plan, $info ];
+            foreach ( $plan['downloads'] as $name => $download ) $gets[ $id . '|' . $name ] = $download;
+        }
+        $limit = min( 16, $per * count( $entries ) );
+        if ( $gets ) self::source_client()->transfer_many( 'GET', $gets, $limit );
+        $puts = [];
+        foreach ( $plans as $id => list( $plan, $info ) ) {
+            $relative = ISXM_Offload::relative_local_path( $id );
+            if ( $relative === null ) continue;
+            // The same keys offload_attachment() will compute for this item.
+            $destination = ISXM_Offload::destination_key( $id, $relative, $info, $plan['dir'] );
+            foreach ( $plan['paths'] as $name => $path ) {
+                if ( ! is_file( $path ) ) continue;
+                $type = wp_check_filetype( $name );
+                $puts[ $id . '|' . $name ] = [ 'key' => $destination['base_key'] . $name, 'path' => $path,
+                    'mime' => $type['type'] ?: 'application/octet-stream', 'acl' => ! empty( $s['send_public_acl'] ), 'receipt_dir' => $plan['dir'] ];
+            }
+        }
+        if ( $puts ) ( new ISXM_Client() )->transfer_many( 'PUT', $puts, $limit );
+    }
+
+    /** Private staging keeps downloads separate from pre-existing local media. */
+    public static function migrate_staged( $id, array $keys, $run ) {
+        $plan = self::plan_staged( $id, $keys, $run );
+        if ( is_wp_error( $plan ) ) return $plan;
+        $dir = $plan['dir']; $paths = $plan['paths'];
+        foreach ( self::source_client()->transfer_many( 'GET', $plan['downloads'] ) as $result ) if ( is_wp_error( $result ) ) return $result;
         $result = ( new ISXM_Offload() )->offload_attachment( $id, wp_get_attachment_metadata( $id ), true, 'migrate', $paths, $dir );
         ISXM_Offload::clear_pending_deletions();
         if ( is_wp_error( $result ) ) return $result;

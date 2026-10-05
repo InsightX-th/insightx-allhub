@@ -121,12 +121,16 @@ class ISXM_Client {
      *                     '' when no job owns the call (an upload request).
      */
     public function transfer_many( $method, array $files, $concurrency = null, $receipt_dir = '', $tool = 'migrate' ) {
-        $limit = max( 1, min( 4, (int) ( $concurrency ?? apply_filters( 'isxm_migrate_concurrency', 4 ) ) ) );
+        $limit = max( 1, min( 16, (int) ( $concurrency ?? apply_filters( 'isxm_migrate_concurrency', 4 ) ) ) );
         $results = []; $receipts = [];
-        if ( $method === 'PUT' && $receipt_dir !== '' ) {
+        if ( $method === 'PUT' ) {
             foreach ( $files as $id => $file ) {
+                // A file may name its own receipt dir: one batch can then
+                // carry several attachments, each with its own staging dir.
+                $dir = $file['receipt_dir'] ?? $receipt_dir;
+                if ( $dir === '' ) continue;
                 $fingerprint = hash( 'sha256', $this->endpoint . '|' . $this->bucket . '|' . $file['key'] . '|' . hash_file( 'sha256', $file['path'] ) );
-                $receipts[ $id ] = $receipt_dir . $fingerprint . '.uploaded';
+                $receipts[ $id ] = $dir . $fingerprint . '.uploaded';
                 if ( is_file( $receipts[ $id ] ) ) { $results[ $id ] = true; unset( $files[ $id ] ); }
             }
         }

@@ -333,6 +333,61 @@ class ISXM_Offload {
         self::$url_post_cache = [];
     }
 
+    /**
+     * Object key folder and version for one attachment's files. Shared by
+     * run_offload() and the migration prefetch, which uploads ahead of the
+     * offload and must land on exactly the same keys.
+     *
+     * @param int        $attachment_id
+     * @param string     $relative  Uploads-relative path of the primary file.
+     * @param array|null $existing  Current tracking record (its version is reused).
+     * @param string     $stage_dir Migration staging dir ('' for a normal offload):
+     *                              seeds a deterministic version so a retried
+     *                              migration reuses the objects it already sent.
+     * @return array{base_key:string,version:string}
+     */
+    public static function destination_key( $attachment_id, $relative, $existing, $stage_dir = '' ) {
+        $settings = ISXM_Settings::all();
+        $base_key = ISXM_Settings::key_prefix();
+        // Content-type folder sits between the site prefix and year/month:
+        // the prefix namespaces the whole site, while grouping by product/
+        // post has to stay OUTSIDE year/month or one product's files scatter
+        // across every month it was ever edited in. Empty when the feature is
+        // off or nothing matched — then the key is exactly what it was before.
+        $type_segment = ISXM_Settings::type_folder_segment( $attachment_id );
+        if ( $type_segment !== '' ) {
+            $base_key .= trailingslashit( $type_segment );
+        }
+        // Once a file is filed under its own content folder, year/month and
+        // version are just noise in the middle of the path — the point of the
+        // content folder is a short, readable key. They still apply to
+        // anything the content rules could NOT classify ($type_segment ===
+        // ''), where they remain the only thing keeping same-named files in
+        // different months apart.
+        $flatten = ( $type_segment !== '' );
+        if ( $settings['use_year_month'] && ! $flatten ) {
+            // From the normalised relative path, not the raw meta: a stale
+            // absolute path used to turn the whole server path into object
+            // keys (".../home/oldsite/public_html/wp-content/uploads/2017/08/").
+            $subdir = dirname( $relative );
+            if ( $subdir !== '.' && $subdir !== '' ) {
+                $base_key .= trailingslashit( $subdir );
+            }
+        }
+        if ( $settings['use_object_version'] && ! $flatten ) {
+            if ( is_array( $existing ) && ! empty( $existing['version'] ) ) {
+                $version = $existing['version'];
+            } else {
+                $version = $stage_dir !== '' ? (string) ( 10000000 + ( hexdec( substr( hash( 'sha256', $stage_dir ), 0, 7 ) ) % 90000000 ) ) : (string) wp_rand( 10000000, 99999999 );
+            }
+            $base_key .= $version . '/';
+        } else {
+            $version = '';
+        }
+
+        return [ 'base_key' => $base_key, 'version' => $version ];
+    }
+
     /** Attachment ID being offloaded from its own first upload, else 0. */
     private static $new_upload = 0;
 
@@ -408,42 +463,9 @@ class ISXM_Offload {
         // Reuse the existing object version on re-offload so URLs stay stable.
         $existing = self::get_record( $attachment_id );
 
-        $base_key = ISXM_Settings::key_prefix();
-        // Content-type folder sits between the site prefix and year/month:
-        // the prefix namespaces the whole site, while grouping by product/
-        // post has to stay OUTSIDE year/month or one product's files scatter
-        // across every month it was ever edited in. Empty when the feature is
-        // off or nothing matched — then the key is exactly what it was before.
-        $type_segment = ISXM_Settings::type_folder_segment( $attachment_id );
-        if ( $type_segment !== '' ) {
-            $base_key .= trailingslashit( $type_segment );
-        }
-        // Once a file is filed under its own content folder, year/month and
-        // version are just noise in the middle of the path — the point of the
-        // content folder is a short, readable key. They still apply to
-        // anything the content rules could NOT classify ($type_segment ===
-        // ''), where they remain the only thing keeping same-named files in
-        // different months apart.
-        $flatten = ( $type_segment !== '' );
-        if ( $settings['use_year_month'] && ! $flatten ) {
-            // From the normalised relative path, not the raw meta: a stale
-            // absolute path used to turn the whole server path into object
-            // keys (".../home/oldsite/public_html/wp-content/uploads/2017/08/").
-            $subdir = dirname( $relative );
-            if ( $subdir !== '.' && $subdir !== '' ) {
-                $base_key .= trailingslashit( $subdir );
-            }
-        }
-        if ( $settings['use_object_version'] && ! $flatten ) {
-            if ( is_array( $existing ) && ! empty( $existing['version'] ) ) {
-                $version = $existing['version'];
-            } else {
-                $version = $migration_paths ? (string) ( 10000000 + ( hexdec( substr( hash( 'sha256', $stage_dir ), 0, 7 ) ) % 90000000 ) ) : (string) wp_rand( 10000000, 99999999 );
-            }
-            $base_key .= $version . '/';
-        } else {
-            $version = '';
-        }
+        $destination = self::destination_key( $attachment_id, $relative, $existing, $migration_paths ? $stage_dir : '' );
+        $base_key    = $destination['base_key'];
+        $version     = $destination['version'];
 
         $client   = new ISXM_Client();
         $uploaded = [];

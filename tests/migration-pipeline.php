@@ -37,6 +37,17 @@ do { $w = ISXM_Migration_Store::index_window( $after, 3 ); ISXM_Migration_Store:
 t( 'Other meta keys are skipped', $windows === 4 );
 t( 'Every attachment indexed with its latest path', ISXM_Migration_Store::resolve( [ 'f1.jpg', 'f5.jpg', 'old1.jpg' ] ) === [ 'f1.jpg' => 1, 'f5.jpg' => 5 ] );
 
+group( 'A changed mapping replaces the old one instead of stopping the run' );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$old = 'https://example.com/wp-content/uploads/2025/01/x.jpg';
+ISXM_Migration_Store::put( 'conflict', 'url', $old, [ 'old' => $old, 'new' => 'https://cdn.test/11111111/x.jpg' ] );
+$id = $db->get_var( "SELECT id FROM wp_isxs_migration_work WHERE run_id='conflict'" );
+$thrown = null;
+try { ISXM_Migration_Store::put( 'conflict', 'url', $old, [ 'old' => $old, 'new' => 'https://cdn.test/22222222/x.jpg' ] ); } catch ( RuntimeException $e ) { $thrown = $e->getMessage(); }
+t( 'No exception on a changed mapping', $thrown === null, (string) $thrown );
+t( 'Newest mapping stored, row id kept', $db->get_var( "SELECT id FROM wp_isxs_migration_work WHERE run_id='conflict'" ) === $id
+    && ISXM_Migration_Store::url_map( 'conflict', $old )[ $old ] === 'https://cdn.test/22222222/x.jpg' );
+
 group( 'Indexed URL lookup forms' );
 foreach ( [ 'image.jpg', 'photo(1).jpg', 'my image.jpg', 'ภาพ.jpg' ] as $name ) {
     $old = 'https://source.test/version/' . $name; $new = 'https://dest.test/' . rawurlencode( $name );

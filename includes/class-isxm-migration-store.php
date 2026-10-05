@@ -5,6 +5,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_Migration_Store {
     const VERSION_OPTION = 'isxs_migration_schema';
 
+    /** Replaced mappings logged in this request (capped to keep the log readable). */
+    private static $replaced = 0;
+
     public static function table( $kind ) {
         global $wpdb;
         return $wpdb->prefix . ( $kind === 'paths' ? 'isxs_migration_paths' : 'isxs_migration_work' );
@@ -139,7 +142,18 @@ class ISXM_Migration_Store {
                 array_merge( [ $run, $kind ], array_keys( $expected ) )
             ) ) );
             foreach ( $rows as $row ) {
-                if ( $row->payload !== $expected[ $row->item_hash ] ) throw new RuntimeException( 'Conflicting migration mapping; checkpoint retained.' );
+                if ( $row->payload !== $expected[ $row->item_hash ] ) {
+                    // The newest intent wins: a URL that now maps elsewhere
+                    // follows the record as it is now, and a cleanup hash
+                    // follows the file now on disk (re-checked before any
+                    // delete). Throwing here stopped the whole run on the same
+                    // item at every resume.
+                    $written = $wpdb->update( $table, [ 'payload' => $expected[ $row->item_hash ] ], [ 'run_id' => $run, 'kind' => $kind, 'item_hash' => $row->item_hash ] );
+                    if ( $written === false ) throw new RuntimeException( 'Migration intent write failed; checkpoint retained.' );
+                    if ( self::$replaced++ < 20 ) {
+                        isxm_log_error( sprintf( 'Migration mapping replaced (kind=%s): was %s, now %s', $kind, mb_substr( $row->payload, 0, 300 ), mb_substr( $expected[ $row->item_hash ], 0, 300 ) ) );
+                    }
+                }
                 unset( $expected[ $row->item_hash ] );
             }
             if ( $expected ) throw new RuntimeException( 'Migration intent write failed; checkpoint retained.' );

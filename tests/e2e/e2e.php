@@ -117,6 +117,58 @@ switch ( $stage ) {
 		$finish();
 		break;
 
+	case 'upload':
+		// Auto-offload on upload with Remove Local + delivery, for an image
+		// big enough that WordPress attaches a -scaled copy.
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		e2e_settings( array( 'offload_enabled' => true, 'remove_local' => true, 'deliver_enabled' => true ) );
+		$img = imagecreatetruecolor( 3000, 2000 );
+		imagefill( $img, 0, 0, imagecolorallocate( $img, 200, 60, 60 ) );
+		$up   = wp_upload_dir();
+		$path = $up['path'] . '/huge.jpg';
+		imagejpeg( $img, $path, 80 );
+		$id   = wp_insert_attachment( array( 'post_mime_type' => 'image/jpeg', 'post_title' => 'huge', 'post_status' => 'inherit' ), $path );
+		$meta = wp_generate_attachment_metadata( $id, $path ); // fires the upload hook ('create')
+		wp_update_attachment_metadata( $id, $meta );
+		$info = ISXM_Offload::get_record( $id );
+		$c    = new ISXM_Client();
+		$all  = e2e_keys( $c );
+		$check( 'uploaded image offloaded by the upload hook', ISXM_Offload::has_record( $info ) && $info['bucket'] === 'e2e-media', wp_json_encode( $info ) );
+		$check( 'WordPress attached a -scaled copy', strpos( (string) get_post_meta( $id, '_wp_attached_file', true ), '-scaled' ) !== false );
+		foreach ( (array) ( $info['files'] ?? array() ) as $file ) {
+			$check( "object {$info['base_key']}$file exists", in_array( $info['base_key'] . $file, $all, true ) );
+		}
+		$dir = dirname( get_attached_file( $id ) );
+		$check( 'local copies removed after a successful upload', ! glob( "$dir/huge*.jpg" ), wp_json_encode( glob( "$dir/huge*.jpg" ) ) );
+		$check( 'guid points at the bucket', strpos( get_post( $id )->guid, $endpoint ) === 0, get_post( $id )->guid );
+		$row  = ISXM_Items::get( $id );
+		$meta_record = get_post_meta( $id, ISXM_Offload::META_KEY, true );
+		$check( 'ledger row matches the postmeta record', is_array( $row ) && $row['bucket'] === $meta_record['bucket'] && $row['base_key'] === $meta_record['base_key'] && $row['files'] === $meta_record['files'], wp_json_encode( array( $row, $meta_record ) ) );
+		$size = $meta['sizes']['medium']['file'];
+		$local = trailingslashit( $up['url'] ) . $size;
+		$html = apply_filters( 'the_content', "<img src=\"$local\">" );
+		$check( 'a size of the -scaled image is delivered from the bucket', strpos( $html, $info['base_key'] . $size ) !== false && strpos( $html, $up['url'] ) === false, $html );
+		$ids = json_decode( file_get_contents( "$work/ids.json" ), true );
+		$ids['huge'] = $id;
+		file_put_contents( "$work/ids.json", wp_json_encode( $ids ) );
+		$finish();
+		break;
+
+	case 'downloaded':
+		$ids  = json_decode( file_get_contents( "$work/ids.json" ), true );
+		$info = ISXM_Offload::get_record( $ids['huge'] );
+		$dir  = dirname( get_attached_file( $ids['huge'] ) );
+		$c    = new ISXM_Client();
+		foreach ( $info['files'] as $file ) {
+			$tmp = wp_tempnam( $file );
+			$ok  = is_file( "$dir/$file" ) && $c->get_object_to_file( $info['base_key'] . $file, $tmp ) === true && hash_file( 'sha256', $tmp ) === hash_file( 'sha256', "$dir/$file" );
+			@unlink( $tmp );
+			$check( "$file downloaded back byte-for-byte", $ok );
+		}
+		e2e_settings( array( 'offload_enabled' => false, 'remove_local' => false ) );
+		$finish();
+		break;
+
 	case 'remove':
 		// One size vanished from the bucket out-of-band; the local copies are
 		// gone too (as with Remove Local Media). Removing the attachment from

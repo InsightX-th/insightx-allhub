@@ -105,6 +105,11 @@ echo "== bulk offload (wp isxm offload)"
 wp isxm offload
 stage offloaded
 
+echo "== offload on upload (-scaled image, Remove Local) + wp isxm download"
+stage upload
+wp isxm download
+stage downloaded
+
 echo "== remove from bucket with a size missing"
 stage remove
 

@@ -100,6 +100,7 @@ function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $compon
 function wp_basename( $path, $suffix = '' ) { return urldecode( basename( str_replace( array( '%2F', '%5C' ), '/', urlencode( $path ) ), $suffix ) ); }
 function wp_normalize_path( $path ) { return preg_replace( '|(?<=.)/+|', '/', str_replace( '\\', '/', (string) $path ) ); }
 function wp_json_encode( $v ) { return json_encode( $v ); }
+function maybe_unserialize( $v ) { return is_serialized( $v ) ? @unserialize( trim( $v ) ) : $v; }
 function wp_mkdir_p( $dir ) { return is_dir( $dir ) || @mkdir( $dir, 0777, true ); }
 function wp_salt( $scheme = 'auth' ) { return isset( $GLOBALS['isxm_t']['salt'] ) ? $GLOBALS['isxm_t']['salt'] : 'unit-test-salt'; }
 function wp_generate_password( $length = 12 ) { return substr( bin2hex( random_bytes( $length ) ), 0, $length ); }

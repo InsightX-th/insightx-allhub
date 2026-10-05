@@ -485,7 +485,10 @@ class ISXM_Sync {
             foreach ( $page['keys'] as $key ) {
                 if ( isset( $e['map'][ $key ] ) ) {
                     $id = $e['map'][ $key ];
-                    unset( $e['map'][ $key ] );
+                    if ( $id === 0 ) {
+                        continue; // same key listed twice (a store that re-sends a page)
+                    }
+                    $e['map'][ $key ] = 0;
                     $found[ $id ] = ( $found[ $id ] ?? 0 ) + 1;
                     if ( ( $e['primary'][ $id ] ?? '' ) === $key ) {
                         $primary_found[ $id ] = true;

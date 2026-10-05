@@ -42,6 +42,11 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         $value = $this->db->query( $sql )->fetchColumn();
         return $value === false ? null : $value;
     }
+    public function get_col( $sql = "" ) {
+        $this->queries++;
+        $this->last_error = '';
+        return $this->db->query( $sql )->fetchAll( PDO::FETCH_COLUMN );
+    }
     public function get_row( $sql, $output = 'OBJECT' ) {
         $rows = $this->get_results( $sql, $output );
         return $rows ? $rows[0] : null;

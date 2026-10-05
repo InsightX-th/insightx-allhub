@@ -456,7 +456,8 @@ class ISXM_Background {
             isxm_log_error( 'Background worker lost its lease; stopping without changing the checkpoint.' );
             return false;
         } catch ( \Throwable $e ) {
-            isxm_log_error( 'Background worker failed: ' . $e->getMessage() );
+            // Where it broke too, so a report can be traced to a line.
+            isxm_log_error( sprintf( 'Background worker failed (%s): %s at %s:%d', get_class( $e ), $e->getMessage(), wp_basename( $e->getFile() ), $e->getLine() ) );
             if ( isset( $job ) && $job ) {
                 $fresh = ISXM_Job::get( $job->tool );
                 if ( $fresh && $fresh->run_id === $job->run_id ) {
@@ -465,7 +466,8 @@ class ISXM_Background {
                     } catch ( ISXM_Lease_Lost $lost ) {
                         return false;
                     }
-                    $fresh->finish( ISXM_Job::STATE_ERROR, 'The worker stopped unexpectedly. The last checkpoint was retained; resume to retry.' );
+                    // Say why: without the reason the card gave nothing to act on.
+                    $fresh->finish( ISXM_Job::STATE_ERROR, 'The worker stopped unexpectedly: ' . mb_substr( $e->getMessage(), 0, 300 ) . ' The last checkpoint was retained; resume to retry.' );
                 }
             }
             return false;

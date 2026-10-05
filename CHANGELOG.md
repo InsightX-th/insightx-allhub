@@ -17,6 +17,10 @@
 - ไม่ถอดรหัส secret ซ้ำทุกครั้ง, option ที่อ่านทุก request เปลี่ยนเป็น autoload, orphan cleanup โหลดรายการครั้งเดียว, CLI ล้าง cache ระหว่างทำงานกัน memory เต็ม
 - ตาราง ledger v2: ลบ index ซ้ำ และสร้างได้ใน MySQL strict mode
 
+Diagnostic
+- แสดงสาเหตุที่งานหยุด, error ราย item ล่าสุดของแต่ละงาน และรายการไฟล์ที่ offload ไม่สำเร็จ 30 รายการล่าสุดพร้อมเหตุผล/จำนวนครั้งที่ลอง
+- "The worker stopped unexpectedly" บอกสาเหตุจริงต่อท้าย และ log บันทึกชนิด error พร้อมไฟล์:บรรทัด, Recent Log แสดง 60 รายการ
+
 Test
 - เพิ่ม `tests/integrity.php`, `tests/performance.php`, `tests/items.php`, `tests/bulk-tools.php` และ e2e ขั้นอัปโหลดจริง/รูป `-scaled`/download; test ใน CI ครบทุกไฟล์
 

@@ -2630,6 +2630,36 @@ class ISXM_Tools {
                     gmdate( 'Y-m-d H:i:s', (int) ( $job->activity['last_progress'] ?? $job->updated ) ),
                     wp_json_encode( $job->migration['rewrite'] ?? [] ) );
             }
+            // Why the run stopped, and which items failed and why — the
+            // card only ever showed a count.
+            if ( (string) $job->message !== '' ) {
+                $lines[] = '    stopped because: ' . $job->message;
+            }
+            if ( $job->errors ) {
+                $lines[] = sprintf( '    last %d of %d item errors:', count( $job->errors ), $job->error_count );
+                foreach ( $job->errors as $error ) {
+                    $lines[] = '      ' . $error;
+                }
+            }
+        }
+
+        // Every attachment whose last offload attempt failed, newest first.
+        global $wpdb;
+        $failed = $wpdb->get_results( $wpdb->prepare(
+            "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s ORDER BY meta_id DESC LIMIT 30",
+            ISXM_Offload::ERROR_META_KEY
+        ) );
+        $lines[] = '';
+        $lines[] = '--- Failed items (newest 30) ---';
+        if ( ! $failed ) {
+            $lines[] = '(none)';
+        }
+        foreach ( (array) $failed as $row ) {
+            $e = maybe_unserialize( $row->meta_value );
+            if ( is_array( $e ) ) {
+                $lines[] = sprintf( '#%d %s [%s] %s (tries %d, %s UTC)', $row->post_id, $e['file'] ?? '', $e['code'] ?? '', $e['message'] ?? '',
+                    (int) ( $e['tries'] ?? 1 ), gmdate( 'Y-m-d H:i:s', (int) ( $e['time'] ?? 0 ) ) );
+            }
         }
         if ( ! ISXM_Job::all() ) {
             $lines[] = '  (no runs recorded)';
@@ -2644,7 +2674,7 @@ class ISXM_Tools {
         if ( empty( $log ) || ! is_array( $log ) ) {
             $lines[] = '(empty) — isxm_log_error() writes here even with WP_DEBUG off';
         } else {
-            foreach ( array_slice( $log, -25 ) as $entry ) {
+            foreach ( array_slice( $log, -60 ) as $entry ) {
                 $count = ! empty( $entry['count'] ) && $entry['count'] > 1 ? sprintf( ' [x%d]', (int) $entry['count'] ) : '';
                 $lines[] = sprintf( '%s%s %s', $entry['time'] ?? '?', $count, $entry['message'] ?? '' );
             }

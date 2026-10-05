@@ -127,7 +127,8 @@ switch ( $stage ) {
 		$up   = wp_upload_dir();
 		$path = $up['path'] . '/huge.jpg';
 		imagejpeg( $img, $path, 80 );
-		$id   = wp_insert_attachment( array( 'post_mime_type' => 'image/jpeg', 'post_title' => 'huge', 'post_status' => 'inherit' ), $path );
+		// guid as media_handle_upload() sets it: the file URL.
+		$id   = wp_insert_attachment( array( 'guid' => $up['url'] . '/huge.jpg', 'post_mime_type' => 'image/jpeg', 'post_title' => 'huge', 'post_status' => 'inherit' ), $path );
 		$meta = wp_generate_attachment_metadata( $id, $path ); // fires the upload hook ('create')
 		wp_update_attachment_metadata( $id, $meta );
 		$info = ISXM_Offload::get_record( $id );
@@ -223,6 +224,10 @@ switch ( $stage ) {
 		$info = ISXM_Offload::get_record( $ids['attachments'][1] );
 		$check( 'item already offloaded to the OLD bucket was migrated (not skipped)', is_array( $info ) && $info['bucket'] === 'e2e-dest', wp_json_encode( $info ) );
 		$check( 'its files now exist in the destination bucket', is_array( $info ) && in_array( $info['base_key'] . $info['files'][0], $keys, true ), wp_json_encode( $keys ) );
+		update_post_meta( $ids['attachments'][0], ISXM_Offload::ERROR_META_KEY, array( 'code' => 'isxs_e2e', 'message' => 'e2e reason', 'file' => 'alpha.jpg', 'time' => time(), 'tries' => 2 ) );
+		$diag = ISXM_Tools::diagnostic_text();
+		$check( 'Diagnostic lists failed items with their reason', strpos( $diag, '--- Failed items' ) !== false && strpos( $diag, '[isxs_e2e] e2e reason (tries 2' ) !== false, $diag );
+		$check( 'Diagnostic shows the migrate run', strpos( $diag, '  migrate: ' ) !== false );
 		$finish();
 		break;
 }

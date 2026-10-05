@@ -114,8 +114,13 @@ class ISXM_Client {
      * @param bool   $public_acl   Send x-amz-acl: public-read.
      * @return true|WP_Error
      */
-    /** Bounded, streamed requests; only this attachment's owner commits metadata. */
-    public function transfer_many( $method, array $files, $concurrency = null, $receipt_dir = '' ) {
+    /**
+     * Bounded, streamed requests; only this attachment's owner commits metadata.
+     *
+     * @param string $tool Job whose pause/cancel signal stops new transfers;
+     *                     '' when no job owns the call (an upload request).
+     */
+    public function transfer_many( $method, array $files, $concurrency = null, $receipt_dir = '', $tool = 'migrate' ) {
         $limit = max( 1, min( 4, (int) ( $concurrency ?? apply_filters( 'isxm_migrate_concurrency', 4 ) ) ) );
         $results = []; $receipts = [];
         if ( $method === 'PUT' && $receipt_dir !== '' ) {
@@ -128,19 +133,24 @@ class ISXM_Client {
         $queue = array_keys( $files ); $attempts = [];
         if ( ! function_exists( 'curl_multi_init' ) || $limit === 1 ) {
             foreach ( $files as $id => $file ) {
-                if ( ! self::may_wait( 0 ) || ISXM_Job::signal( 'migrate' ) !== '' ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
+                if ( ! self::may_wait( 0 ) || ( $tool !== '' && ISXM_Job::signal( $tool ) !== '' ) ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
                 $results[ $id ] = $method === 'GET' ? $this->get_object_to_file( $file['key'], $file['path'] ) : $this->put_object( $file['key'], $file['path'], $file['mime'], $file['acl'] );
             }
             self::save_receipts( $results, $receipts );
             return $results;
         }
-        $multi = curl_multi_init(); $active = [];
+        $multi = curl_multi_init(); $active = []; $renewed = 0;
         try {
             while ( $queue || $active ) {
-                ISXM_Background::renew_runner_lock();
+                // The scheduler ticks every 0.2 s; one lease write per tick
+                // was a DB UPDATE five times a second for the whole run.
+                if ( microtime( true ) - $renewed >= 5 ) {
+                    ISXM_Background::renew_runner_lock();
+                    $renewed = microtime( true );
+                }
                 while ( $queue && count( $active ) < $limit ) {
                     $id = array_shift( $queue ); $f = $files[ $id ];
-                    if ( ! self::may_wait( 0 ) || ISXM_Job::signal( 'migrate' ) !== '' ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
+                    if ( ! self::may_wait( 0 ) || ( $tool !== '' && ISXM_Job::signal( $tool ) !== '' ) ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
                     $attempts[ $id ] = ( $attempts[ $id ] ?? 0 ) + 1;
                     $headers = [];
                     if ( $method === 'PUT' ) {
@@ -154,9 +164,10 @@ class ISXM_Client {
                     if ( ! $fp ) { $results[ $id ] = new WP_Error( 'isxs_stream_open', 'Could not open migration stream.' ); continue; }
                     $ch = curl_init(); $lines = [];
                     foreach ( $spec['headers'] as $k => $v ) $lines[] = $k . ': ' . $v;
+                    $lines[] = 'Expect:'; // same 100-continue stall put_object() avoids
                     $verify = apply_filters( 'https_ssl_verify', true, $spec['url'] );
                     $options = [ CURLOPT_URL => $spec['url'], CURLOPT_CUSTOMREQUEST => $method,
-                        CURLOPT_HTTPHEADER => $lines, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => 60,
+                        CURLOPT_HTTPHEADER => $lines, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => 300,
                         CURLOPT_SSL_VERIFYPEER => (bool) $verify, CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
                         CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_FOLLOWLOCATION => false ];
                     $ca = ABSPATH . WPINC . '/certificates/ca-bundle.crt';
@@ -183,10 +194,12 @@ class ISXM_Client {
                         if ( is_file( $a['tmp'] ) ) @unlink( $a['tmp'] );
                     }
                     $retry = $message['result'] !== CURLE_OK || in_array( $code, [ 408, 429, 500, 502, 503, 504 ], true );
-                    curl_multi_remove_handle( $multi, $ch ); curl_close( $ch ); unset( $active[ $handle_id ] );
+                    curl_multi_remove_handle( $multi, $ch ); self::close_curl( $ch ); unset( $active[ $handle_id ] );
                     if ( ! $ok && $retry && $attempts[ $id ] < 3 && self::may_wait( 0 ) ) $queue[] = $id;
                     else {
-                        $results[ $id ] = $ok ? true : new WP_Error( 'isxs_transfer_failed', 'Storage transfer failed (HTTP ' . $code . ').' );
+                        // Keep the status in the code: Remove/Download tell a
+                        // missing object (isxs_http_404) from a real failure.
+                        $results[ $id ] = $ok ? true : new WP_Error( $code ? 'isxs_http_' . $code : 'isxs_transfer_failed', 'Storage transfer failed (HTTP ' . $code . ').' );
                         self::save_receipts( [ $id => $results[ $id ] ], $receipts );
                     }
                 }
@@ -194,12 +207,19 @@ class ISXM_Client {
             }
         } finally {
             foreach ( $active as $a ) {
-                curl_multi_remove_handle( $multi, $a['ch'] ); curl_close( $a['ch'] ); fclose( $a['fp'] );
+                curl_multi_remove_handle( $multi, $a['ch'] ); self::close_curl( $a['ch'] ); fclose( $a['fp'] );
                 if ( $a['tmp'] !== '' && is_file( $a['tmp'] ) ) @unlink( $a['tmp'] );
             }
             curl_multi_close( $multi );
         }
         return $results;
+    }
+
+    /** curl_close() is a no-op since PHP 8.0 and deprecated in 8.5; handles free on unset. */
+    private static function close_curl( $ch ) {
+        if ( PHP_VERSION_ID < 80000 ) {
+            curl_close( $ch );
+        }
     }
 
     private static function save_receipts( array $results, array $receipts ) {
@@ -258,6 +278,55 @@ class ISXM_Client {
     public function delete_object( $key ) {
         $response = $this->request( 'DELETE', $key );
         return $this->expect_status( $response, [ 200, 204, 404 ] );
+    }
+
+    /**
+     * Delete many objects with S3 DeleteObjects (up to 1,000 per request)
+     * instead of one DELETE each. Stores that don't implement it fall back
+     * to single deletes. Missing objects count as deleted, as in delete_object().
+     *
+     * @param string[] $keys
+     * @return array<string,true|WP_Error> Outcome per key.
+     */
+    public function delete_objects( array $keys ) {
+        $results = [];
+        foreach ( array_chunk( array_values( array_unique( $keys ) ), 1000 ) as $chunk ) {
+            if ( count( $chunk ) === 1 ) {
+                $results[ $chunk[0] ] = $this->delete_object( $chunk[0] );
+                continue;
+            }
+            $xml = '<?xml version="1.0" encoding="UTF-8"?><Delete><Quiet>true</Quiet>';
+            foreach ( $chunk as $key ) {
+                $xml .= '<Object><Key>' . htmlspecialchars( $key, ENT_XML1 | ENT_QUOTES, 'UTF-8' ) . '</Key></Object>';
+            }
+            $xml .= '</Delete>';
+            $response = $this->request_with_retry( 'POST', '', [
+                'query'   => [ 'delete' => '' ],
+                'body'    => $xml,
+                // S3 requires an integrity header on DeleteObjects.
+                'headers' => [ 'content-type' => 'application/xml', 'content-md5' => base64_encode( md5( $xml, true ) ) ],
+            ] );
+            if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+                foreach ( $chunk as $key ) {
+                    $results[ $key ] = $this->delete_object( $key );
+                }
+                continue;
+            }
+            foreach ( $chunk as $key ) {
+                $results[ $key ] = true;
+            }
+            // Quiet mode lists only the keys that failed.
+            if ( preg_match_all( '#<Error>(.*?)</Error>#s', wp_remote_retrieve_body( $response ), $errors ) ) {
+                foreach ( $errors[1] as $error ) {
+                    $key  = preg_match( '#<Key>(.*?)</Key>#s', $error, $m ) ? html_entity_decode( $m[1], ENT_XML1 | ENT_QUOTES, 'UTF-8' ) : '';
+                    $code = preg_match( '#<Code>(.*?)</Code>#s', $error, $m ) ? $m[1] : 'Error';
+                    if ( $key !== '' && $code !== 'NoSuchKey' ) {
+                        $results[ $key ] = new WP_Error( 'isxs_delete_failed', sprintf( 'DELETE %s failed: %s', $key, $code ) );
+                    }
+                }
+            }
+        }
+        return $results;
     }
 
     /**

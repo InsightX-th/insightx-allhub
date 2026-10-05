@@ -177,14 +177,24 @@ add_action( 'plugins_loaded', function () {
     // so it doesn't keep firing as an orphaned no-op.
     if ( get_option( 'isxs_sync_auto_check_cleaned' ) !== '1' ) {
         wp_clear_scheduled_hook( 'isxs_sync_daily_check' );
-        update_option( 'isxs_sync_auto_check_cleaned', '1', false );
+        update_option( 'isxs_sync_auto_check_cleaned', '1', true );
     }
     // v0.2.0 moved bulk runs onto server-side job records (isxs_jobs); the
     // browser-driven progress option they replaced is dead weight in the
     // options table on every upgraded site.
     if ( get_option( 'isxs_bulk_progress_cleaned' ) !== '1' ) {
         delete_option( 'isxs_bulk_progress' );
-        update_option( 'isxs_bulk_progress_cleaned', '1', false );
+        update_option( 'isxs_bulk_progress_cleaned', '1', true );
+    }
+
+    // Options read on every request were stored non-autoloaded — one
+    // SELECT each per page view. Flip the rows that already exist, once.
+    if ( get_option( 'isxs_autoload_fixed' ) !== '1' ) {
+        if ( function_exists( 'wp_set_options_autoload' ) ) {
+            wp_set_options_autoload( [ 'isxs_settings', 'isxs_connections', 'isxs_connections_migrated', 'isxs_items_db_version',
+                'isxs_items_backfilled', 'isxs_sync_auto_check_cleaned', 'isxs_bulk_progress_cleaned' ], true );
+        }
+        update_option( 'isxs_autoload_fixed', '1', true );
     }
 
     // Boot the plugin proper. Needs to live here (not file-scope) so the
@@ -238,9 +248,20 @@ function isxm_plugin_uninstall() {
     $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}isxs_migration_paths, {$wpdb->prefix}isxs_migration_work" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL -- table names from $wpdb->prefix, uninstall cleanup
     delete_option( 'isxs_migration_schema' );
     delete_option( 'isxs_migration_index_ready' );
+    delete_option( 'isxs_autoload_fixed' );
 }
 
 add_action( 'added_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
 add_action( 'updated_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
 add_action( 'deleted_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
 add_action( 'delete_attachment', [ 'ISXM_Migration_Store', 'delete_attachment' ] );
+
+// Every core meta prime (WP_Query, the Media Library list and grid, product
+// loops) also loads those attachments' ledger rows in one query, instead of
+// one SELECT per image when its URL is built.
+add_filter( 'update_post_metadata_cache', function ( $check, $ids ) {
+    if ( ISXM_Items::ready() ) {
+        ISXM_Items::prime( array_filter( (array) $ids, function ( $id ) { return get_post_type( $id ) === 'attachment'; } ) );
+    }
+    return $check;
+}, 10, 2 );

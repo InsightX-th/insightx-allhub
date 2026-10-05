@@ -640,8 +640,7 @@ class ISXM_Sync {
             if ( is_wp_error( $page ) ) {
                 return $page;
             }
-            foreach ( self::orphan_candidates( $page, $e, $prefix, $started ) as $key ) {
-                $result = $client->delete_object( $key );
+            foreach ( $client->delete_objects( self::orphan_candidates( $page, $e, $prefix, $started ) ) as $result ) {
                 if ( ! is_wp_error( $result ) ) {
                     $deleted++;
                 }

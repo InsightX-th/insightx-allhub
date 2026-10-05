@@ -213,7 +213,7 @@ class ISXM_Connections {
             'send_public_acl' => ! empty( $config['send_public_acl'] ),
         ];
 
-        update_option( self::OPTION_KEY, $stored, false );
+        update_option( self::OPTION_KEY, $stored, true );
         // ISXM_Settings::all() caches the resolved connection fields for the
         // whole request — without this, everything after this point in the
         // same request (the connection test, a CLI command that saves then
@@ -337,6 +337,6 @@ class ISXM_Connections {
             }
         }
 
-        update_option( self::MIGRATED_FLAG, 1, false );
+        update_option( self::MIGRATED_FLAG, 1, true );
     }
 }

@@ -154,7 +154,7 @@ class ISXM_Settings {
             $settings['endpoint'], $settings['region'], $settings['bucket'], $settings['access_key'], $settings['secret_key'], $settings['path_style'], $settings['send_public_acl'],
             $settings['source_endpoint'], $settings['source_region'], $settings['source_bucket'], $settings['source_access_key'], $settings['source_secret_key'], $settings['source_path_style']
         );
-        update_option( self::OPTION_KEY, $settings, false );
+        update_option( self::OPTION_KEY, $settings, true );
         self::$cache = null;
     }
 
@@ -175,8 +175,11 @@ class ISXM_Settings {
      * Whether the destination connection is complete enough to talk to a bucket.
      */
     public static function is_configured() {
+        // From the cached settings: ISXM_Connections::is_configured() rebuilt
+        // the provider list and decrypted the secret on every call — once
+        // per Media Library row.
         $s = self::all();
-        return ISXM_Connections::is_configured( $s['provider'] );
+        return $s['bucket'] !== '' && $s['access_key'] !== '' && $s['secret_key'] !== '';
     }
 
     /**

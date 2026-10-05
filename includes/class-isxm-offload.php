@@ -199,7 +199,7 @@ class ISXM_Offload {
         add_filter( 'intermediate_image_sizes_advanced', [ $this, 'maybe_drop_image_sizes' ], 99, 1 );
         add_filter( 'big_image_size_threshold', [ $this, 'maybe_keep_original_size' ], 99, 1 );
 
-        add_filter( 'wp_generate_attachment_metadata', [ $this, 'offload_on_generate' ], 110, 2 );
+        add_filter( 'wp_generate_attachment_metadata', [ $this, 'offload_on_generate' ], 110, 3 );
         add_action( 'delete_attachment', [ $this, 'delete_remote_on_delete' ], 10, 1 );
 
         add_filter( 'wp_get_attachment_url', [ $this, 'rewrite_attachment_url' ], 99, 2 );
@@ -263,9 +263,18 @@ class ISXM_Offload {
     /**
      * Hook: offload right after WordPress generates attachment metadata.
      */
-    public function offload_on_generate( $metadata, $attachment_id ) {
+    public function offload_on_generate( $metadata, $attachment_id, $context = 'update' ) {
         if ( ISXM_Settings::get( 'offload_enabled' ) && ISXM_Settings::is_configured() ) {
-            $result = $this->offload_attachment( $attachment_id, $metadata );
+            // A brand-new upload cannot be referenced anywhere yet, so the
+            // permanent rewrite only needs its guid — not three full-table
+            // LIKE scans per file. Regenerating an existing one ('update')
+            // keeps the full rewrite.
+            self::$new_upload = $context === 'create' ? (int) $attachment_id : 0;
+            try {
+                $result = $this->offload_attachment( $attachment_id, $metadata );
+            } finally {
+                self::$new_upload = 0;
+            }
             if ( is_wp_error( $result ) && $result->get_error_code() !== 'isxs_protected_download' ) {
                 isxm_log_error( 'Offload failed for #' . $attachment_id . ': ' . $result->get_error_message() );
             }
@@ -318,6 +327,9 @@ class ISXM_Offload {
 
         return $result;
     }
+
+    /** Attachment ID being offloaded from its own first upload, else 0. */
+    private static $new_upload = 0;
 
     /** Lease that expires, so a fatal mid-upload never wedges an item. */
     const LOCK_TTL = 600;
@@ -455,7 +467,23 @@ class ISXM_Offload {
         // attachment with no meta at all, so every retry started from zero.
         $primary = wp_basename( $file );
 
+        // Every size after the original goes up in parallel once the
+        // original itself has succeeded (it must still fail the whole item).
+        $sizes = [];
+        if ( ! $migration_paths ) {
+            foreach ( $filenames as $filename ) {
+                if ( $filename !== $primary && file_exists( $local_dir . $filename ) ) {
+                    $type = wp_check_filetype( $filename );
+                    $sizes[ $filename ] = [ 'key' => $base_key . $filename, 'path' => $local_dir . $filename, 'mime' => $type['type'] ?: 'application/octet-stream', 'acl' => ! empty( $settings['send_public_acl'] ) ];
+                }
+            }
+        }
+
         foreach ( $filenames as $filename ) {
+            if ( $sizes && $filename !== $primary ) {
+                $parallel = $client->transfer_many( 'PUT', $sizes, null, '', '' );
+                $sizes    = [];
+            }
             $path = $migration_paths[ $filename ] ?? ( $local_dir . $filename );
             if ( ! file_exists( $path ) ) {
                 if ( in_array( $filename, $prior, true ) ) { $uploaded[] = $filename; continue; }
@@ -518,7 +546,9 @@ class ISXM_Offload {
         // the runtime rewrite filters (rewrite_attachment_url/srcset/content)
         // stay active as a fallback for anything this pass doesn't reach.
         // No-op when the permanent rewrite is switched off (persist_urls).
-        if ( ! $defer_persist ) {
+        if ( ! $defer_persist && self::$new_upload === (int) $attachment_id ) {
+            ISXM_DB_Rewriter::update_attachment_guid( $attachment_id, self::collect_url_pairs( $attachment_id ) );
+        } elseif ( ! $defer_persist ) {
             self::persist_permanent_urls( $attachment_id );
         }
 
@@ -826,10 +856,10 @@ class ISXM_Offload {
         // stale tracking meta instead of getting stuck on this item forever.
 
         $client = self::client_for_info( $info );
-        foreach ( $info['files'] as $filename ) {
-            $result = $client->delete_object( $info['base_key'] . $filename );
+        $keys   = array_map( function ( $filename ) use ( $info ) { return $info['base_key'] . $filename; }, $info['files'] );
+        foreach ( $client->delete_objects( $keys ) as $key => $result ) {
             if ( is_wp_error( $result ) ) {
-                return new WP_Error( 'isxs_delete_failed', sprintf( __( 'Could not delete %s from the bucket: %s', 'insightx-offload' ), $filename, $result->get_error_message() ) );
+                return new WP_Error( 'isxs_delete_failed', sprintf( __( 'Could not delete %s from the bucket: %s', 'insightx-offload' ), wp_basename( $key ), $result->get_error_message() ) );
             }
         }
 
@@ -964,12 +994,14 @@ class ISXM_Offload {
 
         if ( ISXM_Settings::is_configured() ) {
             $client = self::client_for_info( $info );
-            foreach ( $info['files'] as $filename ) {
-                $result = $client->delete_object( $info['base_key'] . $filename );
+            $keys   = array_map( function ( $filename ) use ( $info ) { return $info['base_key'] . $filename; }, $info['files'] );
+            foreach ( $client->delete_objects( $keys ) as $key => $result ) {
                 if ( is_wp_error( $result ) ) {
-                    isxm_log_error( 'Remote delete failed for #' . $attachment_id . ' ' . $filename . ': ' . $result->get_error_message() );
+                    isxm_log_error( 'Remote delete failed for #' . $attachment_id . ' ' . $key . ': ' . $result->get_error_message() );
                 }
             }
+        } else {
+            isxm_log_error( 'Storage not configured: objects of deleted attachment #' . $attachment_id . ' were left in the bucket: ' . $info['base_key'] . implode( ', ', $info['files'] ) );
         }
 
         // Unconditional: whether or not the remote objects could be removed,
@@ -1279,31 +1311,18 @@ class ISXM_Offload {
 
         $uploads  = wp_get_upload_dir();
         $base_url = untrailingslashit( $uploads['baseurl'] );
-        $base_alt = ( strpos( $base_url, 'https://' ) === 0 )
-            ? 'http://' . substr( $base_url, 8 )
-            : 'https://' . substr( $base_url, 7 );
-
-        // Must be one of our two upload bases; strip it to get the relative
-        // path (subdirectory + filename) under uploads.
-        if ( strpos( $url, $base_url . '/' ) === 0 ) {
-            $relative = substr( $url, strlen( $base_url ) + 1 );
-        } elseif ( strpos( $url, $base_alt . '/' ) === 0 ) {
-            $relative = substr( $url, strlen( $base_alt ) + 1 );
-        } else {
+        $relative = self::uploads_relative( $url );
+        if ( $relative === null ) {
             return null;
         }
-
         $filename = wp_basename( $relative );
-        // Map sized files (example-300x200.jpg) back to the original for lookup.
-        $lookup = preg_replace( '#-\d+x\d+(\.[a-zA-Z0-9]+)$#', '$1', $relative );
 
-        $attachment_id = self::attachment_id_for_path( $base_url, $lookup );
-        if ( ! $attachment_id ) {
-            // Images over the big-image threshold (WP 5.3+) are attached as
-            // name-scaled.ext, while the original and every size keep the
-            // bare name — so their size URLs never matched and stayed local.
-            // ponytail: edited images (name-e1699….ext) still miss; resolve by the wp-image-{ID} class if that shows up.
-            $attachment_id = self::attachment_id_for_path( $base_url, preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-scaled$1', $lookup ) );
+        $attachment_id = 0;
+        foreach ( self::lookup_paths( $relative ) as $lookup ) {
+            $attachment_id = self::attachment_id_for_path( $base_url, $lookup );
+            if ( $attachment_id ) {
+                break;
+            }
         }
         if ( ! $attachment_id ) {
             return null;
@@ -1328,9 +1347,98 @@ class ISXM_Offload {
      */
     private static function attachment_id_for_path( $base_url, $relative ) {
         if ( ! array_key_exists( $relative, self::$url_post_cache ) ) {
-            self::$url_post_cache[ $relative ] = (int) attachment_url_to_postid( $base_url . '/' . $relative );
+            $cached = wp_cache_get( $relative, 'isxs_url2id' );
+            self::$url_post_cache[ $relative ] = $cached !== false ? (int) $cached : (int) attachment_url_to_postid( $base_url . '/' . $relative );
+            wp_cache_set( $relative, self::$url_post_cache[ $relative ], 'isxs_url2id', HOUR_IN_SECONDS );
         }
         return self::$url_post_cache[ $relative ];
+    }
+
+    /**
+     * Path under uploads for a URL on either scheme of the uploads base.
+     *
+     * @param string $url
+     * @return string|null
+     */
+    private static function uploads_relative( $url ) {
+        $uploads  = wp_get_upload_dir();
+        $base_url = untrailingslashit( $uploads['baseurl'] );
+        $base_alt = ( strpos( $base_url, 'https://' ) === 0 )
+            ? 'http://' . substr( $base_url, 8 )
+            : 'https://' . substr( $base_url, 7 );
+        foreach ( [ $base_url, $base_alt ] as $base ) {
+            if ( strpos( $url, $base . '/' ) === 0 ) {
+                return substr( $url, strlen( $base ) + 1 );
+            }
+        }
+        return null;
+    }
+
+    /**
+     * `_wp_attached_file` values a file URL may belong to, most likely first.
+     *
+     * Sized files (photo-300x200.jpg) map back to the original. Images over
+     * the big-image threshold (WP 5.3+) are attached as photo-scaled.jpg
+     * while the original and every size keep the bare name.
+     * ponytail: edited images (name-e1699….ext) still miss; resolve by the wp-image-{ID} class if that shows up.
+     *
+     * @param string $relative Path under uploads.
+     * @return string[]
+     */
+    private static function lookup_paths( $relative ) {
+        $lookup = preg_replace( '#-\d+x\d+(\.[a-zA-Z0-9]+)$#', '$1', $relative );
+        return [ $lookup, preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-scaled$1', $lookup ) ];
+    }
+
+    /**
+     * Resolve every candidate path of a set of URLs in ONE postmeta query
+     * (plus the object cache), so rendering a post with 20 images is not 20
+     * unindexed `attachment_url_to_postid()` scans. Misses are cached too.
+     *
+     * @param string[] $urls
+     */
+    private static function prime_url_lookups( array $urls ) {
+        $paths = [];
+        foreach ( $urls as $url ) {
+            $relative = self::uploads_relative( $url );
+            if ( $relative === null ) {
+                continue;
+            }
+            foreach ( self::lookup_paths( $relative ) as $path ) {
+                if ( ! array_key_exists( $path, self::$url_post_cache ) ) {
+                    $cached = wp_cache_get( $path, 'isxs_url2id' );
+                    if ( $cached !== false ) {
+                        self::$url_post_cache[ $path ] = (int) $cached;
+                    } else {
+                        $paths[ $path ] = true;
+                    }
+                }
+            }
+        }
+        if ( ! $paths ) {
+            return;
+        }
+
+        global $wpdb;
+        $found = [];
+        foreach ( array_chunk( array_keys( $paths ), 200 ) as $chunk ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value IN (" . implode( ',', array_fill( 0, count( $chunk ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array
+                $chunk
+            ) );
+            if ( $wpdb->last_error ) {
+                return; // resolve_local_url() falls back to one lookup per path
+            }
+            foreach ( (array) $rows as $row ) {
+                if ( ! isset( $found[ $row->meta_value ] ) ) {
+                    $found[ $row->meta_value ] = (int) $row->post_id;
+                }
+            }
+        }
+        foreach ( array_keys( $paths ) as $path ) {
+            self::$url_post_cache[ $path ] = $found[ $path ] ?? 0;
+            wp_cache_set( $path, self::$url_post_cache[ $path ], 'isxs_url2id', HOUR_IN_SECONDS );
+        }
     }
 
     /**
@@ -1374,6 +1482,7 @@ class ISXM_Offload {
         if ( $plain ) {
             $pattern = '#(?:' . preg_quote( $base_url, '#' ) . '|' . preg_quote( $base_alt, '#' ) . ')/([^\s"\'<>\)]+)#';
             if ( preg_match_all( $pattern, $content, $matches ) ) {
+                self::prime_url_lookups( $matches[0] );
                 foreach ( $matches[0] as $url ) {
                     $remote = self::resolve_local_url( $url );
                     if ( $remote !== null && $remote !== $url ) {
@@ -1389,6 +1498,7 @@ class ISXM_Offload {
         if ( $escaped ) {
             $pattern = '#(?:' . preg_quote( $esc( $base_url ), '#' ) . '|' . preg_quote( $esc( $base_alt ), '#' ) . ')\\\\/((?:[^\s"\'<>\)\\\\]|\\\\/|\\\\u[0-9a-fA-F]{4})+)#';
             if ( preg_match_all( $pattern, $content, $matches ) ) {
+                self::prime_url_lookups( array_filter( array_map( function ( $u ) { return json_decode( '"' . $u . '"' ); }, $matches[0] ), 'is_string' ) );
                 foreach ( $matches[0] as $escaped_url ) {
                     $url    = json_decode( '"' . $escaped_url . '"' );
                     $remote = is_string( $url ) ? self::resolve_local_url( $url ) : null;

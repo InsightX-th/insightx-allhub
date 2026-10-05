@@ -496,14 +496,20 @@ isxm_test_queue_response( 404 );                   // GET r-300x200.jpg — gone
 isxm_test_queue_response( 200, 'large' );          // GET r-1024x768.jpg (if it is ever asked for)
 $o->remove_remote_attachment( 70 );
 $unsafe = array();
+$deleted = array();
 foreach ( $GLOBALS['isxm_t']['http'] as $call ) {
 	if ( $call['args']['method'] === 'DELETE' ) {
-		$name = rawurldecode( basename( parse_url( $call['url'], PHP_URL_PATH ) ) );
-		if ( $name !== 'r-300x200.jpg' && ! is_file( "$dir/$name" ) ) {
-			$unsafe[] = $name;
-		}
+		$deleted[] = rawurldecode( basename( parse_url( $call['url'], PHP_URL_PATH ) ) );
+	} elseif ( $call['args']['method'] === 'POST' && preg_match_all( '#<Key>(.*?)</Key>#', (string) $call['args']['body'], $m ) ) {
+		foreach ( $m[1] as $key ) $deleted[] = basename( html_entity_decode( $key, ENT_XML1 ) ); // DeleteObjects batch
 	}
 }
+foreach ( $deleted as $name ) {
+	if ( $name !== 'r-300x200.jpg' && ! is_file( "$dir/$name" ) ) {
+		$unsafe[] = $name;
+	}
+}
+t( 'E15a Remove issued its deletes', count( $deleted ) >= 2, json_encode( $deleted ) );
 t( 'E15 Remove from Bucket never deletes an object that has no local copy', empty( $unsafe ), 'deleted without a local copy: ' . implode( ', ', $unsafe ) );
 
 // Sold files never go to the (public) media bucket.

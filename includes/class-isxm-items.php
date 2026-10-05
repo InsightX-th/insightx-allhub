@@ -37,7 +37,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_Items {
 
     /** Bumped when the schema changes; drives maybe_install(). */
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
 
     const DB_VERSION_OPTION = 'isxs_items_db_version';
 
@@ -74,12 +74,11 @@ class ISXM_Items {
         //  - uidx_source enforces the one-row-per-attachment rule the
         //    postmeta model had implicitly, and is the lookup every
         //    per-attachment read uses.
-        //  - idx_destination answers "is this on the current bucket?" for
-        //    the counts and both bulk scans. Prefix lengths keep the key
-        //    inside InnoDB's limit while staying selective (bucket and
-        //    endpoint names differ early, not at character 100).
-        //  - idx_scan is what get_pending_ids()/get_offloaded_ids() page on:
-        //    destination first, then source_id so the keyset walk is index-only.
+        //  - idx_scan answers "is this on the current bucket?" for the counts
+        //    (its bucket/endpoint prefix) and is what get_pending_ids()/
+        //    get_offloaded_ids() page on: destination first, then source_id
+        //    so the keyset walk is index-only. Prefix lengths keep the key
+        //    inside InnoDB's limit while staying selective.
         $sql = "CREATE TABLE {$table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             source_type VARCHAR(20) NOT NULL DEFAULT 'media-library',
@@ -95,15 +94,23 @@ class ISXM_Items {
             files LONGTEXT NULL,
             missing LONGTEXT NULL,
             is_partial TINYINT(1) NOT NULL DEFAULT 0,
-            updated_at DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',
+            updated_at DATETIME NULL DEFAULT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY uidx_source (source_type, source_id),
-            KEY idx_destination (bucket(100), endpoint(100)),
             KEY idx_scan (bucket(100), endpoint(100), source_id),
             KEY idx_partial (is_partial)
         ) {$collate};";
 
         dbDelta( $sql );
+
+        // v1 -> v2. dbDelta() never drops an index: idx_destination was only
+        // the left prefix of idx_scan, one extra write per put(). The zero-
+        // date default made CREATE fail under MySQL's strict NO_ZERO_DATE
+        // mode, leaving such sites on the slow postmeta path for good.
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM {$table} WHERE Key_name = %s", 'idx_destination' ) ) ) { // phpcs:ignore WordPress.DB.PreparedSQL -- table name from $wpdb->prefix
+            $wpdb->query( "ALTER TABLE {$table} DROP INDEX idx_destination" ); // phpcs:ignore WordPress.DB.PreparedSQL
+        }
+        $wpdb->query( "ALTER TABLE {$table} MODIFY updated_at DATETIME NULL DEFAULT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL
 
         // dbDelta() reports nothing useful when the CREATE fails (a DB user
         // without CREATE rights, disk full, a name collision). Recording the
@@ -115,7 +122,7 @@ class ISXM_Items {
             return;
         }
 
-        update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
+        update_option( self::DB_VERSION_OPTION, self::DB_VERSION, true );
     }
 
     /**
@@ -144,7 +151,7 @@ class ISXM_Items {
      * Mark the backfill complete. Only ISXM_Tools' backfill batch calls this.
      */
     public static function mark_backfilled() {
-        update_option( self::BACKFILLED_OPTION, '1', false );
+        update_option( self::BACKFILLED_OPTION, '1', true );
     }
 
     /* ---------------------------------------------------------------------

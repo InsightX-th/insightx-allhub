@@ -108,6 +108,8 @@ function wp_check_filetype( $filename ) {
 	$ext   = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
 	return array( 'ext' => $ext, 'type' => isset( $types[ $ext ] ) ? $types[ $ext ] : false );
 }
+function wp_cache_get( $key, $group = '' ) { return $GLOBALS['isxm_t']['cache'][ $group ][ $key ] ?? false; }
+function wp_cache_set( $key, $value, $group = '', $expire = 0 ) { $GLOBALS['isxm_t']['cache'][ $group ][ $key ] = $value; return true; }
 function wp_cache_delete() { return true; }
 function _prime_post_caches() {}
 function wp_list_pluck( $list, $field ) { return array_map( function ( $row ) use ( $field ) { return is_object( $row ) ? $row->$field : $row[ $field ]; }, $list ); }
@@ -218,11 +220,25 @@ class ISXM_Test_WPDB {
 	public $postmeta = 'wp_postmeta';
 	public $options  = 'wp_options';
 	public $termmeta = 'wp_termmeta';
-	public function prepare( $query ) { return $query; }
+	public function prepare( $query, ...$args ) {
+		$this->prepared_args = isset( $args[0] ) && is_array( $args[0] ) ? $args[0] : $args;
+		return $query;
+	}
+	public $prepared_args = array();
 	public function esc_like( $text ) { return addcslashes( $text, '_%\\' ); }
 	public function get_col() { return array(); }
 	public function get_results( $q = '' ) {
 		$GLOBALS['isxm_t']['sql'][] = $q;
+		// Batch path lookup: answer from the same url_ids map the
+		// attachment_url_to_postid() fake uses.
+		if ( empty( $GLOBALS['isxm_t']['wpdb_results'] ) && strpos( $q, "meta_key = '_wp_attached_file' AND meta_value IN" ) !== false ) {
+			$base = rtrim( wp_get_upload_dir()['baseurl'], '/' ) . '/';
+			$rows = array();
+			foreach ( $this->prepared_args as $path ) {
+				if ( ! empty( $GLOBALS['isxm_t']['url_ids'][ $base . $path ] ) ) $rows[] = (object) array( 'post_id' => $GLOBALS['isxm_t']['url_ids'][ $base . $path ], 'meta_value' => $path );
+			}
+			return $rows;
+		}
 		return empty( $GLOBALS['isxm_t']['wpdb_results'] ) ? array() : array_shift( $GLOBALS['isxm_t']['wpdb_results'] );
 	}
 	public function __call( $name, $args ) { return null; }

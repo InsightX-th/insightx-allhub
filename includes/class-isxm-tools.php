@@ -689,8 +689,7 @@ class ISXM_Tools {
                 }
                 // Runs started before 'started' was recorded: treat as starting now.
                 $run_started = isset( $state['started'] ) ? (int) $state['started'] : time();
-                foreach ( ISXM_Sync::orphan_candidates( $page, $e, $prefix, $run_started ) as $key ) {
-                    $result = $client->delete_object( $key );
+                foreach ( $client->delete_objects( ISXM_Sync::orphan_candidates( $page, $e, $prefix, $run_started ) ) as $key => $result ) {
                     if ( ! is_wp_error( $result ) ) {
                         $state['deleted']++;
                     } else {

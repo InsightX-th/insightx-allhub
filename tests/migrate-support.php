@@ -77,7 +77,6 @@ function clean_post_cache( $id ) {
     // Core cache invalidation may query the post and clear the last SQL error.
     $GLOBALS['wpdb']->last_error = '';
 }
-function wp_cache_get( $key, $group = '' ) { return false; }
 function wp_remote_post( $url, $args ) { return wp_remote_request( $url, $args ); }
 function admin_url( $path ) { return 'https://example.com/wp-admin/' . $path; }
 function wp_next_scheduled( $hook ) { return false; }

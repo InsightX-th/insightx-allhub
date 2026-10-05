@@ -112,7 +112,15 @@ msgstr "การเชื่อมต่อขาดหลายครั้ง
 msgid "Counting files in the source bucket…"
 msgstr "กำลังนับไฟล์ใน source bucket…"
 
-#: includes/class-isxm-admin.php:104
+#: includes/class-isxm-admin.php:106
+msgid "Building attachment index…"
+msgstr "กำลังสร้างดัชนีไฟล์แนบ…"
+
+#: includes/class-isxm-admin.php:107
+msgid "Finalizing migration…"
+msgstr "กำลังปิดงานย้ายไฟล์…"
+
+#: includes/class-isxm-admin.php:108
 msgid "Writing URLs to the database…"
 msgstr "กำลังเขียน URL ลงฐานข้อมูล…"
 
@@ -1311,3 +1319,11 @@ msgstr ": ยังไม่ได้ offload ไปยัง bucket ปัจ�
 #: includes/class-isxm-wc-downloads.php:173
 msgid "Could not update the download file URL: "
 msgstr "อัปเดต URL ของไฟล์ดาวน์โหลดไม่สำเร็จ: "
+
+#: includes/class-isxm-offload.php
+msgid "Could not save the upload record to the database; local files were kept"
+msgstr "บันทึกข้อมูลการอัปโหลดลงฐานข้อมูลไม่สำเร็จ จึงเก็บไฟล์ในเซิร์ฟเวอร์ไว้ก่อน"
+
+#: includes/class-isxm-offload.php
+msgid "Another process is uploading this item right now — it will be picked up again later"
+msgstr "มีอีกงานกำลังอัปโหลดไฟล์นี้อยู่ เดี๋ยวระบบจะทำรายการนี้ใหม่อีกครั้ง"

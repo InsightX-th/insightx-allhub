@@ -235,9 +235,11 @@ class ISXM_DB_Rewriter {
      *                              the row belongs to (post ID / option name).
      * @param string   $kind        Optional 'posts'|'postmeta'|'options' — which
      *                              cache to purge for rewritten rows.
-     * @return array{processed:int,last_id:int,done:bool}
+     * @param float    $deadline    Optional microtime() to stop at, mid-window.
+     * @return array{processed:int,last_id:int,done:bool}|WP_Error Error only
+     *               for a failed write; the cursor in the caller stays put.
      */
-    public static function rewrite_window( $table, $id_col, $value_col, callable $map_builder, $after_id = 0, $limit = 100, $ref_col = null, $kind = null ) {
+    public static function rewrite_window( $table, $id_col, $value_col, callable $map_builder, $after_id = 0, $limit = 100, $ref_col = null, $kind = null, $deadline = 0 ) {
         global $wpdb;
 
         $rows = $wpdb->get_results( $wpdb->prepare(
@@ -249,30 +251,54 @@ class ISXM_DB_Rewriter {
             (int) $after_id,
             (int) $limit
         ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- $id_col/$value_col/$ref_col are this class's own hard-coded column names
+        if ( $wpdb->last_error ) {
+            return new WP_Error( 'isxs_rewrite_read', 'Could not read the next URL rewrite window; checkpoint retained.' );
+        }
 
         $refs      = [];
         $last_id   = (int) $after_id;
         $processed = 0;
+        $stopped   = false;
 
         foreach ( $rows as $row ) {
-            $last_id = (int) $row->id;
-            $processed++;
+            // A window of slow rows must not outlive the request: the caller
+            // only saves the cursor when this returns.
+            if ( $deadline && microtime( true ) >= $deadline ) {
+                $stopped = true;
+                break;
+            }
+            // Never rewrite our own settings, checkpoints or cached state.
+            if ( $kind === 'options' && isset( $row->ref ) && preg_match( '/^(isxs_|isxm_|_transient_|_site_transient_)/', $row->ref ) ) {
+                $last_id = (int) $row->id;
+                continue;
+            }
 
             // Only rows the probe matched are here, but the probe is broad —
             // the per-row map decides whether anything actually changes. An
             // empty map (no resolvable offloaded URL in this value) means
             // the row is left alone entirely.
             $map = call_user_func( $map_builder, $row->val );
-            if ( empty( $map ) ) {
-                continue;
-            }
-            $replaced = self::recursive_replace_pairs( $row->val, $map );
+            $replaced = empty( $map ) ? $row->val : self::recursive_replace_pairs( $row->val, $map );
             if ( $replaced !== $row->val ) {
-                $wpdb->update( $table, [ $value_col => $replaced ], [ $id_col => $row->id ] );
+                // Compare-and-swap: an editor saving this row meanwhile wins,
+                // and the row is re-read on the next window.
+                $written = $wpdb->update( $table, [ $value_col => $replaced ], [ $id_col => $row->id, $value_col => $row->val ] );
+                if ( $written === false ) {
+                    if ( $refs && $kind ) {
+                        self::purge_cache( $kind, $refs );
+                    }
+                    return new WP_Error( 'isxs_rewrite_write', 'A URL rewrite could not be committed; checkpoint retained for retry.' );
+                }
+                if ( $written === 0 ) {
+                    $stopped = true;
+                    break;
+                }
                 if ( $ref_col && isset( $row->ref ) ) {
                     $refs[] = $row->ref;
                 }
             }
+            $last_id = (int) $row->id;
+            $processed++;
         }
 
         if ( ! empty( $refs ) && $kind ) {
@@ -282,7 +308,7 @@ class ISXM_DB_Rewriter {
         return [
             'processed' => $processed,
             'last_id'   => $last_id,
-            'done'      => count( $rows ) < $limit,
+            'done'      => ! $stopped && count( $rows ) < $limit,
         ];
     }
 

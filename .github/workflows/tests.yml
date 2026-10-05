@@ -64,6 +64,9 @@ jobs:
       - name: Migration checkpoints
         run: php tests/migrate-checkpoints.php
 
+      - name: Data integrity
+        run: php tests/integrity.php
+
       - name: Migration scale (523,886 objects)
         if: matrix.php == '8.3'
         run: php -d memory_limit=256M tests/migrate-scale.php

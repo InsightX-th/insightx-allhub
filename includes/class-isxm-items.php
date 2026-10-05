@@ -242,19 +242,33 @@ class ISXM_Items {
             'updated_at'     => current_time( 'mysql', true ),
         ];
 
-        self::$cache[ $attachment_id ] = self::normalize_record( $record );
-
-        $table = self::table();
-        $existing_id = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM {$table} WHERE source_type = %s AND source_id = %d", // phpcs:ignore WordPress.DB.PreparedSQL -- table name from $wpdb->prefix
-            'media-library',
-            $attachment_id
-        ) );
-
-        if ( $existing_id ) {
-            return false !== $wpdb->update( $table, $data, [ 'id' => (int) $existing_id ] );
+        // No table yet (install failed or still pending): postmeta is the
+        // only store, so there is nothing to keep consistent here.
+        if ( (int) get_option( self::DB_VERSION_OPTION ) !== self::DB_VERSION ) {
+            return true;
         }
-        return false !== $wpdb->insert( $table, $data );
+
+        // One atomic upsert on uidx_source. The old SELECT-then-INSERT let
+        // two concurrent offloads both miss the row, and the loser's INSERT
+        // failed silently, leaving the previous record in place.
+        $table   = self::table();
+        if ( $data['missing'] === null ) {
+            unset( $data['missing'] ); // prepare() has no NULL; the column defaults to it.
+        }
+        $columns = implode( ',', array_keys( $data ) );
+        $marks   = implode( ',', array_map( function ( $v ) { return is_int( $v ) ? '%d' : '%s'; }, $data ) );
+        $sql     = $wpdb->prepare( "REPLACE INTO {$table} ({$columns}) VALUES ({$marks})", array_values( $data ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- table/columns are internal constants
+        if ( false === $wpdb->query( $sql ) || $wpdb->last_error ) {
+            // A stale row would keep winning over the fresh postmeta in
+            // get_record(); drop it so reads fall back to postmeta.
+            self::delete( $attachment_id );
+            unset( self::$cache[ $attachment_id ] );
+            isxm_log_error( sprintf( 'Ledger write failed for attachment #%d: %s', $attachment_id, $wpdb->last_error ) );
+            return false;
+        }
+
+        self::$cache[ $attachment_id ] = self::normalize_record( $record );
+        return true;
     }
 
     /**

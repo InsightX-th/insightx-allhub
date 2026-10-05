@@ -379,10 +379,19 @@ class ISXM_CLI {
 
         $offload = new ISXM_Offload();
 
-        $this->run_offloaded( $assoc_args, 'Removing media from bucket', function ( $id ) use ( $offload ) {
+        $removed = [];
+        $this->run_offloaded( $assoc_args, 'Removing media from bucket', function ( $id ) use ( $offload, &$removed ) {
             // defer_persist: reverse URL pairs are returned and flushed as
             // one bulk DB rewrite per chunk (guid already updated inside).
-            return $offload->remove_remote_attachment( $id, true );
+            $pairs = $offload->remove_remote_attachment( $id, true );
+            if ( ! is_wp_error( $pairs ) ) {
+                $removed[] = $id;
+            }
+            return $pairs;
+        }, function () use ( &$removed ) {
+            // Records go only after the chunk's rewrite has landed.
+            ISXM_Offload::finish_removal( $removed );
+            $removed = [];
         } );
     }
 
@@ -396,7 +405,7 @@ class ISXM_CLI {
      * @param string   $label      Progress bar label.
      * @param callable $process    fn( int $id ): true|array|WP_Error
      */
-    private function run_offloaded( $assoc_args, $label, callable $process ) {
+    private function run_offloaded( $assoc_args, $label, callable $process, ?callable $after_rewrite = null ) {
         if ( function_exists( 'set_time_limit' ) ) {
             @set_time_limit( 0 );
         }
@@ -446,6 +455,9 @@ class ISXM_CLI {
 
             if ( ! empty( $url_pairs ) ) {
                 ISXM_DB_Rewriter::replace_urls_bulk( $url_pairs );
+            }
+            if ( $after_rewrite ) {
+                $after_rewrite();
             }
 
             $after_id = $batch['last_id'];
@@ -623,8 +635,10 @@ class ISXM_CLI {
         $progress->finish();
 
         // The one final one-pass rewrite, then the deletions it unlocks.
-        if ( ISXM_Offload::should_persist_urls() ) {
-            ISXM_Tools::rewrite_all_urls_once();
+        $rewritten = ISXM_Offload::should_persist_urls() ? ISXM_Tools::rewrite_all_urls_once() : true;
+        if ( is_wp_error( $rewritten ) ) {
+            // Local copies stay: the database may still point at them.
+            WP_CLI::error( $rewritten->get_error_message() . ' Local files were kept; run the command again to finish.' );
         }
         if ( $defer_file !== null ) {
             ISXM_Tools::flush_deferred_deletions( $defer_file );

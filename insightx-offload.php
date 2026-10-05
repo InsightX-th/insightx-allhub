@@ -235,6 +235,9 @@ function isxm_plugin_uninstall() {
 
     global $wpdb;
     $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}isxs_items" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL -- table name from $wpdb->prefix, uninstall cleanup
+    $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}isxs_migration_paths, {$wpdb->prefix}isxs_migration_work" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL -- table names from $wpdb->prefix, uninstall cleanup
+    delete_option( 'isxs_migration_schema' );
+    delete_option( 'isxs_migration_index_ready' );
 }
 
 add_action( 'added_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );

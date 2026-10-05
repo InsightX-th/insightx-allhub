@@ -143,10 +143,14 @@ class ISXM_Offload {
      *
      * @param int   $attachment_id
      * @param array $record
+     * @return bool Whether BOTH stores now hold this record.
      */
     public static function set_record( $attachment_id, array $record ) {
         update_post_meta( $attachment_id, self::META_KEY, $record );
-        ISXM_Items::put( $attachment_id, $record );
+        // update_post_meta() also returns false for an unchanged value, so
+        // the read-back is the only reliable success signal.
+        $saved = get_post_meta( $attachment_id, self::META_KEY, true ) === $record;
+        return ISXM_Items::put( $attachment_id, $record ) && $saved;
     }
 
     /**
@@ -294,7 +298,17 @@ class ISXM_Offload {
             return new WP_Error( 'isxs_protected_download', __( 'Protected download (WooCommerce / Easy Digital Downloads) — kept on the server so it is never publicly readable in the bucket', 'insightx-offload' ) );
         }
 
-        $result = $this->run_offload( $attachment_id, $metadata, $defer_persist, $origin, $migration_paths, $stage_dir );
+        // An upload's own offload and a background run can reach the same
+        // attachment at once; each would pick its own object version and the
+        // first one's Remove Local could delete files the other still reads.
+        if ( ! self::lock_attachment( $attachment_id ) ) {
+            return new WP_Error( 'isxs_busy', __( 'Another process is uploading this item right now — it will be picked up again later', 'insightx-offload' ) );
+        }
+        try {
+            $result = $this->run_offload( $attachment_id, $metadata, $defer_persist, $origin, $migration_paths, $stage_dir );
+        } finally {
+            delete_option( 'isxs_lock_' . (int) $attachment_id );
+        }
 
         if ( is_wp_error( $result ) ) {
             self::record_error( $attachment_id, $result );
@@ -303,6 +317,30 @@ class ISXM_Offload {
         }
 
         return $result;
+    }
+
+    /** Lease that expires, so a fatal mid-upload never wedges an item. */
+    const LOCK_TTL = 600;
+
+    /**
+     * Per-attachment mutex. add_option() is an INSERT on the unique
+     * option_name, so exactly one caller wins it.
+     *
+     * @param int $attachment_id
+     * @return bool
+     */
+    private static function lock_attachment( $attachment_id ) {
+        $key = 'isxs_lock_' . (int) $attachment_id;
+        if ( add_option( $key, time(), '', false ) ) {
+            return true;
+        }
+        wp_cache_delete( $key, 'options' );
+        if ( time() - (int) get_option( $key ) < self::LOCK_TTL ) {
+            return false;
+        }
+        // ponytail: stale-lease takeover is not atomic; two takers within the same second both win. Rare enough after a 10-minute expiry.
+        update_option( $key, time(), false );
+        return true;
     }
 
     /**
@@ -466,8 +504,11 @@ class ISXM_Offload {
             // Same reason as above: appended last, never inserted.
             $record['missing'] = $missing;
         }
-        self::set_record( $attachment_id, $record );
-        if ( $migration_paths && get_post_meta( $attachment_id, self::META_KEY, true ) !== $record ) return new WP_Error( 'isxs_record_write', 'Could not persist uploaded file record; staging retained.' );
+        // Nothing local may be deleted, and no URL rewritten, for an upload
+        // the database does not remember.
+        if ( ! self::set_record( $attachment_id, $record ) ) {
+            return new WP_Error( 'isxs_record_write', __( 'Could not save the upload record to the database; local files were kept', 'insightx-offload' ) );
+        }
         // A real upload succeeded — whatever "file missing both places"
         // flag the Sync tool may have left is now wrong.
         delete_post_meta( $attachment_id, self::DATA_LOSS_META_KEY );
@@ -801,11 +842,35 @@ class ISXM_Offload {
             }
         }
 
-        self::delete_record( $attachment_id );
-        // The file is deliberately off the bucket now — any stale failure
-        // record would otherwise keep it flagged red forever.
-        self::clear_error( $attachment_id );
-        return $defer_persist ? $pairs : true;
+        // Gone from the bucket AND not restorable: say so, the same way the
+        // Sync tool does, instead of silently forgetting the item.
+        if ( is_wp_error( $restored ) && ! self::local_file_exists( $attachment_id ) ) {
+            update_post_meta( $attachment_id, self::DATA_LOSS_META_KEY, time() );
+        }
+
+        // Deferred: the caller's bulk rewrite has not run yet, and the record
+        // is what lets a resumed run find this item again — dropping it
+        // first meant a request dying in between left remote URLs pointing at
+        // deleted objects for good. The caller calls finish_removal().
+        if ( $defer_persist ) {
+            return $pairs;
+        }
+        self::finish_removal( [ $attachment_id ] );
+        return true;
+    }
+
+    /**
+     * Forget removed items once their reverse URL rewrite has landed.
+     *
+     * @param int[] $attachment_ids
+     */
+    public static function finish_removal( array $attachment_ids ) {
+        foreach ( $attachment_ids as $attachment_id ) {
+            self::delete_record( $attachment_id );
+            // The file is deliberately off the bucket now — any stale failure
+            // record would otherwise keep it flagged red forever.
+            self::clear_error( $attachment_id );
+        }
     }
 
     /**
@@ -1232,10 +1297,14 @@ class ISXM_Offload {
         // Map sized files (example-300x200.jpg) back to the original for lookup.
         $lookup = preg_replace( '#-\d+x\d+(\.[a-zA-Z0-9]+)$#', '$1', $relative );
 
-        if ( ! array_key_exists( $lookup, self::$url_post_cache ) ) {
-            self::$url_post_cache[ $lookup ] = attachment_url_to_postid( $base_url . '/' . $lookup );
+        $attachment_id = self::attachment_id_for_path( $base_url, $lookup );
+        if ( ! $attachment_id ) {
+            // Images over the big-image threshold (WP 5.3+) are attached as
+            // name-scaled.ext, while the original and every size keep the
+            // bare name — so their size URLs never matched and stayed local.
+            // ponytail: edited images (name-e1699….ext) still miss; resolve by the wp-image-{ID} class if that shows up.
+            $attachment_id = self::attachment_id_for_path( $base_url, preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-scaled$1', $lookup ) );
         }
-        $attachment_id = self::$url_post_cache[ $lookup ];
         if ( ! $attachment_id ) {
             return null;
         }
@@ -1248,6 +1317,20 @@ class ISXM_Offload {
             return null;
         }
         return self::build_remote_url( $info, $filename );
+    }
+
+    /**
+     * Attachment ID for a path relative to uploads, memoized per request.
+     *
+     * @param string $base_url Uploads base URL.
+     * @param string $relative Path under uploads.
+     * @return int 0 when no attachment uses this file.
+     */
+    private static function attachment_id_for_path( $base_url, $relative ) {
+        if ( ! array_key_exists( $relative, self::$url_post_cache ) ) {
+            self::$url_post_cache[ $relative ] = (int) attachment_url_to_postid( $base_url . '/' . $relative );
+        }
+        return self::$url_post_cache[ $relative ];
     }
 
     /**

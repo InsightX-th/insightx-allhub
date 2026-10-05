@@ -163,6 +163,10 @@ function update_option( $key, $value, $autoload = null ) {
     if ( isset( $GLOBALS['isxm_t']['on_option_write'] ) ) call_user_func( $GLOBALS['isxm_t']['on_option_write'], $key, $value );
     return true;
 }
+function add_option( $key, $value = '', $deprecated = '', $autoload = null ) {
+    if ( array_key_exists( $key, $GLOBALS['isxm_t']['options'] ) ) return false;
+    return update_option( $key, $value, $autoload );
+}
 function delete_option( $key ) { unset( $GLOBALS['isxm_t']['options'][ $key ] ); return true; }
 function get_transient( $key ) { return get_option( '_transient_' . $key ); }
 function set_transient( $key, $value ) { return update_option( '_transient_' . $key, $value ); }
@@ -279,4 +283,16 @@ function isxm_test_configure( array $conn = array(), array $settings = array() )
 	);
 	$GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( array( 'provider' => 'custom' ), $settings );
 	ISXM_Settings::flush_cache();
+}
+
+/** Start tests/fake-s3.php under `php -S`; returns [ port, log file ]. */
+function isxm_start_fake_s3() {
+    $log  = sys_get_temp_dir() . '/isxm_fake_s3_' . getmypid() . '_' . mt_rand() . '.jsonl';
+    $port = 17000 + mt_rand( 0, 999 );
+    $proc = proc_open( array( PHP_BINARY, '-S', "127.0.0.1:$port", __DIR__ . '/fake-s3.php' ),
+        array( 0 => array( 'pipe', 'r' ), 1 => array( 'file', '/dev/null', 'w' ), 2 => array( 'file', '/dev/null', 'w' ) ),
+        $pipes, null, array( 'ISXM_FAKE_S3_LOG' => $log ) );
+    register_shutdown_function( function () use ( $proc, $log ) { proc_terminate( $proc ); @unlink( $log ); } );
+    for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $port ); $i++ ) usleep( 100000 );
+    return array( $port, $log );
 }

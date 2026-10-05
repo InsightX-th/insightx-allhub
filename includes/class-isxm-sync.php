@@ -388,9 +388,12 @@ class ISXM_Sync {
             if ( $key === '' || $id <= 0 ) {
                 continue;
             }
-            if ( ! isset( $map[ $key ] ) ) {
-                $map[ $key ] = $id;
+            // A page replayed after a crash appends the same lines again;
+            // counting them twice made complete items look partial.
+            if ( isset( $map[ $key ] ) ) {
+                continue;
             }
+            $map[ $key ] = $id;
             if ( ! isset( $counts[ $id ] ) ) {
                 $counts[ $id ]  = 1;
                 $primary[ $id ] = $key; // first key per attachment = primary
@@ -578,6 +581,12 @@ class ISXM_Sync {
                 continue;
             }
             if ( ( $info['endpoint'] ?? '' ) !== $current_endpoint ) {
+                continue;
+            }
+
+            // The scan is a snapshot; the item may have been re-uploaded
+            // since. One prefixed listing before forgetting it for good.
+            if ( ISXM_Sync::primary_exists_on_destination( $info ) ) {
                 continue;
             }
 

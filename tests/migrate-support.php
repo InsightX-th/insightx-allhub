@@ -1,5 +1,6 @@
 <?php
 /** Real bounded SQL windows in SQLite, WordPress/storage boundaries faked. */
+if ( ! defined( 'ARRAY_A' ) ) define( 'ARRAY_A', 'ARRAY_A' );
 class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
     public $db;
     public $queries = 0;
@@ -27,11 +28,11 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
             return $m[0] === '%s' ? $this->db->quote( (string) $v ) : (string) (int) $v;
         }, $sql );
     }
-    public function get_results( $sql = '' ) {
+    public function get_results( $sql = '', $output = 'OBJECT' ) {
         $this->queries++;
         $this->last_error = '';
         if ( $this->fail_read ) { $this->last_error = 'injected read failure'; return null; }
-        $rows = $this->db->query( $sql )->fetchAll( PDO::FETCH_OBJ );
+        $rows = $this->db->query( $sql )->fetchAll( $output === ARRAY_A ? PDO::FETCH_ASSOC : PDO::FETCH_OBJ );
         $this->max_rows = max( $this->max_rows, count( $rows ) );
         return $rows;
     }
@@ -41,8 +42,15 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         $value = $this->db->query( $sql )->fetchColumn();
         return $value === false ? null : $value;
     }
+    public function get_row( $sql, $output = 'OBJECT' ) {
+        $rows = $this->get_results( $sql, $output );
+        return $rows ? $rows[0] : null;
+    }
+    /** Regex: matching statements fail like a MySQL error would. */
+    public $fail_query = '';
     public function query( $sql ) {
         $this->last_error = '';
+        if ( $this->fail_query !== '' && preg_match( $this->fail_query, $sql ) ) { $this->last_error = 'injected query failure'; return false; }
         return $this->db->exec( str_replace( 'INSERT IGNORE', 'INSERT OR IGNORE', $sql ) );
     }
     public function update( $table, $data, $where ) {
@@ -109,4 +117,10 @@ function migration_drain( $max = 100 ) {
         if ( is_wp_error( $result ) || $result['done'] ) return $result;
     }
     throw new RuntimeException( 'Migration did not settle.' );
+}
+
+/** The offload ledger (ISXM_Items) in the SQLite test DB, marked installed. */
+function isxm_items_table( ISXM_Migration_Test_DB $db ) {
+    $db->db->exec( 'CREATE TABLE IF NOT EXISTS wp_isxs_items (id INTEGER PRIMARY KEY AUTOINCREMENT, source_type TEXT, source_id INTEGER, provider TEXT, bucket TEXT, endpoint TEXT, region TEXT, path_style INTEGER, base_key TEXT, object_version TEXT, origin TEXT, files TEXT, missing TEXT, is_partial INTEGER, updated_at TEXT, UNIQUE(source_type,source_id))' );
+    update_option( ISXM_Items::DB_VERSION_OPTION, ISXM_Items::DB_VERSION );
 }

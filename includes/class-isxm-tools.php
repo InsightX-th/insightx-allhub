@@ -489,7 +489,11 @@ class ISXM_Tools {
                     }
                     if ( isset( $e['map'][ $key ] ) ) {
                         $id = $e['map'][ $key ];
-                        unset( $e['map'][ $key ] );
+                        if ( $id === 0 ) {
+                            continue; // same key listed twice (page replayed after a crash)
+                        }
+                        // ponytail: duplicate ORPHAN keys still count twice; report-only, the delete pass re-lists.
+                        $e['map'][ $key ] = 0;
                         $found[ $id ] = ( $found[ $id ] ?? 0 ) + 1;
                         if ( ( $e['primary'][ $id ] ?? '' ) === $key ) {
                             $primary_found[ $id ] = true;
@@ -1630,7 +1634,7 @@ class ISXM_Tools {
      * so nothing the database references is being removed.
      *
      * @param string $rest "{table}:{after_id}" portion of the job cursor.
-     * @return array{processed:int,last_id:string,done:bool,errors:string[],phase:string}
+     * @return array{processed:int,last_id:string,done:bool,errors:string[],phase:string}|WP_Error
      */
     private function run_rewrite_batch( $rest ) {
         if ( function_exists( 'set_time_limit' ) ) {
@@ -1657,8 +1661,12 @@ class ISXM_Tools {
                 $after,
                 self::REWRITE_WINDOW,
                 $cfg['ref_col'],
-                $cfg['kind']
+                $cfg['kind'],
+                $started + $budget
             );
+            if ( is_wp_error( $window ) ) {
+                return $window;
+            }
 
             if ( ! $window['done'] ) {
                 // More rows left in this table — resume from where we stopped.
@@ -1704,7 +1712,7 @@ class ISXM_Tools {
      * time budget) — the CLI's equivalent of the background job's rewrite|
      * phase, used by `wp isxm offload` after every chunk has uploaded.
      *
-     * @return void
+     * @return true|WP_Error
      */
     public static function rewrite_all_urls_once() {
         foreach ( self::rewrite_tables() as $cfg ) {
@@ -1720,9 +1728,13 @@ class ISXM_Tools {
                     $cfg['ref_col'],
                     $cfg['kind']
                 );
+                if ( is_wp_error( $window ) ) {
+                    return $window;
+                }
                 $after = $window['last_id'];
             } while ( ! $window['done'] );
         }
+        return true;
     }
 
     /* ---------------------------------------------------------------------
@@ -1851,7 +1863,7 @@ class ISXM_Tools {
      * @param callable $process  fn( int $id ): true|array|WP_Error
      * @return array{processed:int,last_id:int,done:bool,errors:string[]}
      */
-    private function run_offloaded_batch( $after_id, callable $process ) {
+    private function run_offloaded_batch( $after_id, callable $process, ?callable $after_rewrite = null ) {
         if ( function_exists( 'set_time_limit' ) ) {
             @set_time_limit( self::MAX_REQUEST_SECONDS );
         }
@@ -1899,6 +1911,9 @@ class ISXM_Tools {
 
         if ( ! empty( $url_pairs ) ) {
             ISXM_DB_Rewriter::replace_urls_bulk( $url_pairs );
+        }
+        if ( $after_rewrite ) {
+            $after_rewrite();
         }
 
         return [
@@ -2186,6 +2201,9 @@ class ISXM_Tools {
 
         if ( $phase === 'rewrite' ) {
             $result = $this->run_rewrite_batch( $rest );
+            if ( is_wp_error( $result ) ) {
+                return $result;
+            }
             return self::batch_result( $result, [
                 'cursor' => 'rewrite|' . $result['last_id'],
                 'phase'  => $result['phase'],
@@ -2346,10 +2364,18 @@ class ISXM_Tools {
     private function batch_remove( $cursor ) {
         $offload = new ISXM_Offload();
 
-        $result = $this->run_offloaded_batch( (int) $cursor, function ( $id ) use ( $offload ) {
+        $removed = [];
+        $result = $this->run_offloaded_batch( (int) $cursor, function ( $id ) use ( $offload, &$removed ) {
             // defer_persist: reverse URL pairs are returned and flushed as
             // one bulk DB rewrite per batch (guid already updated inside).
-            return $offload->remove_remote_attachment( $id, true );
+            $pairs = $offload->remove_remote_attachment( $id, true );
+            if ( ! is_wp_error( $pairs ) ) {
+                $removed[] = $id;
+            }
+            return $pairs;
+        }, function () use ( &$removed ) {
+            // Records go only after the batch's rewrite has landed.
+            ISXM_Offload::finish_removal( $removed );
         } );
 
         return self::batch_result( $result );

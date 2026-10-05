@@ -438,6 +438,7 @@ class ISXM_CLI {
             $batch     = ISXM_Tools::get_offloaded_ids( $chunk, $after_id );
             $url_pairs = [];
 
+            ISXM_Tools::flush_runtime_caches();
             ISXM_Tools::prime_caches( $batch['ids'] );
 
             foreach ( $batch['ids'] as $id ) {
@@ -508,6 +509,7 @@ class ISXM_CLI {
             }
 
             $url_pairs = [];
+            ISXM_Tools::flush_runtime_caches();
             ISXM_Tools::prime_caches( array_keys( $batch['items'] ) );
             foreach ( $batch['items'] as $id => $key_map ) {
                 $result = ISXM_Migrate::migrate_attachment( $id, $key_map, true );
@@ -600,6 +602,7 @@ class ISXM_CLI {
         while ( ! $done ) {
             $batch = call_user_func( $fetch_ids, $chunk, $after_id );
 
+            ISXM_Tools::flush_runtime_caches();
             ISXM_Tools::prime_caches( $batch['ids'] );
 
             foreach ( $batch['ids'] as $id ) {

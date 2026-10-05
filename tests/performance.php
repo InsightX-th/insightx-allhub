@@ -66,6 +66,7 @@ $proc = proc_open( [ 'python3', __DIR__ . '/parallel-s3.py', (string) $port ], [
 register_shutdown_function( function () use ( $proc ) { proc_terminate( $proc ); } );
 for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $port ); $i++ ) usleep( 100000 );
 isxm_test_configure( [ 'endpoint' => "http://127.0.0.1:$port" ], [ 'persist_urls' => false, 'use_prefix' => false, 'use_object_version' => false ] );
+$GLOBALS['isxm_t']['filters']['isxm_migrate_concurrency'] = function () { return 4; };
 $sizes = [];
 file_put_contents( "$dir/big.jpg", str_repeat( 'x', 5000 ) );
 for ( $v = 1; $v <= 8; $v++ ) { file_put_contents( "$dir/big-{$v}00x100.jpg", str_repeat( 'y', 5000 ) ); $sizes[ "s$v" ] = [ 'file' => "big-{$v}00x100.jpg" ]; }
@@ -88,6 +89,40 @@ $before = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), tr
 $r = $o->offload_attachment( 42, [ 'file' => '2025/10/fail-original.jpg', 'sizes' => $sizes ] );
 $after = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), true )['calls'];
 t( 'Failed original stops the item before any size is sent', is_wp_error( $r ) && count( $after ) - count( $before ) === 1 );
+
+group( 'B3 Download/Remove restore several files at once, 404 apart' );
+isxm_test_configure( [ 'endpoint' => "http://127.0.0.1:$port" ], [ 'persist_urls' => false ] );
+$GLOBALS['isxm_t']['filters']['isxm_migrate_concurrency'] = function () { return 4; };
+$dl = ISXM_TEST_UPLOADS . '/2025/11'; @mkdir( $dl, 0777, true );
+array_map( 'unlink', glob( "$dl/*" ) ?: [] );
+$files = [ 'd.jpg' ];
+for ( $v = 1; $v <= 7; $v++ ) $files[] = "d-{$v}00x100.jpg";
+isxm_test_add_post( 43, [] );
+update_post_meta( 43, '_wp_attached_file', '2025/11/d.jpg' );
+ISXM_Offload::set_record( 43, [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$port", 'base_key' => '2025/11/', 'files' => $files ] );
+$p0 = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), true );
+$started = microtime( true );
+$r = $o->download_attachment( 43 );
+$seconds = microtime( true ) - $started;
+t( 'All 8 files restored', $r === true && count( glob( "$dl/d*.jpg" ) ) === 8 && file_get_contents( "$dl/d.jpg" ) === 'object:/media/2025/11/d.jpg' );
+t( '8 GETs at 120 ms each run concurrently (< 0.6 s)', $seconds < 0.6, sprintf( '%.2fs', $seconds ) );
+ISXM_Offload::set_record( 43, [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$port", 'base_key' => '2025/11/', 'files' => [ 'd.jpg', 'fail.jpg', 'truncated.jpg' ] ] );
+$r = $o->download_attachment( 43 );
+t( 'Permission/truncation failures are errors, never "missing"', is_wp_error( $r ) && $r->get_error_code() === 'isxs_download_failed', is_wp_error( $r ) ? $r->get_error_code() : 'true' );
+t( 'No partial file left behind', ! is_file( "$dl/truncated.jpg" ) && ! glob( "$dl/*.part-*" ) );
+ISXM_Offload::set_record( 43, [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$port", 'base_key' => '2025/11/', 'files' => [ 'd.jpg', 'fail.jpg' ] ] );
+$deleted = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), true )['calls'];
+$r = $o->remove_remote_attachment( 43 );
+$after = json_decode( file_get_contents( "http://127.0.0.1:$port/__stats" ), true )['calls'];
+t( 'Remove stops before deleting anything when a restore failed', is_wp_error( $r ) && ! array_filter( array_keys( $after ), function ( $k ) { return strpos( $k, 'DELETE' ) === 0 || strpos( $k, 'POST' ) === 0; } ) && ISXM_Offload::get_record( 43 ) !== null );
+
+group( 'B6 long CLI runs drop per-item caches' );
+ISXM_Items::prime( [ 990 ] );
+ISXM_Offload::resolve_local_url( 'https://example.com/wp-content/uploads/x.jpg' );
+ISXM_Tools::flush_runtime_caches();
+$cache = new ReflectionProperty( 'ISXM_Items', 'cache' ); if ( PHP_VERSION_ID < 80100 ) $cache->setAccessible( true );
+$urls = new ReflectionProperty( 'ISXM_Offload', 'url_post_cache' ); if ( PHP_VERSION_ID < 80100 ) $urls->setAccessible( true );
+t( 'flush_runtime_caches empties the per-item caches', $cache->getValue() === [] && $urls->getValue() === [] );
 
 group( 'F7 deleting an attachment is one request, not one per file' );
 isxm_test_configure( [], [] );

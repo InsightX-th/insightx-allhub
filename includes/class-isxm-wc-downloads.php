@@ -127,7 +127,7 @@ class ISXM_WC_Downloads {
             }
 
             $info = ISXM_Offload::get_record( $attachment_id );
-            if ( ! is_array( $info ) || empty( $info['files'] ) || $info['bucket'] !== $current_bucket ) {
+            if ( ! is_array( $info ) || empty( $info['files'] ) || $info['bucket'] !== $current_bucket || ( $info['endpoint'] ?? '' ) !== ISXM_Settings::get( 'endpoint' ) ) {
                 $notes[] = $download->get_name() . __( ': not yet offloaded to the current bucket — offload it first, then run this tool', 'insightx-offload' );
                 continue;
             }

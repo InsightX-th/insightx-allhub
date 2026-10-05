@@ -636,7 +636,7 @@ class ISXM_Sync {
         $token   = '';
 
         do {
-            $page = $client->list_objects_keys_page( $token, 1000 );
+            $page = $client->list_objects_keys_page( $token, 1000, $prefix );
             if ( is_wp_error( $page ) ) {
                 return $page;
             }

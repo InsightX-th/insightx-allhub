@@ -328,6 +328,11 @@ class ISXM_Offload {
         return $result;
     }
 
+    /** Forget memoized URL lookups (long CLI runs). */
+    public static function flush_url_cache() {
+        self::$url_post_cache = [];
+    }
+
     /** Attachment ID being offloaded from its own first upload, else 0. */
     private static $new_upload = 0;
 
@@ -779,6 +784,7 @@ class ISXM_Offload {
 
         $client  = self::client_for_info( $info );
         $missing = [];
+        $wanted  = [];
         foreach ( $info['files'] as $filename ) {
             // Stored meta is the one place a traversal name could have
             // been persisted without going through collect_filenames() —
@@ -789,27 +795,26 @@ class ISXM_Offload {
             if ( $filename === '' ) {
                 return new WP_Error( 'isxs_unsafe_filename', __( 'Invalid file name in the attachment data — check the meta', 'insightx-offload' ) );
             }
-            $path = $local_dir . $filename;
-            if ( file_exists( $path ) ) {
+            if ( ! file_exists( $local_dir . $filename ) ) {
+                $wanted[ $filename ] = [ 'key' => $info['base_key'] . $filename, 'path' => $local_dir . $filename ];
+            }
+        }
+        // Streamed to disk (never held in memory) through a temp file that is
+        // only renamed into place once complete, several files at a time.
+        foreach ( $client->transfer_many( 'GET', $wanted, null, '', '' ) as $filename => $fetched ) {
+            if ( ! is_wp_error( $fetched ) ) {
                 continue;
             }
-            // Streamed to disk rather than returned as a string: a multi-GB
-            // download used to be held whole in memory, and blowing
-            // memory_limit is a fatal that takes the entire batch with it.
-            $fetched = $client->get_object_to_file( $info['base_key'] . $filename, $path );
-            if ( is_wp_error( $fetched ) ) {
-                // "Already gone from the bucket" (404) is not a reason to stop:
-                // returning here left every later size un-downloaded, and
-                // remove_remote_attachment() — which proceeds on
-                // isxs_download_missing — then deleted those sizes from the
-                // bucket too, losing them for good. Keep fetching the rest and
-                // report the missing ones once every other file is local.
-                if ( $fetched->get_error_code() === 'isxs_http_404' ) {
-                    $missing[] = $filename;
-                    continue;
-                }
-                return new WP_Error( 'isxs_download_failed', sprintf( __( 'Download of %s failed: %s', 'insightx-offload' ), $filename, $fetched->get_error_message() ) );
+            // "Already gone from the bucket" (404) is not a reason to stop:
+            // remove_remote_attachment() proceeds on isxs_download_missing,
+            // so every other size must be home first. Any OTHER failure
+            // (auth, network, truncation) must never be read as "missing",
+            // or Remove would delete objects that were never restored.
+            if ( $fetched->get_error_code() === 'isxs_http_404' ) {
+                $missing[] = $filename;
+                continue;
             }
+            return new WP_Error( 'isxs_download_failed', sprintf( __( 'Download of %s failed: %s', 'insightx-offload' ), $filename, $fetched->get_error_message() ) );
         }
 
         if ( $missing ) {

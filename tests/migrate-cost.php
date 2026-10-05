@@ -29,6 +29,7 @@ $db->db->exec( 'CREATE TABLE wp_isxs_items (id INTEGER PRIMARY KEY AUTOINCREMENT
 isxm_test_configure( [ 'endpoint' => 'http://127.0.0.1:' . $port ], [ 'source_provider' => 'custom', 'source_prefix' => '', 'source_use_year_month' => false,
     'use_prefix' => false, 'use_year_month' => false, 'persist_urls' => true, 'remove_local' => true, 'deliver_enabled' => true ] );
 update_option( 'isxs_migration_schema', 1 ); // group() reset the option the test DB set
+$GLOBALS['isxm_t']['filters']['isxm_migrate_concurrency'] = function () { return 4; };
 // GET/PUT go over real cURL to the fixture (120 ms each, default 4-way
 // concurrency); listings stay in the in-process fake below.
 

@@ -32,7 +32,9 @@ function isxm_test_reset() {
 		'posts'     => array(),
 		'http'      => array(),   // recorded wp_remote_request() calls
 		'responses' => array(),   // queued responses (FIFO)
-		'filters'   => array(),   // tag => callable, applied by apply_filters()
+		// Transfers default to one at a time so they go through the recorded
+		// wp_remote_request() fake; tests of the parallel path raise it to 4.
+		'filters'   => array( 'isxm_migrate_concurrency' => function () { return 1; } ),
 		'url_ids'   => array(),   // attachment_url_to_postid() map
 		'home'      => 'https://example.com',
 		'ssl'       => false,

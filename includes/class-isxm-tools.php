@@ -658,6 +658,7 @@ class ISXM_Tools {
         $processed = 0;
         $errors    = [];
         $done      = false;
+        $e         = null;
 
         do {
             if ( $state['phase'] === 'expected' ) {
@@ -670,19 +671,24 @@ class ISXM_Tools {
                     $state['token'] = '';
                 }
             } elseif ( $state['phase'] === 'delete' ) {
-                $e = ISXM_Sync::load_or_build_expected( $run_id );
+                // Once per request, not once per listing page: the file holds
+                // every expected key of the library (~720k lines at 90k items).
                 if ( $e === null ) {
-                    $errors[] = __( 'The scan did not complete — please try again', 'insightx-offload' );
-                    break;
-                }
-                $blocked = ISXM_Sync::orphan_map_blocked( $e );
-                if ( $blocked ) {
-                    $errors[] = $blocked->get_error_message();
-                    break;
+                    $e = ISXM_Sync::load_or_build_expected( $run_id );
+                    if ( $e === null ) {
+                        $errors[] = __( 'The scan did not complete — please try again', 'insightx-offload' );
+                        break;
+                    }
+                    $blocked = ISXM_Sync::orphan_map_blocked( $e );
+                    if ( $blocked ) {
+                        $errors[] = $blocked->get_error_message();
+                        break;
+                    }
                 }
                 $client = new ISXM_Client();
                 $prefix = ISXM_Settings::key_prefix();
-                $page   = $client->list_objects_keys_page( $state['token'], 1000 );
+                // Only keys inside the prefix can be orphans; don't page past them.
+                $page   = $client->list_objects_keys_page( $state['token'], 1000, $prefix );
                 if ( is_wp_error( $page ) ) {
                     $errors[] = $page->get_error_message();
                     break;
@@ -1707,6 +1713,19 @@ class ISXM_Tools {
     }
 
     /**
+     * Drop what a long CLI run accumulates per item — the object cache's
+     * in-request copies, ledger rows and URL lookups — so 90k items don't
+     * add up to an out-of-memory fatal. Persistent caches are untouched.
+     */
+    public static function flush_runtime_caches() {
+        ISXM_Items::flush_cache();
+        ISXM_Offload::flush_url_cache();
+        if ( function_exists( 'wp_cache_flush_runtime' ) ) {
+            wp_cache_flush_runtime();
+        }
+    }
+
+    /**
      * Run the one-pass DB URL rewrite to completion in this request (no
      * time budget) — the CLI's equivalent of the background job's rewrite|
      * phase, used by `wp isxm offload` after every chunk has uploaded.
@@ -1717,6 +1736,7 @@ class ISXM_Tools {
         foreach ( self::rewrite_tables() as $cfg ) {
             $after = 0;
             do {
+                self::flush_runtime_caches();
                 $window = ISXM_DB_Rewriter::rewrite_window(
                     $cfg['table'],
                     $cfg['id_col'],

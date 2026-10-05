@@ -50,4 +50,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200,b'' if self.command == 'PUT' else ('object:'+self.path).encode())
         finally:
             with lock: state['active'] -= 1
+# Python's default listen backlog is 5: with 16 parallel transfers Linux drops
+# the overflow SYNs and each retries after ~1 s, which made the parallel path
+# look slower than the serial one on CI. Real S3/R2 have no such limit.
+ThreadingHTTPServer.request_queue_size = 128
 ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1])), Handler).serve_forever()

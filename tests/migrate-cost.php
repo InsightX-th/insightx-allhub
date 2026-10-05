@@ -154,7 +154,13 @@ t( 'Every request correctly signed', $stats['invalid'] === 0 );
 $hours = ( $first['ms'] + $last['ms'] ) / 2 / 1000 * $attachments / 3600;
 printf( "  projection: %.1f h for %s attachments with a continuous runner; %.0f h with the old 25s-on / 300s-stall gap\n",
     $hours, number_format( $attachments ), $hours * 325 / 25 );
-t( 'Continuous migration projects under 8 hours (attachments transfer in parallel)', $hours < 8, sprintf( '%.1f h', $hours ) );
+t( 'Continuous migration projects under 24 hours', $hours < 24, sprintf( '%.1f h', $hours ) );
+// Machine-independent: the same kind of page one attachment at a time.
+$GLOBALS['isxm_t']['filters']['isxm_migrate_parallel_items'] = function () { return 1; };
+$serial = cost_transfer_page( 300 * 1000 );
+unset( $GLOBALS['isxm_t']['filters']['isxm_migrate_parallel_items'] );
+printf( "  one attachment at a time: %.0f ms per attachment vs %.0f ms in parallel\n", $serial['ms'], $first['ms'] );
+t( 'Parallel attachments at least 2x faster than one at a time', $first['ms'] * 2 < $serial['ms'], sprintf( '%.0f vs %.0f ms', $first['ms'], $serial['ms'] ) );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

@@ -68,6 +68,10 @@ jobs:
         if: matrix.php == '8.3'
         run: php -d memory_limit=256M tests/migrate-scale.php
 
+      - name: Migration cost profile (fresh 523,886-object run)
+        if: matrix.php == '8.3'
+        run: php -d memory_limit=256M tests/migrate-cost.php
+
   # Real WordPress + MySQL end to end (tests/e2e/run.sh). One PHP version is
   # enough here — the matrix above already covers the language versions.
   integration:

@@ -87,7 +87,7 @@ class ISXM_DB_Rewriter {
      * Cursor is {table: 0..3, after: row ID}; callers persist it only on success.
      * @return array{cursor:array,done:bool}|WP_Error
      */
-    public static function replace_urls_window( array $pairs, array $cursor, $deadline = 0 ) {
+    public static function replace_urls_window( array $pairs, array $cursor, $deadline = 0, $map_builder = null ) {
         global $wpdb;
         $tables = [
             [ $wpdb->posts, 'ID', 'post_content', 'ID', 'posts' ],
@@ -118,7 +118,11 @@ class ISXM_DB_Rewriter {
             // Never rewrite our own settings, checkpoints, logs or cached
             // state: these intentionally still contain the SOURCE URL map.
             $internal = $kind === 'options' && preg_match( '/^(isxs_|isxm_|_transient_|_site_transient_)/', $row->ref );
-            $candidate = false;
+            if ( $map_builder && ! $internal ) {
+                $map = call_user_func( $map_builder, $row->val );
+                $replay_map = array_fill_keys( array_values( $map ), '' );
+            }
+            $candidate = $map_builder && ! $internal;
             if ( ! $internal ) {
                 foreach ( $probes as $probe => $unused ) {
                     if ( strpos( $row->val, (string) $probe ) !== false ) { $candidate = true; break; }
@@ -137,7 +141,7 @@ class ISXM_DB_Rewriter {
             }
             // Invalidate changed/replayed rows only. Purging every unrelated
             // post causes another get_post query plus cache hooks per row.
-            if ( ! $internal && ( $replaced !== $row->val || strtr( $row->val, $replay_map ) !== $row->val ) ) {
+            if ( ! $internal && ( ( $map_builder && $map ) || $replaced !== $row->val || strtr( $row->val, $replay_map ) !== $row->val ) ) {
                 self::purge_cache( $kind, [ $row->ref ] );
             }
             $cursor['after'] = (int) $row->id;

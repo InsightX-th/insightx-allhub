@@ -5,6 +5,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_Migrate_Queue {
     /** Run one bounded slice. Counts are committed here, never again by the runner. */
     public static function step( ISXM_Job $job, $budget = 15 ) {
+        if ( empty( $job->migration ) || isset( $job->migration['version'] ) ) {
+            return ISXM_Migration_Pipeline::step( $job, $budget );
+        }
+        return self::legacy_step( $job, $budget );
+    }
+
+    /** Finish a saved v0.2.13 batch before switching engines. */
+    public static function legacy_step( ISXM_Job $job, $budget = 15 ) {
         if ( ( $job->migration['stage'] ?? '' ) === 'complete' ) return self::result( $job, true );
         if ( function_exists( 'set_time_limit' ) ) @set_time_limit( ISXM_Tools::MAX_REQUEST_SECONDS );
         $started = microtime( true );
@@ -114,8 +122,8 @@ class ISXM_Migrate_Queue {
             if ( $pairs ) {
                 $result = ISXM_DB_Rewriter::replace_urls_window( $pairs, $job->migration['rewrite'], $deadline );
                 if ( is_wp_error( $result ) ) return $result;
+                if ( $job->migration['rewrite'] !== $result['cursor'] ) $job->activity['last_progress'] = microtime( true );
                 $job->migration['rewrite'] = $result['cursor'];
-                $job->activity['last_progress'] = microtime( true );
                 self::checkpoint( $job );
                 if ( ! $result['done'] ) return self::result( $job );
                 foreach ( $job->migration['pairs'] as $id => $item_pairs ) {
@@ -168,7 +176,7 @@ class ISXM_Migrate_Queue {
         if ( $id ) $job->activity['attachment'] = $id;
     }
 
-    private static function checkpoint( ISXM_Job $job ) {
+    public static function checkpoint( ISXM_Job $job ) {
         ISXM_Background::renew_runner_lock();
         $current = ISXM_Job::get( $job->tool );
         if ( ! $current || $current->run_id !== $job->run_id || $current->state !== ISXM_Job::STATE_RUNNING ) {

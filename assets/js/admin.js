@@ -595,11 +595,14 @@
     Object.keys(jobs).some((tool) => jobs[tool].state === "running");
 
   const phaseLabel = (job) => {
+    if (job.activity && ["guid", "cleanup"].includes(job.activity.stage)) return cfg.i18n.finalizing;
+    if (job.phase === "index") return cfg.i18n.indexing + " " + (job.index_after || 0);
     if (job.phase === "counting") {
       return cfg.i18n.counting;
     }
     if (job.phase === "rewriting") {
-      return cfg.i18n.rewriting;
+      const cursor = job.rewrite_cursor;
+      return cfg.i18n.rewriting + (cursor ? " " + ["posts", "postmeta", "options"][cursor.table] + ": " + cursor.after : "");
     }
     return "";
   };

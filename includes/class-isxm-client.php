@@ -114,6 +114,102 @@ class ISXM_Client {
      * @param bool   $public_acl   Send x-amz-acl: public-read.
      * @return true|WP_Error
      */
+    /** Bounded, streamed requests; only this attachment's owner commits metadata. */
+    public function transfer_many( $method, array $files, $concurrency = null, $receipt_dir = '' ) {
+        $limit = max( 1, min( 4, (int) ( $concurrency ?? apply_filters( 'isxm_migrate_concurrency', 4 ) ) ) );
+        $results = []; $receipts = [];
+        if ( $method === 'PUT' && $receipt_dir !== '' ) {
+            foreach ( $files as $id => $file ) {
+                $fingerprint = hash( 'sha256', $this->endpoint . '|' . $this->bucket . '|' . $file['key'] . '|' . hash_file( 'sha256', $file['path'] ) );
+                $receipts[ $id ] = $receipt_dir . $fingerprint . '.uploaded';
+                if ( is_file( $receipts[ $id ] ) ) { $results[ $id ] = true; unset( $files[ $id ] ); }
+            }
+        }
+        $queue = array_keys( $files ); $attempts = [];
+        if ( ! function_exists( 'curl_multi_init' ) || $limit === 1 ) {
+            foreach ( $files as $id => $file ) {
+                if ( ! self::may_wait( 0 ) || ISXM_Job::signal( 'migrate' ) !== '' ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
+                $results[ $id ] = $method === 'GET' ? $this->get_object_to_file( $file['key'], $file['path'] ) : $this->put_object( $file['key'], $file['path'], $file['mime'], $file['acl'] );
+            }
+            self::save_receipts( $results, $receipts );
+            return $results;
+        }
+        $multi = curl_multi_init(); $active = [];
+        try {
+            while ( $queue || $active ) {
+                ISXM_Background::renew_runner_lock();
+                while ( $queue && count( $active ) < $limit ) {
+                    $id = array_shift( $queue ); $f = $files[ $id ];
+                    if ( ! self::may_wait( 0 ) || ISXM_Job::signal( 'migrate' ) !== '' ) { $results[ $id ] = new WP_Error( 'isxs_transfer_yield', 'Transfer checkpoint retained.' ); continue; }
+                    $attempts[ $id ] = ( $attempts[ $id ] ?? 0 ) + 1;
+                    $headers = [];
+                    if ( $method === 'PUT' ) {
+                        $headers['content-type'] = $f['mime'];
+                        if ( $f['acl'] ) $headers['x-amz-acl'] = 'public-read';
+                    }
+                    $spec = $this->request( $method, $f['key'], [ 'prepare_only' => true, 'body_file' => $method === 'PUT' ? $f['path'] : '', 'headers' => $headers ] );
+                    if ( is_wp_error( $spec ) ) { $results[ $id ] = $spec; continue; }
+                    $tmp = $method === 'GET' ? $f['path'] . '.part-' . bin2hex( random_bytes( 6 ) ) : '';
+                    $fp = @fopen( $method === 'GET' ? $tmp : $f['path'], $method === 'GET' ? 'wb' : 'rb' );
+                    if ( ! $fp ) { $results[ $id ] = new WP_Error( 'isxs_stream_open', 'Could not open migration stream.' ); continue; }
+                    $ch = curl_init(); $lines = [];
+                    foreach ( $spec['headers'] as $k => $v ) $lines[] = $k . ': ' . $v;
+                    $verify = apply_filters( 'https_ssl_verify', true, $spec['url'] );
+                    $options = [ CURLOPT_URL => $spec['url'], CURLOPT_CUSTOMREQUEST => $method,
+                        CURLOPT_HTTPHEADER => $lines, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => 60,
+                        CURLOPT_SSL_VERIFYPEER => (bool) $verify, CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
+                        CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_FOLLOWLOCATION => false ];
+                    $ca = ABSPATH . WPINC . '/certificates/ca-bundle.crt';
+                    if ( is_file( $ca ) ) $options[ CURLOPT_CAINFO ] = $ca;
+                    if ( $method === 'GET' ) $options[ CURLOPT_FILE ] = $fp;
+                    else {
+                        $options[ CURLOPT_UPLOAD ] = true; $options[ CURLOPT_INFILE ] = $fp;
+                        $options[ CURLOPT_INFILESIZE ] = filesize( $f['path'] );
+                        // Do not buffer an unbounded error response from the provider.
+                        $options[ CURLOPT_WRITEFUNCTION ] = function ( $handle, $data ) { return strlen( $data ); };
+                    }
+                    curl_setopt_array( $ch, $options ); curl_multi_add_handle( $multi, $ch );
+                    $active[ (int) ( is_object( $ch ) ? spl_object_id( $ch ) : $ch ) ] = [ 'ch' => $ch, 'fp' => $fp, 'tmp' => $tmp, 'id' => $id ];
+                }
+                do { $status = curl_multi_exec( $multi, $running ); } while ( $status === CURLM_CALL_MULTI_PERFORM );
+                if ( $status !== CURLM_OK ) throw new RuntimeException( 'Migration network scheduler failed.' );
+                while ( $message = curl_multi_info_read( $multi ) ) {
+                    $ch = $message['handle']; $handle_id = (int) ( is_object( $ch ) ? spl_object_id( $ch ) : $ch );
+                    $a = $active[ $handle_id ]; $id = $a['id']; $code = (int) curl_getinfo( $ch, CURLINFO_RESPONSE_CODE );
+                    fclose( $a['fp'] );
+                    $ok = $message['result'] === CURLE_OK && $code === 200;
+                    if ( $method === 'GET' ) {
+                        if ( $ok ) $ok = @rename( $a['tmp'], $files[ $id ]['path'] );
+                        if ( is_file( $a['tmp'] ) ) @unlink( $a['tmp'] );
+                    }
+                    $retry = $message['result'] !== CURLE_OK || in_array( $code, [ 408, 429, 500, 502, 503, 504 ], true );
+                    curl_multi_remove_handle( $multi, $ch ); curl_close( $ch ); unset( $active[ $handle_id ] );
+                    if ( ! $ok && $retry && $attempts[ $id ] < 3 && self::may_wait( 0 ) ) $queue[] = $id;
+                    else {
+                        $results[ $id ] = $ok ? true : new WP_Error( 'isxs_transfer_failed', 'Storage transfer failed (HTTP ' . $code . ').' );
+                        self::save_receipts( [ $id => $results[ $id ] ], $receipts );
+                    }
+                }
+                if ( $active && curl_multi_select( $multi, 0.2 ) === -1 ) usleep( 10000 );
+            }
+        } finally {
+            foreach ( $active as $a ) {
+                curl_multi_remove_handle( $multi, $a['ch'] ); curl_close( $a['ch'] ); fclose( $a['fp'] );
+                if ( $a['tmp'] !== '' && is_file( $a['tmp'] ) ) @unlink( $a['tmp'] );
+            }
+            curl_multi_close( $multi );
+        }
+        return $results;
+    }
+
+    private static function save_receipts( array $results, array $receipts ) {
+        foreach ( $results as $id => $result ) {
+            if ( $result === true && isset( $receipts[ $id ] ) && file_put_contents( $receipts[ $id ], 'uploaded', LOCK_EX ) === false ) {
+                throw new RuntimeException( 'Could not persist upload receipt; checkpoint retained.' );
+            }
+        }
+    }
+
     public function put_object( $key, $file_path, $content_type = 'application/octet-stream', $public_acl = false ) {
         if ( ! file_exists( $file_path ) ) {
             // basename only — these messages surface in the admin UI and the
@@ -681,6 +777,8 @@ class ISXM_Client {
         unset( $request_headers['host'] ); // WP HTTP API sets Host from the URL
 
         $url = $this->scheme . '://' . $this->host() . $uri . ( $canonical_query !== '' ? '?' . $canonical_query : '' );
+
+        if ( ! empty( $args['prepare_only'] ) ) return [ 'url' => $url, 'headers' => $request_headers ];
 
         if ( $body_file !== '' ) {
             // The WP HTTP API can only take a string body, so a streamed

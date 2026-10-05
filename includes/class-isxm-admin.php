@@ -103,6 +103,8 @@ class ISXM_Admin {
                 // The final one-pass DB URL rewrite at the end of an offload
                 // run — uploads are all done, the bar sits near 100% while
                 // this phase rewrites stored URLs table by table.
+                'indexing'      => __( 'Building attachment index…', 'insightx-offload' ),
+                'finalizing'    => __( 'Finalizing migration…', 'insightx-offload' ),
                 'rewriting'     => __( 'Writing URLs to the database…', 'insightx-offload' ),
                 'keepTabOpen'   => __( 'This site cannot call itself — keep this page open until the job finishes', 'insightx-offload' ),
                 'sessionExpired' => __( 'Session expired or logged out — refresh this page and try again (all work so far is saved)', 'insightx-offload' ),

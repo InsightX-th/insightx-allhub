@@ -129,7 +129,7 @@ class ISXM_Migrate {
      *               the caller report progress in OBJECT units, matching the
      *               source-object-count denominator shown in the UI.
      */
-    public static function scan_source_batch( $continuation_token ) {
+    public static function scan_source_batch( $continuation_token, $indexed = false ) {
         global $wpdb;
 
         $s      = ISXM_Settings::all();
@@ -186,6 +186,9 @@ class ISXM_Migrate {
         }
 
         $candidates   = array_values( array_unique( wp_list_pluck( $resolved, 'candidate' ) ) );
+        if ( $indexed ) {
+            $by_candidate = ISXM_Migration_Store::resolve( $candidates );
+        } else {
         $placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
         $rows         = $wpdb->get_results( $wpdb->prepare(
             "SELECT post_id, meta_value FROM {$wpdb->postmeta}
@@ -202,6 +205,8 @@ class ISXM_Migrate {
             if ( ! isset( $by_candidate[ $row->meta_value ] ) ) {
                 $by_candidate[ $row->meta_value ] = (int) $row->post_id;
             }
+        }
+
         }
 
         foreach ( $resolved as $entry ) {
@@ -242,6 +247,41 @@ class ISXM_Migrate {
      *                             ISXM_DB_Rewriter::replace_urls_bulk().
      * @return true|WP_Error
      */
+    /** Private staging keeps downloads separate from pre-existing local media. */
+    public static function migrate_staged( $id, array $keys, $run ) {
+        $local = ISXM_Offload::local_path( $id );
+        if ( $local === '' ) return new WP_Error( 'isxs_no_path', 'Unknown attachment path.' );
+        $uploads = wp_get_upload_dir();
+        $dir = trailingslashit( $uploads['basedir'] ) . 'isxs-migration/' . hash( 'sha256', $run ) . '/' . (int) $id . '/';
+        if ( ! wp_mkdir_p( $dir ) ) return new WP_Error( 'isxs_stage_dir', 'Could not create migration staging directory.' );
+        $primary = wp_basename( $local );
+        if ( ! in_array( $primary, $keys, true ) && ! is_file( $local ) ) {
+            $first = key( $keys ); $base = dirname( $first );
+            $keys[ ( $base === '.' ? '' : $base . '/' ) . $primary ] = $primary;
+        }
+        $paths = []; $downloads = []; $seen = [];
+        foreach ( $keys as $key => $name ) {
+            if ( $name === '' || ISXM_Offload::safe_filename( $name ) !== $name ) return new WP_Error( 'isxs_source_name', 'Unsafe source filename.' );
+            if ( isset( $seen[ $name ] ) && $seen[ $name ] !== $key ) return new WP_Error( 'isxs_source_collision', 'Multiple source keys resolve to the same filename.' );
+            $seen[ $name ] = $key;
+            $original = trailingslashit( dirname( $local ) ) . $name;
+            $paths[ $name ] = is_file( $original ) ? $original : $dir . $name;
+            if ( ! is_file( $paths[ $name ] ) ) $downloads[ $name ] = [ 'key' => $key, 'path' => $paths[ $name ] ];
+        }
+        if ( is_file( $local ) ) $paths[ $primary ] = $local;
+        foreach ( self::source_client()->transfer_many( 'GET', $downloads ) as $result ) if ( is_wp_error( $result ) ) return $result;
+        $result = ( new ISXM_Offload() )->offload_attachment( $id, wp_get_attachment_metadata( $id ), true, 'migrate', $paths, $dir );
+        ISXM_Offload::clear_pending_deletions();
+        if ( is_wp_error( $result ) ) return $result;
+        $record = ISXM_Offload::get_record( $id );
+        foreach ( $paths as $name => $path ) {
+            if ( strpos( $path, $dir ) === 0 && in_array( $name, $record['files'] ?? [], true ) ) @unlink( $path );
+        }
+        foreach ( glob( $dir . '*.uploaded' ) ?: [] as $receipt ) @unlink( $receipt );
+        @rmdir( $dir );
+        return true;
+    }
+
     public static function migrate_attachment( $attachment_id, array $key_map, $defer_persist = false ) {
         if ( empty( $key_map ) ) {
             return new WP_Error( 'isxs_no_source_keys', __( 'File for this item not found in the source bucket', 'insightx-offload' ) );

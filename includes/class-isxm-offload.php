@@ -287,14 +287,14 @@ class ISXM_Offload {
      *                                  Remove tools themselves treat as pending.
      * @return true|WP_Error
      */
-    public function offload_attachment( $attachment_id, $metadata = null, $defer_persist = false, $origin = 'offload' ) {
+    public function offload_attachment( $attachment_id, $metadata = null, $defer_persist = false, $origin = 'offload', array $migration_paths = [], $stage_dir = '' ) {
         if ( self::is_protected_download( $attachment_id ) ) {
             // Not a failure — a deliberate skip, so no error record.
             self::clear_error( $attachment_id );
             return new WP_Error( 'isxs_protected_download', __( 'Protected download (WooCommerce / Easy Digital Downloads) — kept on the server so it is never publicly readable in the bucket', 'insightx-offload' ) );
         }
 
-        $result = $this->run_offload( $attachment_id, $metadata, $defer_persist, $origin );
+        $result = $this->run_offload( $attachment_id, $metadata, $defer_persist, $origin, $migration_paths, $stage_dir );
 
         if ( is_wp_error( $result ) ) {
             self::record_error( $attachment_id, $result );
@@ -312,7 +312,7 @@ class ISXM_Offload {
      *
      * @return true|WP_Error
      */
-    private function run_offload( $attachment_id, $metadata, $defer_persist, $origin ) {
+    private function run_offload( $attachment_id, $metadata, $defer_persist, $origin, array $migration_paths = [], $stage_dir = '' ) {
         if ( ! ISXM_Settings::is_configured() ) {
             return new WP_Error( 'isxs_not_configured', __( 'Storage is not fully configured', 'insightx-offload' ) );
         }
@@ -328,6 +328,7 @@ class ISXM_Offload {
         }
 
         $file = self::local_path( $attachment_id );
+        if ( $file !== '' && isset( $migration_paths[ wp_basename( $file ) ] ) ) $file = $migration_paths[ wp_basename( $file ) ];
         if ( $file === '' || ! file_exists( $file ) ) {
             // With "Remove Local Media" on, a file already living in some
             // bucket legitimately has no local copy — say so, because the fix
@@ -382,7 +383,7 @@ class ISXM_Offload {
             if ( is_array( $existing ) && ! empty( $existing['version'] ) ) {
                 $version = $existing['version'];
             } else {
-                $version = (string) wp_rand( 10000000, 99999999 );
+                $version = $migration_paths ? (string) ( 10000000 + ( hexdec( substr( hash( 'sha256', $stage_dir ), 0, 7 ) ) % 90000000 ) ) : (string) wp_rand( 10000000, 99999999 );
             }
             $base_key .= $version . '/';
         } else {
@@ -392,6 +393,22 @@ class ISXM_Offload {
         $client   = new ISXM_Client();
         $uploaded = [];
         $missing  = [];
+        $prior = $origin === 'migrate' && is_array( $existing ) && ( $existing['bucket'] ?? '' ) === $settings['bucket'] && ( $existing['endpoint'] ?? '' ) === $settings['endpoint'] ? ( $existing['files'] ?? [] ) : [];
+        $parallel = [];
+        if ( $migration_paths ) {
+            $prior = array_values( array_filter( $prior, function ( $name ) use ( $existing, $migration_paths ) {
+                if ( isset( $migration_paths[ $name ] ) ) return false;
+                $probe = $existing; $probe['files'] = [ $name ];
+                return ISXM_Sync::primary_exists_on_destination( $probe );
+            } ) );
+            foreach ( $migration_paths as $name => $path ) {
+                $type = wp_check_filetype( $name );
+                $parallel[ $name ] = [ 'key' => $base_key . $name, 'path' => $path, 'mime' => $type['type'] ?: 'application/octet-stream', 'acl' => ! empty( $settings['send_public_acl'] ) ];
+            }
+            $parallel = $client->transfer_many( 'PUT', $parallel, null, $stage_dir );
+            foreach ( $parallel as $outcome ) if ( is_wp_error( $outcome ) ) return $outcome;
+            $filenames = array_values( array_unique( array_merge( $filenames, array_keys( $migration_paths ) ) ) );
+        }
 
         // The original file is the one that matters: without it the
         // attachment simply isn't on the bucket, so a failure there fails the
@@ -401,8 +418,9 @@ class ISXM_Offload {
         $primary = wp_basename( $file );
 
         foreach ( $filenames as $filename ) {
-            $path = $local_dir . $filename;
+            $path = $migration_paths[ $filename ] ?? ( $local_dir . $filename );
             if ( ! file_exists( $path ) ) {
+                if ( in_array( $filename, $prior, true ) ) { $uploaded[] = $filename; continue; }
                 if ( $filename === $primary ) {
                     return new WP_Error( 'isxs_missing_local', __( 'Original file not found on the server', 'insightx-offload' ) );
                 }
@@ -412,7 +430,7 @@ class ISXM_Offload {
             $filetype = wp_check_filetype( $filename );
             $mime     = $filetype['type'] ? $filetype['type'] : 'application/octet-stream';
 
-            $result = $client->put_object( $base_key . $filename, $path, $mime, ! empty( $settings['send_public_acl'] ) );
+            $result = $parallel[ $filename ] ?? $client->put_object( $base_key . $filename, $path, $mime, ! empty( $settings['send_public_acl'] ) );
             if ( is_wp_error( $result ) ) {
                 if ( $filename === $primary ) {
                     return new WP_Error( 'isxs_upload_failed', sprintf( __( 'Upload of %s failed: %s', 'insightx-offload' ), $filename, $result->get_error_message() ) );
@@ -428,6 +446,8 @@ class ISXM_Offload {
             return new WP_Error( 'isxs_nothing_uploaded', __( 'No files to upload', 'insightx-offload' ) );
         }
 
+        $uploaded = array_values( array_unique( array_merge( $uploaded, $prior ) ) );
+        $missing = array_values( array_diff( $missing, $uploaded ) );
         $record = [
             'bucket'     => $settings['bucket'],
             'base_key'   => $base_key,
@@ -447,6 +467,7 @@ class ISXM_Offload {
             $record['missing'] = $missing;
         }
         self::set_record( $attachment_id, $record );
+        if ( $migration_paths && get_post_meta( $attachment_id, self::META_KEY, true ) !== $record ) return new WP_Error( 'isxs_record_write', 'Could not persist uploaded file record; staging retained.' );
         // A real upload succeeded — whatever "file missing both places"
         // flag the Sync tool may have left is now wrong.
         delete_post_meta( $attachment_id, self::DATA_LOSS_META_KEY );
@@ -851,7 +872,7 @@ class ISXM_Offload {
      * @param array $pairs [ [ 'old' => string, 'new' => string ], … ]
      * @return array
      */
-    private static function with_escaped_pairs( array $pairs ) {
+    public static function with_escaped_pairs( array $pairs ) {
         $out = $pairs;
         foreach ( $pairs as $pair ) {
             $old = str_replace( '/', '\\/', $pair['old'] );
@@ -1327,7 +1348,10 @@ class ISXM_Offload {
      *                     or null when the meta holds nothing usable.
      */
     public static function relative_local_path( $attachment_id ) {
-        $meta = get_post_meta( $attachment_id, '_wp_attached_file', true );
+        return self::normalize_relative_path( get_post_meta( $attachment_id, '_wp_attached_file', true ) );
+    }
+
+    public static function normalize_relative_path( $meta ) {
         if ( ! is_string( $meta ) || trim( $meta ) === '' ) {
             return null;
         }

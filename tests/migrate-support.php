@@ -13,6 +13,11 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         $this->db->exec( 'CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT)' );
         $this->db->exec( 'CREATE TABLE wp_postmeta (meta_id INTEGER PRIMARY KEY, post_id INTEGER, meta_key TEXT, meta_value TEXT)' );
         $this->db->exec( 'CREATE INDEX attached_files ON wp_postmeta(meta_key,meta_value)' );
+        $this->db->exec( 'CREATE TABLE wp_isxs_migration_paths (attachment_id INTEGER PRIMARY KEY, path_hash TEXT, path TEXT)' );
+        $this->db->exec( 'CREATE INDEX path_lookup ON wp_isxs_migration_paths(path_hash,attachment_id)' );
+        $this->db->exec( 'CREATE TABLE wp_isxs_migration_work (id INTEGER PRIMARY KEY AUTOINCREMENT,run_id TEXT,kind TEXT,item_hash TEXT,payload TEXT,UNIQUE(run_id,kind,item_hash))' );
+        $this->db->exec( 'CREATE INDEX pending ON wp_isxs_migration_work(run_id,kind,id)' );
+        update_option( 'isxs_migration_schema', 1 );
         $this->db->exec( 'CREATE TABLE wp_options (option_id INTEGER PRIMARY KEY, option_name TEXT UNIQUE, option_value TEXT, autoload TEXT)' );
     }
     public function prepare( $sql, ...$args ) {
@@ -47,6 +52,11 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         foreach ( $data as $k => $v ) $set[] = $k . '=' . $this->db->quote( (string) $v );
         foreach ( $where as $k => $v ) $conditions[] = $k . '=' . $this->db->quote( (string) $v );
         return $this->db->exec( 'UPDATE ' . $table . ' SET ' . implode( ',', $set ) . ' WHERE ' . implode( ' AND ', $conditions ) );
+    }
+    public function insert( $table, $data ) {
+        $this->last_error = ''; $this->queries++;
+        $values = array_map( function ( $v ) { return $v === null ? 'NULL' : $this->db->quote( (string) $v ); }, $data );
+        return $this->db->exec( 'INSERT INTO ' . $table . ' (' . implode( ',', array_keys( $data ) ) . ') VALUES (' . implode( ',', $values ) . ')' );
     }
     public function delete( $table, $where ) {
         $conditions = [];
@@ -92,7 +102,7 @@ function migration_listing( array $keys, $next = '' ) {
     if ( $next !== '' ) $xml .= '<NextContinuationToken>' . htmlspecialchars( $next, ENT_XML1 ) . '</NextContinuationToken>';
     return [ 'response' => [ 'code' => 200 ], 'body' => $xml . '</ListBucketResult>' ];
 }
-function migration_step( $budget = 15 ) { return ISXM_Migrate_Queue::step( ISXM_Job::get( 'migrate' ), $budget ); }
+function migration_step( $budget = 15 ) { return ISXM_Migrate_Queue::legacy_step( ISXM_Job::get( 'migrate' ), $budget ); }
 function migration_drain( $max = 100 ) {
     for ( $i = 0; $i < $max; $i++ ) {
         $result = migration_step();

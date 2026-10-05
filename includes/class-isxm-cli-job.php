@@ -114,6 +114,9 @@ class ISXM_CLI_Job {
      * : Continue the existing cursor instead of starting a fresh scan. Only
      *   meaningful for a run that is stopped or errored.
      *
+     * [--runner=<runner>]
+     * : web (default) or cli (external cron/foreground only).
+     *
      * [--watch]
      * : Drive the run in the foreground and print progress until it settles,
      *   instead of handing it to the background runner and returning.
@@ -128,7 +131,9 @@ class ISXM_CLI_Job {
         $tool   = $args[0];
         $resume = ! empty( $assoc_args['resume'] );
 
-        $result = ISXM_Background::start_job( $tool, $resume );
+        $runner = $assoc_args['runner'] ?? null;
+        if ( $runner !== null && ! in_array( $runner, [ 'web', 'cli' ], true ) ) WP_CLI::error( 'Runner must be web or cli.' );
+        $result = ISXM_Background::start_job( $tool, $resume, $runner );
         if ( isset( $result['error'] ) ) {
             WP_CLI::error( $result['error'] );
         }
@@ -143,6 +148,7 @@ class ISXM_CLI_Job {
             return;
         }
 
+        if ( $runner === 'cli' ) { WP_CLI::log( 'Run `wp isxm job run` or configure external cron.' ); return; }
         if ( ! ISXM_Background::loopback_available() ) {
             WP_CLI::warning(
                 __( 'This site cannot make loopback requests to itself — the job will not advance in the background. Run `wp isxm job run` (or add it to cron) to drive it to completion', 'insightx-offload' )
@@ -188,6 +194,9 @@ class ISXM_CLI_Job {
      *
      * <tool>
      * : Which tool to resume.
+     *
+     * [--runner=<runner>]
+     * : web (default) or cli (external cron/foreground only).
      *
      * [--watch]
      * : Drive it in the foreground and print progress until it settles.
@@ -265,6 +274,9 @@ class ISXM_CLI_Job {
      *
      * ## OPTIONS
      *
+     * [--max-runtime=<seconds>]
+     * : Stop accepting new slices after this duration; in-flight work finishes safely.
+     *
      * [--once]
      * : Process a single runner slice and return, rather than looping until
      *   the job settles. Useful from a per-minute cron.
@@ -288,12 +300,14 @@ class ISXM_CLI_Job {
         WP_CLI::log( sprintf( __( 'Driving job "%s"…', 'insightx-offload' ), ISXM_Tools::tool_label( $job->tool ) ) );
 
         if ( ! empty( $assoc_args['once'] ) ) {
-            ISXM_Background::run();
+            ISXM_Background::run( true );
             $this->report( $job->tool );
             return;
         }
 
-        $this->watch( $job->tool );
+        $runtime = isset( $assoc_args['max-runtime'] ) ? (int) $assoc_args['max-runtime'] : 0;
+        if ( isset( $assoc_args['max-runtime'] ) && $runtime < 1 ) WP_CLI::error( '--max-runtime must be a positive number of seconds.' );
+        $this->watch( $job->tool, $runtime );
     }
 
     /**
@@ -334,16 +348,18 @@ class ISXM_CLI_Job {
      *
      * @param string $tool
      */
-    private function watch( $tool ) {
+    private function watch( $tool, $runtime = 0 ) {
+        $deadline = $runtime ? microtime( true ) + $runtime : 0;
         $last = '';
 
-        while ( true ) {
+        while ( ! $deadline || microtime( true ) < $deadline ) {
+            if ( ISXM_Background::runner_lock_held() ) break;
             $job = ISXM_Job::get( $tool );
             if ( ! $job || $job->state !== ISXM_Job::STATE_RUNNING ) {
                 break;
             }
 
-            ISXM_Background::run();
+            ISXM_Background::run( true, $deadline ? max( 0.1, min( 25, $deadline - microtime( true ) ) ) : 25 );
 
             $job = ISXM_Job::get( $tool );
             if ( ! $job ) {
@@ -354,6 +370,7 @@ class ISXM_CLI_Job {
             $line = $p['total'] > 0
                 ? sprintf( '  %s%%  %s/%s', $p['percent'], number_format_i18n( $p['processed'] ), number_format_i18n( $p['total'] ) )
                 : sprintf( __( '  %s items', 'insightx-offload' ), number_format_i18n( $p['processed'] ) );
+            $line .= '  stage=' . ( $job->activity['stage'] ?? $job->phase ) . ' cursor=' . wp_json_encode( $job->migration['rewrite'] ?? [ 'after' => $job->migration['after'] ?? 0 ] );
             if ( $p['error_count'] > 0 ) {
                 $line .= sprintf( __( '  (%s failed)', 'insightx-offload' ), number_format_i18n( $p['error_count'] ) );
             }

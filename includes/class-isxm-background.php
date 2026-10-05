@@ -222,6 +222,8 @@ class ISXM_Background {
      * @return bool Whether a runner was dispatched.
      */
     public static function dispatch() {
+        $running = ISXM_Job::running();
+        if ( $running && $running->runner === 'cli' ) return false;
         // Re-arm the healthcheck on every hand-off. The event is only
         // meant to exist while a job runs, and a long run outlives plenty
         // of things that could have cleared it (plugin update, manual cron
@@ -236,7 +238,9 @@ class ISXM_Background {
         $url = admin_url( 'admin-ajax.php' );
 
         $response = wp_remote_post( $url, [
-            'timeout'   => 0.01,
+            // 0.01s is too short for a TLS handshake: the request never
+            // reaches the server and the chain waits for the stall cron.
+            'timeout'   => 1,
             'blocking'  => false,
             'body'      => [
                 'action' => 'isxs_bg_run',
@@ -348,7 +352,9 @@ class ISXM_Background {
      *
      * @return bool Whether work remains (i.e. another runner is needed).
      */
-    public static function run() {
+    public static function run( $cli = false, $budget = self::RUNNER_BUDGET ) {
+        $running = ISXM_Job::running();
+        if ( $running && $running->runner === 'cli' && ! $cli ) return false;
         if ( ! self::lock() ) {
             // Another runner is already on it — that one will re-dispatch.
             return false;
@@ -442,7 +448,7 @@ class ISXM_Background {
                     return false;
                 }
 
-                if ( microtime( true ) - $started >= self::RUNNER_BUDGET || self::memory_exceeded() ) {
+                if ( microtime( true ) - $started >= $budget || self::memory_exceeded() ) {
                     return true;
                 }
             }
@@ -499,7 +505,7 @@ class ISXM_Background {
      * @param bool   $resume Continue the existing cursor instead of restarting.
      * @return array{error?:string,payload?:array}
      */
-    public static function start_job( $tool, $resume = false ) {
+    public static function start_job( $tool, $resume = false, $runner = null ) {
         if ( ! ISXM_Tools::is_known_tool( $tool ) ) {
             return [ 'error' => __( 'Unknown tool', 'insightx-offload' ) ];
         }
@@ -515,7 +521,7 @@ class ISXM_Background {
         // Note: the lock is released before the caller responds, never in a
         // finally — wp_send_json_*() calls die(), which skips finally blocks.
         // A crash between here and the release is covered by the lock's TTL.
-        $result = self::start_locked( $tool, $resume );
+        $result = self::start_locked( $tool, $resume, $runner );
         self::release( self::START_LOCK );
 
         return $result;
@@ -531,7 +537,7 @@ class ISXM_Background {
      * @param bool   $resume
      * @return array{error?:string,payload?:array}
      */
-    private static function start_locked( $tool, $resume ) {
+    private static function start_locked( $tool, $resume, $runner ) {
         // A stop asked for on a run nobody is driving would otherwise still
         // be pending here and make the slot look occupied.
         self::apply_orphaned_signals();
@@ -590,6 +596,8 @@ class ISXM_Background {
             $total = ISXM_Tools::tool_total( $tool );
             $job   = ISXM_Job::start( $tool, $total );
         }
+
+        if ( $runner !== null ) { $job->runner = $runner === 'cli' ? 'cli' : 'web'; $job->save(); }
 
         self::ensure_healthcheck_scheduled();
 

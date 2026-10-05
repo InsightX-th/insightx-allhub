@@ -132,6 +132,7 @@ class ISXM_Job {
 
     /** Durable, bounded migration page + pending rewrite, owned by this run. */
     public $migration;
+    public $runner = 'web';
     /** Small diagnostic record; never contains credentials or URL maps. */
     public $activity;
 
@@ -157,6 +158,7 @@ class ISXM_Job {
             ? array_values( array_filter( $data['batch_rates'], 'is_numeric' ) )
             : [];
         $this->batch_rates = array_slice( $rates, -self::MAX_BATCH_SAMPLES );
+        $this->runner = ( $data['runner'] ?? 'web' ) === 'cli' ? 'cli' : 'web';
         $this->migration = isset( $data['migration'] ) && is_array( $data['migration'] ) ? $data['migration'] : [];
         $this->activity = isset( $data['activity'] ) && is_array( $data['activity'] ) ? $data['activity'] : [];
     }
@@ -392,6 +394,7 @@ class ISXM_Job {
             'message'        => $this->message,
             'batch_rates'    => $this->batch_rates,
             'migration'      => $this->migration,
+            'runner'         => $this->runner,
             'activity'       => $this->activity,
         ];
     }
@@ -435,6 +438,10 @@ class ISXM_Job {
             'run_id'          => $this->run_id,
             'state'           => $this->state,
             'phase'           => $this->phase,
+            'runner'          => $this->runner,
+            'activity'        => $this->activity,
+            'rewrite_cursor'  => $this->migration['rewrite'] ?? null,
+            'index_after'     => $this->migration['after'] ?? 0,
             'processed'       => $live,
             // A completed run drained the whole set by definition, so its
             // own count IS the total — a snapshot denominator taken before

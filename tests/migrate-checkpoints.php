@@ -175,6 +175,7 @@ update_option( 'isxs_connections', $connections );
 $settings = get_option( 'isxs_settings' ); $settings['source_provider'] = 'minio';
 update_option( 'isxs_settings', $settings ); ISXM_Settings::flush_cache();
 $job->activity['test'] = true; $job->save();
+migration_step(); // Saved v0.2.13 batch enters the compatibility route.
 ISXM_Background::run();
 $finished = ISXM_Job::get( 'migrate' );
 t( 'Production runner reloads checkpoint and does not double-count', $finished->state === ISXM_Job::STATE_DONE && $finished->processed === 3, $finished->message );

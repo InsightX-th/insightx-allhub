@@ -9,8 +9,8 @@ require __DIR__ . '/migrate-support.php';
 group( '523,886 source objects / 90,654 attachments' );
 $started = microtime( true );
 $total = 523886; $attachments = 90654; $six = $total - 5 * $attachments;
-$combined = in_array( '--with-rewrite', $argv, true );
-if ( $combined ) echo "  Permanent URL rewrite ENABLED for every transfer batch\n";
+$combined = ! in_array( '--without-rewrite', $argv, true );
+if ( $combined ) echo "  Permanent URL rewrite ENABLED once after transfer\n";
 $GLOBALS['wpdb'] = new ISXM_Migration_Test_DB();
 $db = $GLOBALS['wpdb'];
 isxm_test_configure( [], [ 'source_provider' => 'custom', 'source_prefix' => '', 'source_use_year_month' => false,
@@ -26,10 +26,12 @@ if ( $combined ) {
         $insert_post->execute( [ $id, serialize( [ 'image' => $url ] ), $url ] );
     }
 }
-$GLOBALS['isxm_t']['meta_provider'] = function ( $id, $key ) {
+$GLOBALS['isxm_t']['meta_provider'] = function ( $id, $key ) use ( $six ) {
     $filename = sprintf( 'scale%06d.jpg', $id );
     if ( $key === '_wp_attached_file' ) return $filename;
-    if ( $key === ISXM_Offload::META_KEY ) return [ 'bucket' => 'media', 'endpoint' => 'https://s3.example.test', 'base_key' => '', 'files' => [ $filename ] ];
+    $files = [ $filename ];
+    for ( $v = 1; $v < ( $id <= $six ? 6 : 5 ); $v++ ) $files[] = sprintf( 'scale%06d-%dx100.jpg', $id, $v * 100 );
+    if ( $key === ISXM_Offload::META_KEY ) return [ 'bucket' => 'media', 'endpoint' => 'https://s3.example.test', 'base_key' => '', 'files' => $files ];
     return '';
 };
 $list_calls = 0; $verify_calls = 0; $injected_listing = false;
@@ -62,20 +64,20 @@ $GLOBALS['isxm_t']['on_option_write'] = function ( $key, $value ) use ( &$next_c
 ISXM_Job::start( 'migrate', $total, 'run|' );
 $slices = 0; $listing_errors = 0; $last_count = 0; $monotonic = true;
 do {
-    try { $result = migration_step( ++$slices % 71 === 0 ? -1 : 15 ); }
+    try { $result = ISXM_Migrate_Queue::step( ISXM_Job::get( 'migrate' ), ++$slices % 71 === 0 ? -1 : 15 ); }
     catch ( RuntimeException $e ) { if ( strpos( $e->getMessage(), 'injected' ) !== 0 ) throw $e; continue; }
     $job = ISXM_Job::get( 'migrate' );
     $monotonic = $monotonic && $job->processed >= $last_count && $job->processed <= $total;
     $last_count = $job->processed;
     if ( is_wp_error( $result ) ) { $listing_errors++; continue; }
-    if ( $slices % ( $combined ? 50000 : 2000 ) === 0 ) echo '  progress ' . $job->processed . '/' . $total . "\n";
+    if ( $slices % 500 === 0 ) echo '  progress ' . $job->processed . '/' . $total . "\n";
     if ( $slices > ( $combined ? 1500000 : 20000 ) ) throw new RuntimeException( 'Run did not settle within expected slices.' );
 } while ( is_wp_error( $result ) || ! $result['done'] );
 t( 'All 523,886 object units committed exactly', $job->processed === $total && $monotonic );
 t( 'Repeated worker terminations resumed', $crashes >= 70 );
 t( 'Listing outage retried without losing committed work', $listing_errors === 1 );
 t( 'Page checkpoints stay below 256 KiB', $max_checkpoint < 262144, (string) $max_checkpoint );
-t( 'Verification is one narrow request per encountered attachment', $verify_calls < $attachments + 3000 );
+t( 'Every source object is verified without an unbounded listing', $verify_calls <= $total + 1000 );
 t( 'No attachment errors', $job->error_count === 0 );
 if ( $combined ) {
     t( 'Combined migration rewrites all 91 seeded posts and GUIDs',

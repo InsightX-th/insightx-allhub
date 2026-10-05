@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.13
+ * Version:     0.2.14
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.13' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.14' );
 
 /*
  * GitHub update checker.
@@ -65,6 +65,8 @@ $isxm_files_to_load = [
     'includes/class-isxm-offload.php',
     'includes/class-isxm-migrate.php',
     'includes/class-isxm-migrate-queue.php',
+    'includes/class-isxm-migration-store.php',
+    'includes/class-isxm-migration-pipeline.php',
     'includes/class-isxm-sync.php',
     'includes/class-isxm-items.php',
     'includes/class-isxm-job.php',
@@ -234,3 +236,8 @@ function isxm_plugin_uninstall() {
     global $wpdb;
     $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}isxs_items" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL -- table name from $wpdb->prefix, uninstall cleanup
 }
+
+add_action( 'added_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
+add_action( 'updated_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
+add_action( 'deleted_post_meta', [ 'ISXM_Migration_Store', 'meta_changed' ], 10, 4 );
+add_action( 'delete_attachment', [ 'ISXM_Migration_Store', 'delete_attachment' ] );

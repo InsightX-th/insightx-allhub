@@ -240,6 +240,7 @@ class ISXM_CLI {
             WP_CLI::error( 'Migration source is not configured — set source bucket/access key/secret key first.' );
         }
 
+        WP_CLI::log( 'For resumable migration and external cron use: wp isxm job start migrate --runner=cli' );
         $this->run_migrate( $assoc_args );
     }
 

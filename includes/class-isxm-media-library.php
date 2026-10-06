@@ -17,6 +17,8 @@ class ISXM_Media_Library {
 
     /** Query var for the status filter (also linked to from the Tools page). */
     const FILTER_VAR = 'isxs_status';
+    const BUCKET_VAR = 'isxs_bucket';
+    const BUCKETS_TRANSIENT = 'isxs_ml_buckets';
 
     /** Bulk action id + the query arg its result notice is passed back in. */
     const BULK_ACTION  = 'isxs_offload';
@@ -184,6 +186,59 @@ class ISXM_Media_Library {
             );
         }
         echo '</select>';
+
+        $buckets = self::bucket_options();
+        if ( ! $buckets ) {
+            return;
+        }
+        $current = self::selected_bucket_value();
+        echo '<select name="' . esc_attr( self::BUCKET_VAR ) . '">';
+        printf( '<option value="">%s</option>', esc_html__( 'All buckets', 'insightx-offload' ) );
+        foreach ( $buckets as $value => $row ) {
+            printf(
+                '<option value="%s"%s>%s</option>',
+                esc_attr( $value ),
+                selected( $current, $value, false ),
+                esc_html( sprintf( '%s · %s (%s)', $row['provider'], $row['bucket'], number_format_i18n( $row['count'] ) ) )
+            );
+        }
+        echo '</select>';
+    }
+
+    /**
+     * Every endpoint + bucket the ledger has live attachments in, for the
+     * Bucket filter. One grouped query, cached for five minutes — it only
+     * feeds a dropdown.
+     *
+     * @return array<string,array{endpoint:string,bucket:string,provider:string,count:int}> value => row
+     */
+    public static function bucket_options() {
+        if ( ! ISXM_Items::ready() ) {
+            return [];
+        }
+        $cached = get_transient( self::BUCKETS_TRANSIENT );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+        global $wpdb;
+        $items = ISXM_Items::table();
+        $rows  = $wpdb->get_results(
+            "SELECT i.endpoint, i.bucket, COUNT(*) AS n FROM {$items} i INNER JOIN {$wpdb->posts} p ON p.ID = i.source_id
+             WHERE i.source_type = 'media-library' AND p.post_type = 'attachment' AND p.post_status <> 'trash'
+             GROUP BY i.endpoint, i.bucket ORDER BY n DESC" // phpcs:ignore WordPress.DB.PreparedSQL -- table names from $wpdb->prefix, no input
+        );
+        $out = [];
+        foreach ( (array) $rows as $row ) {
+            $info = [ 'endpoint' => (string) $row->endpoint, 'bucket' => (string) $row->bucket ];
+            $out[ rawurlencode( $info['endpoint'] ) . '|' . rawurlencode( $info['bucket'] ) ] = $info + [ 'provider' => self::provider_label( $info ), 'count' => (int) $row->n ];
+        }
+        set_transient( self::BUCKETS_TRANSIENT, $out, 5 * MINUTE_IN_SECONDS );
+        return $out;
+    }
+
+    /** The Bucket filter value from the request, or '' (never trusted beyond the option list). */
+    private static function selected_bucket_value() {
+        return isset( $_GET[ self::BUCKET_VAR ] ) ? (string) wp_unslash( $_GET[ self::BUCKET_VAR ] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- read-only list filter
     }
 
     /**
@@ -219,6 +274,21 @@ class ISXM_Media_Library {
         }
         if ( $query->get( 'post_type' ) !== 'attachment' ) {
             return $clauses;
+        }
+
+        // Bucket filter: only a value that is one of the offered options is
+        // used, and only through prepare(). Its own alias, so it combines
+        // with the status filter below.
+        $bucket_value = self::selected_bucket_value();
+        if ( $bucket_value !== '' && strpos( $clauses['join'], 'isxs_b' ) === false ) {
+            $options = self::bucket_options();
+            if ( isset( $options[ $bucket_value ] ) ) {
+                $clauses['join'] .= $wpdb->prepare(
+                    ' INNER JOIN ' . ISXM_Items::table() . " isxs_b ON isxs_b.source_type = 'media-library' AND isxs_b.source_id = {$wpdb->posts}.ID AND isxs_b.endpoint = %s AND isxs_b.bucket = %s ", // phpcs:ignore WordPress.DB.PreparedSQL -- table name from $wpdb->prefix
+                    $options[ $bucket_value ]['endpoint'],
+                    $options[ $bucket_value ]['bucket']
+                );
+            }
         }
 
         $status = isset( $_GET[ self::FILTER_VAR ] ) ? sanitize_key( wp_unslash( $_GET[ self::FILTER_VAR ] ) ) : '';

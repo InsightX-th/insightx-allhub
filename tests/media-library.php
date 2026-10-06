@@ -1,8 +1,10 @@
 <?php
 /** php tests/media-library.php — the Media Library Storage / Bucket columns. */
 require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/migrate-support.php';
 if ( ! function_exists( 'wp_parse_url' ) ) { function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); } }
 if ( ! function_exists( 'esc_html' ) ) { function esc_html( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES, 'UTF-8' ); } }
+if ( ! function_exists( 'selected' ) ) { function selected( $a, $b, $echo = true ) { return (string) $a === (string) $b ? ' selected="selected"' : ''; } }
 if ( ! function_exists( 'esc_attr' ) ) { function esc_attr( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES, 'UTF-8' ); } }
 require_once dirname( __DIR__ ) . '/includes/class-isxm-media-library.php';
 
@@ -35,6 +37,40 @@ t( 'Full key folder in the tooltip', strpos( bucket_cell( 1 ), 'title="sounddd-s
 update_post_meta( 6, ISXM_Offload::META_KEY, record( 'https://evil.example', '<script>x</script>' ) );
 t( 'Bucket name is escaped', strpos( bucket_cell( 6 ), '<script>' ) === false );
 t( 'Not offloaded -> dash', strpos( bucket_cell( 99 ), '—' ) !== false );
+
+group( 'Bucket filter' );
+$GLOBALS['wpdb'] = new ISXM_Migration_Test_DB(); $db = $GLOBALS['wpdb'];
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_test_configure( [], [] );
+isxm_items_table( $db );
+update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+$r2 = 'https://abc.r2.cloudflarestorage.com';
+for ( $i = 1; $i <= 6; $i++ ) {
+    $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($i)" );
+    ISXM_Items::put( $i, record( $i <= 4 ? $r2 : 'https://s3.ap-southeast-1.amazonaws.com', $i <= 4 ? 'sounddd-shop' : 'sounddd' ) );
+}
+$db->db->exec( "UPDATE wp_posts SET post_status='trash' WHERE ID=6" );
+$opts = ISXM_Media_Library::bucket_options();
+$first = reset( $opts );
+t( 'Options: one per endpoint+bucket, live items only, busiest first', count( $opts ) === 2 && $first['provider'] === 'Cloudflare R2' && $first['count'] === 4 && end( $opts )['count'] === 1, json_encode( $opts ) );
+ob_start(); ( new ISXM_Media_Library() )->render_filter( 'attachment' ); $html = ob_get_clean();
+t( 'Dropdown renders "provider · bucket (count)"', strpos( $html, 'Cloudflare R2 · sounddd-shop (4)' ) !== false && strpos( $html, 'Amazon S3 · sounddd (1)' ) !== false, $html );
+
+$GLOBALS['pagenow'] = 'upload.php';
+$GLOBALS['isxm_is_admin'] = true;
+$query = new class { public function is_main_query() { return true; } public function get( $k ) { return $k === 'post_type' ? 'attachment' : ''; } };
+$run = function () use ( $db, $query ) {
+    $c = ( new ISXM_Media_Library() )->filter_clauses( [ 'join' => '', 'where' => " AND wp_posts.post_type = 'attachment' AND wp_posts.post_status <> 'trash' " ], $query );
+    return array_map( 'intval', $db->db->query( "SELECT wp_posts.ID FROM wp_posts {$c['join']} WHERE 1=1 {$c['where']} ORDER BY wp_posts.ID" )->fetchAll( PDO::FETCH_COLUMN ) );
+};
+$_GET = [ 'isxs_bucket' => array_keys( $opts )[0] ];
+t( 'Filtering by the R2 bucket lists only its items', $run() === [ 1, 2, 3, 4 ], json_encode( $run() ) );
+$_GET = [ 'isxs_bucket' => array_keys( $opts )[1] ];
+t( 'Filtering by the S3 bucket lists only its items', $run() === [ 5 ], json_encode( $run() ) );
+$_GET = [ 'isxs_bucket' => "x' OR 1=1 --" ];
+t( 'A value that is not an option is ignored (no filter, no SQL)', count( $run() ) === 5 );
+$_GET = [];
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

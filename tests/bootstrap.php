@@ -122,7 +122,7 @@ function wp_get_attachment_metadata( $id ) { return get_post_meta( $id, '_wp_att
 function wp_delete_file( $file ) { @unlink( $file ); }
 function current_time( $type ) { return $type === 'mysql' ? gmdate( 'Y-m-d H:i:s' ) : time(); }
 function is_ssl() { return $GLOBALS['isxm_t']['ssl']; }
-function is_admin() { return false; }
+function is_admin() { return ! empty( $GLOBALS['isxm_is_admin'] ); }
 function is_feed() { return false; }
 function home_url( $path = '' ) { return rtrim( $GLOBALS['isxm_t']['home'], '/' ) . '/' . ltrim( $path, '/' ); }
 function wp_get_raw_referer() { return false; }

@@ -1339,3 +1339,7 @@ msgstr "ลบไฟล์บนเซิร์ฟเวอร์ %1$s/%2$s"
 #: includes/class-isxm-media-library.php
 msgid "Bucket"
 msgstr "Bucket"
+
+#: includes/class-isxm-media-library.php
+msgid "All buckets"
+msgstr "ทุก bucket"

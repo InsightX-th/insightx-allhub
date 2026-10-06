@@ -103,6 +103,8 @@ stage seed
 
 echo "== bulk offload (wp isxm offload)"
 wp isxm offload
+# Mark the ledger ready (as the healthcheck would) so the indexed paths run on real MySQL.
+wp isxm backfill
 stage offloaded
 
 echo "== offload on upload (-scaled image, Remove Local) + wp isxm download"

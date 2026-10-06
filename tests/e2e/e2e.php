@@ -126,6 +126,8 @@ switch ( $stage ) {
 		( new ISXM_Media_Library() )->render_column( 'isxs_bucket', $ids['attachments'][0] );
 		$cell = ob_get_clean();
 		$check( 'Media Library Bucket column shows the bucket', strpos( $cell, '· e2e-media' ) !== false, $cell );
+		$opts = wp_list_pluck( ISXM_Media_Library::bucket_options(), 'bucket' );
+		$check( 'Bucket filter offers the destination bucket (real MySQL grouping)', ISXM_Items::ready() && in_array( 'e2e-media', $opts, true ), wp_json_encode( $opts ) );
 		$check( 'Elementor JSON (escaped slashes) rewritten and still valid', is_array( $el ) && $el[0]['settings']['image']['url'] === $remote, wp_json_encode( $el ) );
 		$finish();
 		break;

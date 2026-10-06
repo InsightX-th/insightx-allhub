@@ -138,6 +138,22 @@ $GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) { return [ 'respo
 $o->remove_remote_attachment( 9 );
 t( 'Data-loss flag set instead of silently forgetting', (int) get_post_meta( 9, ISXM_Offload::DATA_LOSS_META_KEY, true ) > 0 );
 
+group( 'D10 a GUID longer than the column never stops a run' );
+integrity_fixture( 11 );
+$db = $GLOBALS['wpdb'];
+$old = 'https://example.com/wp-content/uploads/2025/09/x.jpg';
+$long = 'https://media.example.test/wp-content/uploads/2024/05/12345678/' . rawurlencode( 'ลำโพงห้องประชุมไร้สายรุ่นใหม่-1.webp' );
+$db->db->exec( 'INSERT INTO wp_posts(ID,post_content,guid) VALUES (11,\'\',' . $db->db->quote( $old ) . ')' );
+$r = ISXM_DB_Rewriter::update_attachment_guid( 11, [ [ 'old' => $old, 'new' => $long ] ] );
+t( 'Over-long GUID (' . strlen( $long ) . ' chars) is skipped, not an error', $r === 0 && $db->get_var( 'SELECT guid FROM wp_posts WHERE ID=11' ) === $old );
+$r = ISXM_DB_Rewriter::update_attachment_guid( 11, [ [ 'old' => $old, 'new' => 'https://media.example.test/x.jpg' ] ] );
+t( 'A GUID that fits is still rewritten', $r === 1 && $db->get_var( 'SELECT guid FROM wp_posts WHERE ID=11' ) === 'https://media.example.test/x.jpg' );
+$db->db->exec( "UPDATE wp_posts SET guid = " . $db->db->quote( $old ) . " WHERE ID = 11" );
+$db->fail_guid = true;
+$r = ISXM_DB_Rewriter::update_attachment_guid( 11, [ [ 'old' => $old, 'new' => 'https://media.example.test/x.jpg' ] ] );
+t( 'A real write failure is reported with the database reason', is_wp_error( $r ) && strpos( $r->get_error_message(), 'injected write failure' ) !== false, is_wp_error( $r ) ? $r->get_error_message() : 'no error' );
+$db->fail_guid = false;
+
 group( 'D9 replayed Sync pages are not double counted' );
 $run = 'integrity' . getmypid();
 ISXM_Sync::cleanup_run_files( $run );

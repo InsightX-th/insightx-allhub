@@ -92,7 +92,12 @@ class ISXM_Migration_Pipeline {
                     $pairs = [];
                     foreach ( ISXM_Migration_Store::url_map( $job->run_id, (string) $guid ) as $old => $new ) $pairs[] = [ 'old' => $old, 'new' => $new ];
                     $result = ISXM_DB_Rewriter::update_attachment_guid( $data['id'], $pairs );
-                    if ( is_wp_error( $result ) ) return $result;
+                    // One attachment's guid is not worth stopping the run for:
+                    // files and content are already migrated by this stage.
+                    if ( is_wp_error( $result ) ) {
+                        $job->errors[] = '#' . $data['id'] . ': ' . $result->get_error_message();
+                        $job->errors = array_slice( $job->errors, -ISXM_Job::MAX_ERRORS ); $job->error_count++;
+                    }
                 } elseif ( ISXM_Settings::get( 'remove_local' ) && ( $data['covered'] || ISXM_Settings::get( 'deliver_enabled' ) ) ) {
                     ISXM_Background::renew_runner_lock();
                     // Preserve files replaced by an editor while this long job ran.

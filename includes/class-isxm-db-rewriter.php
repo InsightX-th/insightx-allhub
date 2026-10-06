@@ -336,8 +336,22 @@ class ISXM_DB_Rewriter {
             if ( in_array( $current, $map, true ) ) clean_post_cache( (int) $attachment_id );
             return 0;
         }
-        $written = $wpdb->update( $wpdb->posts, [ 'guid' => $map[ $current ] ], [ 'ID' => $attachment_id, 'guid' => $current ] );
-        if ( $written === false || $written === 0 ) return new WP_Error( 'isxs_guid_write', 'Could not update the attachment GUID; checkpoint retained.' );
+        $new = $map[ $current ];
+        // wp_posts.guid is varchar(255). A percent-encoded non-Latin file name
+        // easily exceeds it, and strict SQL modes then reject the write.
+        // The guid is an internal identifier, not what pages display, so the
+        // old one is kept rather than stopping a whole run on it.
+        if ( strlen( $new ) > 255 ) {
+            isxm_log_error( sprintf( 'GUID of #%d left unchanged: the new URL is %d characters (the column holds 255).', $attachment_id, strlen( $new ) ) );
+            return 0;
+        }
+        $written = $wpdb->update( $wpdb->posts, [ 'guid' => $new ], [ 'ID' => $attachment_id, 'guid' => $current ] );
+        if ( $written === 0 && $wpdb->get_var( $wpdb->prepare( "SELECT guid FROM {$wpdb->posts} WHERE ID = %d", $attachment_id ) ) === $new ) {
+            $written = 1; // someone (a replay) already wrote it
+        }
+        if ( $written === false || $written === 0 ) {
+            return new WP_Error( 'isxs_guid_write', trim( 'Could not update the attachment GUID; checkpoint retained. ' . $wpdb->last_error ) );
+        }
         // Writing straight to the table leaves the cached post object holding
         // the old guid — on a site with a persistent object cache (Redis/
         // Memcached) that stale copy is what everything reads until the cache

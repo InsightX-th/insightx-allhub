@@ -332,12 +332,9 @@ class ISXM_Migrate {
      */
     private static function as3cf_dirs( array $ids, $bucket ) {
         global $wpdb;
-        static $exists = false; // only a hit is cached: the table can appear mid-run
         $table = $wpdb->prefix . 'as3cf_items';
-        if ( ! $exists ) {
-            $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
-        }
-        if ( ! $exists || ! $ids ) return [];
+        // One cheap check per 200-key listing page; not cached across calls.
+        if ( ! $ids || $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) return [];
         $marks = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
         $rows  = $wpdb->get_results( $wpdb->prepare(
             "SELECT source_id, path FROM {$table} WHERE source_type = 'media-library' AND bucket = %s AND source_id IN ({$marks})", // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array

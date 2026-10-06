@@ -82,10 +82,19 @@ switch ( $stage ) {
 			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $path ) );
 			$ids[] = $id;
 		}
+		// A Thai file name: percent-encoded, its bucket URL outgrows the
+		// 255-character guid column (real MySQL strict mode rejects it).
+		$thai = 'ลำโพงห้องประชุมไร้สายรุ่นใหม่-ทดสอบ';
+		$img  = imagecreatetruecolor( 400, 300 );
+		$path = $up['path'] . "/$thai.jpg";
+		imagejpeg( $img, $path, 80 );
+		$tid  = wp_insert_attachment( array( 'guid' => $up['url'] . "/$thai.jpg", 'post_mime_type' => 'image/jpeg', 'post_title' => 'thai', 'post_status' => 'inherit' ), $path );
+		$check( 'Thai-named attachment created', $tid > 0 );
+		wp_update_attachment_metadata( $tid, wp_generate_attachment_metadata( $tid, $path ) );
 		$url  = wp_get_attachment_url( $ids[0] );
 		$post = wp_insert_post( array( 'post_title' => 'E2E', 'post_status' => 'publish', 'post_content' => "<img src=\"$url\"> look-alike: " . str_replace( '/wp-content/uploads/', '/wp-content/uploads-old/', $url ) ) );
 		update_post_meta( $post, '_elementor_data', wp_slash( wp_json_encode( array( array( 'settings' => array( 'image' => array( 'url' => $url ) ) ) ) ) ) );
-		file_put_contents( "$work/ids.json", wp_json_encode( array( 'attachments' => $ids, 'post' => $post ) ) );
+		file_put_contents( "$work/ids.json", wp_json_encode( array( 'attachments' => $ids, 'post' => $post, 'thai' => $tid ) ) );
 		$check( 'two images with generated sizes', count( wp_get_attachment_metadata( $ids[0] )['sizes'] ) >= 2 );
 		$finish();
 		break;
@@ -224,6 +233,10 @@ switch ( $stage ) {
 		$info = ISXM_Offload::get_record( $ids['attachments'][1] );
 		$check( 'item already offloaded to the OLD bucket was migrated (not skipped)', is_array( $info ) && $info['bucket'] === 'e2e-dest', wp_json_encode( $info ) );
 		$check( 'its files now exist in the destination bucket', is_array( $info ) && in_array( $info['base_key'] . $info['files'][0], $keys, true ), wp_json_encode( $keys ) );
+		$job  = ISXM_Job::get( 'migrate' );
+		$thai = ISXM_Offload::get_record( $ids['thai'] );
+		$check( 'migration completed although one GUID cannot fit the column', $job && $job->state === ISXM_Job::STATE_DONE, $job ? $job->state . ' ' . $job->message : 'no job' );
+		$check( 'the Thai-named item was migrated', is_array( $thai ) && $thai['bucket'] === 'e2e-dest', wp_json_encode( $thai ) );
 		update_post_meta( $ids['attachments'][0], ISXM_Offload::ERROR_META_KEY, array( 'code' => 'isxs_e2e', 'message' => 'e2e reason', 'file' => 'alpha.jpg', 'time' => time(), 'tries' => 2 ) );
 		$diag = ISXM_Tools::diagnostic_text();
 		$check( 'Diagnostic lists failed items with their reason', strpos( $diag, '--- Failed items' ) !== false && strpos( $diag, '[isxs_e2e] e2e reason (tries 2' ) !== false, $diag );

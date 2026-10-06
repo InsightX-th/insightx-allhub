@@ -73,6 +73,16 @@ $db->db->exec( "UPDATE wp_as3cf_items SET bucket = 'other-bucket'" );
 $page = $scan();
 t( 'Rows for another bucket are ignored', isset( $page['items'][1] ) );
 
+group( 'A failing GUID is an item error; the run still completes' );
+$job = migration_fixture( 2 ); $db = $GLOBALS['wpdb'];
+foreach ( [ 1, 2 ] as $i ) $db->db->exec( "INSERT INTO wp_posts VALUES($i,'','https://example.com/wp-content/uploads/m$i.jpg')" );
+$db->fail_guid = true;
+pipeline_drain();
+$db->fail_guid = false;
+$job = ISXM_Job::get( 'migrate' );
+t( 'Run reaches complete despite GUID write failures', $job->migration['stage'] === 'complete' );
+t( 'Each failed GUID is reported per item', $job->error_count === 2 && strpos( implode( ' ', $job->errors ), 'GUID' ) !== false, json_encode( $job->errors ) );
+
 group( 'Indexed URL lookup forms' );
 foreach ( [ 'image.jpg', 'photo(1).jpg', 'my image.jpg', 'ภาพ.jpg' ] as $name ) {
     $old = 'https://source.test/version/' . $name; $new = 'https://dest.test/' . rawurlencode( $name );

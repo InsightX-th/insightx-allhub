@@ -470,7 +470,7 @@ class ISXM_Admin {
                                 <div class="isxs-field">
                                     <label for="isxs-source-public-url"><?php esc_html_e( 'Source Public URL (current)', 'insightx-offload' ); ?></label>
                                     <input type="url" id="isxs-source-public-url" placeholder="<?php esc_attr_e( 'Leave empty to infer it from the Endpoint/Bucket above', 'insightx-offload' ); ?>" value="<?php echo esc_attr( $s['source_public_base_url'] ); ?>">
-                                    <p class="isxs-hint"><?php esc_html_e( 'e.g. https://old-bucket.s3.amazonaws.com or https://cdn.old-domain.com — leave empty if existing media still uses this site\'s local URLs (wp-content/uploads)', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Where the existing media is served from NOW, before migrating — e.g. https://old-bucket.s3.ap-southeast-1.amazonaws.com or the old CDN domain. Not the destination address. Leave empty if existing media still uses this site\'s local URLs (wp-content/uploads)', 'insightx-offload' ); ?></p>
                                 </div>
                             </div>
                         </div>

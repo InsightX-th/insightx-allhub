@@ -182,6 +182,11 @@ switch ( $stage ) {
 			$check( "$file downloaded back byte-for-byte", $ok );
 		}
 		e2e_settings( array( 'offload_enabled' => false, 'remove_local' => false ) );
+		// As on a site whose old offload plugin removed local copies: the
+		// migration must take every size from the source bucket.
+		foreach ( glob( "$dir/huge*" ) as $local_copy ) {
+			@unlink( $local_copy );
+		}
 		$finish();
 		break;
 
@@ -243,6 +248,14 @@ switch ( $stage ) {
 		$thai = ISXM_Offload::get_record( $ids['thai'] );
 		$check( 'migration completed although one GUID cannot fit the column', $job && $job->state === ISXM_Job::STATE_DONE, $job ? $job->state . ' ' . $job->message : 'no job' );
 		$check( 'the Thai-named item was migrated', is_array( $thai ) && $thai['bucket'] === 'e2e-dest', wp_json_encode( $thai ) );
+		$huge = ISXM_Offload::get_record( $ids['huge'] );
+		$meta = wp_get_attachment_metadata( $ids['huge'] );
+		$want = array_merge( [ wp_basename( $meta['file'] ), $meta['original_image'] ?? '' ], wp_list_pluck( $meta['sizes'], 'file' ) );
+		$missing = array_diff( array_filter( $want ), (array) ( $huge['files'] ?? [] ) );
+		$check( 'every size and the original of the -scaled image reached the destination', is_array( $huge ) && $huge['bucket'] === 'e2e-dest' && ! $missing, wp_json_encode( [ 'missing' => array_values( $missing ), 'record' => $huge ] ) );
+		$destkeys = e2e_keys( $dest );
+		$absent = array_filter( (array) ( $huge['files'] ?? [] ), function ( $f ) use ( $huge, $destkeys ) { return ! in_array( $huge['base_key'] . $f, $destkeys, true ); } );
+		$check( '...and each of them is really in the destination bucket', ! $absent, wp_json_encode( array_values( $absent ) ) );
 		update_post_meta( $ids['attachments'][0], ISXM_Offload::ERROR_META_KEY, array( 'code' => 'isxs_e2e', 'message' => 'e2e reason', 'file' => 'alpha.jpg', 'time' => time(), 'tries' => 2 ) );
 		$diag = ISXM_Tools::diagnostic_text();
 		$check( 'Diagnostic lists failed items with their reason', strpos( $diag, '--- Failed items' ) !== false && strpos( $diag, '[isxs_e2e] e2e reason (tries 2' ) !== false, $diag );

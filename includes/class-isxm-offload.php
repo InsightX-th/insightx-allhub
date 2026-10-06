@@ -328,6 +328,53 @@ class ISXM_Offload {
         return $result;
     }
 
+    /**
+     * Give a duplicate attachment the record of a twin that points at the
+     * same file and is already on the current destination.
+     *
+     * @param int $attachment_id
+     * @return bool Whether a record was adopted.
+     */
+    public static function adopt_shared_record( $attachment_id ) {
+        global $wpdb;
+        $path = (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+        if ( $path === '' ) {
+            return false;
+        }
+        $twins = $wpdb->get_col( $wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value = %s AND post_id <> %d ORDER BY post_id",
+            $path,
+            $attachment_id
+        ) );
+        $s = ISXM_Settings::all();
+        foreach ( (array) $twins as $twin ) {
+            $info = self::get_record( (int) $twin );
+            if ( self::has_record( $info ) && ( $info['bucket'] ?? '' ) === $s['bucket'] && ( $info['endpoint'] ?? '' ) === $s['endpoint'] ) {
+                return self::set_record( $attachment_id, $info );
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The object keys of a record that no OTHER attachment still uses —
+     * duplicates share objects, and deleting one must not break the other.
+     *
+     * @param int   $attachment_id
+     * @param array $info Tracking record.
+     * @return string[]
+     */
+    public static function unshared_keys( $attachment_id, array $info ) {
+        $shared = ISXM_Items::files_shared( (string) $info['bucket'], (string) ( $info['endpoint'] ?? '' ), (string) $info['base_key'], (int) $attachment_id );
+        $keys   = [];
+        foreach ( $info['files'] as $filename ) {
+            if ( ! in_array( $filename, $shared, true ) ) {
+                $keys[] = $info['base_key'] . $filename;
+            }
+        }
+        return $keys;
+    }
+
     /** Forget memoized URL lookups (long CLI runs). */
     public static function flush_url_cache() {
         self::$url_post_cache = [];
@@ -440,6 +487,13 @@ class ISXM_Offload {
         $file = self::local_path( $attachment_id );
         if ( $file !== '' && isset( $migration_paths[ wp_basename( $file ) ] ) ) $file = $migration_paths[ wp_basename( $file ) ];
         if ( $file === '' || ! file_exists( $file ) ) {
+            // A duplicate attachment (same _wp_attached_file as another one)
+            // whose twin is already on this destination: the objects are
+            // there, it only needs to know — uploading is neither possible
+            // (the shared local file is gone) nor needed.
+            if ( ! $migration_paths && self::adopt_shared_record( $attachment_id ) ) {
+                return true;
+            }
             // With "Remove Local Media" on, a file already living in some
             // bucket legitimately has no local copy — say so, because the fix
             // (download it back first) is different from a genuinely lost file.
@@ -883,7 +937,7 @@ class ISXM_Offload {
         // stale tracking meta instead of getting stuck on this item forever.
 
         $client = self::client_for_info( $info );
-        $keys   = array_map( function ( $filename ) use ( $info ) { return $info['base_key'] . $filename; }, $info['files'] );
+        $keys   = self::unshared_keys( $attachment_id, $info );
         foreach ( $client->delete_objects( $keys ) as $key => $result ) {
             if ( is_wp_error( $result ) ) {
                 return new WP_Error( 'isxs_delete_failed', sprintf( __( 'Could not delete %s from the bucket: %s', 'insightx-offload' ), wp_basename( $key ), $result->get_error_message() ) );
@@ -1021,7 +1075,7 @@ class ISXM_Offload {
 
         if ( ISXM_Settings::is_configured() ) {
             $client = self::client_for_info( $info );
-            $keys   = array_map( function ( $filename ) use ( $info ) { return $info['base_key'] . $filename; }, $info['files'] );
+            $keys   = self::unshared_keys( $attachment_id, $info );
             foreach ( $client->delete_objects( $keys ) as $key => $result ) {
                 if ( is_wp_error( $result ) ) {
                     isxm_log_error( 'Remote delete failed for #' . $attachment_id . ' ' . $key . ': ' . $result->get_error_message() );
@@ -1412,9 +1466,15 @@ class ISXM_Offload {
      * @param string $relative Path under uploads.
      * @return string[]
      */
-    private static function lookup_paths( $relative ) {
+    public static function lookup_paths( $relative ) {
         $lookup = preg_replace( '#-\d+x\d+(\.[a-zA-Z0-9]+)$#', '$1', $relative );
-        return [ $lookup, preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-scaled$1', $lookup ) ];
+        return [
+            $lookup,
+            preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-scaled$1', $lookup ),
+            // EXIF-rotated uploads are attached as name-rotated.ext; their
+            // sizes keep the bare name too.
+            preg_replace( '#(\.[a-zA-Z0-9]+)$#', '-rotated$1', $lookup ),
+        ];
     }
 
     /**

@@ -37,7 +37,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_Items {
 
     /** Bumped when the schema changes; drives maybe_install(). */
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
 
     const DB_VERSION_OPTION = 'isxs_items_db_version';
 
@@ -98,6 +98,7 @@ class ISXM_Items {
             PRIMARY KEY  (id),
             UNIQUE KEY uidx_source (source_type, source_id),
             KEY idx_scan (bucket(100), endpoint(100), source_id),
+            KEY idx_base (bucket(100), base_key(150)),
             KEY idx_partial (is_partial)
         ) {$collate};";
 
@@ -299,6 +300,49 @@ class ISXM_Items {
      * Drop the per-request cache. Long-running batches call this between
      * chunks so the cache can't grow without bound.
      */
+    /**
+     * File names other attachments' records use in the same key folder
+     * (duplicates of one file share its objects).
+     *
+     * @return string[]
+     */
+    public static function files_shared( $bucket, $endpoint, $base_key, $exclude_id ) {
+        global $wpdb;
+        if ( (int) get_option( self::DB_VERSION_OPTION ) === self::DB_VERSION ) {
+            $rows = $wpdb->get_col( $wpdb->prepare(
+                'SELECT files FROM ' . self::table() . " WHERE source_type = 'media-library' AND bucket = %s AND base_key = %s AND endpoint = %s AND source_id <> %d", // phpcs:ignore WordPress.DB.PreparedSQL -- table name from $wpdb->prefix
+                $bucket, $base_key, $endpoint, $exclude_id
+            ) );
+            $files = [];
+            foreach ( (array) $rows as $json ) {
+                $files = array_merge( $files, (array) json_decode( (string) $json, true ) );
+            }
+            if ( ! self::ready() ) {
+                // Records not yet copied into the ledger live only in postmeta.
+                $files = array_merge( $files, self::files_shared_postmeta( $bucket, $endpoint, $base_key, $exclude_id ) );
+            }
+            return array_values( array_unique( $files ) );
+        }
+        return self::files_shared_postmeta( $bucket, $endpoint, $base_key, $exclude_id );
+    }
+
+    private static function files_shared_postmeta( $bucket, $endpoint, $base_key, $exclude_id ) {
+        global $wpdb;
+        $needle = 's:8:"base_key";s:' . strlen( $base_key ) . ':"' . $base_key . '"';
+        $rows   = $wpdb->get_results( $wpdb->prepare(
+            "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value LIKE %s AND post_id <> %d",
+            ISXM_Offload::META_KEY, '%' . $wpdb->esc_like( $needle ) . '%', $exclude_id
+        ) );
+        $files = [];
+        foreach ( (array) $rows as $row ) {
+            $info = maybe_unserialize( $row->meta_value );
+            if ( is_array( $info ) && ( $info['bucket'] ?? '' ) === $bucket && ( $info['endpoint'] ?? '' ) === $endpoint && ( $info['base_key'] ?? null ) === $base_key ) {
+                $files = array_merge( $files, (array) ( $info['files'] ?? [] ) );
+            }
+        }
+        return $files;
+    }
+
     public static function flush_cache() {
         self::$cache = [];
     }

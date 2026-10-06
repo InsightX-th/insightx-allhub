@@ -130,6 +130,46 @@ $last = end( $seen );
 t( 'Card gets done/total for the finalize stage', $last && $last['total'] >= 250 && $last['done'] >= 200 && $last['done'] <= $last['total'], json_encode( $last ) );
 t( 'One checkpoint per 100-row chunk, not one per row', $writes <= 8, (string) $writes );
 
+group( 'Sizes of big (-scaled) and EXIF-rotated images are migrated too' );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$db->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (1,'_wp_attached_file','big-scaled.jpg'),(2,'_wp_attached_file','rot-rotated.jpg')" );
+$GLOBALS['isxm_t']['http_provider'] = function () {
+    return migration_listing( [ 'big.jpg', 'big-1536x1536.jpg', 'big-300x200.jpg', 'big-scaled.jpg', 'big-scaled-800x800.jpg', 'rot.jpg', 'rot-150x150.jpg', 'rot-rotated.jpg', 'nobody-uses-this.jpg' ] );
+};
+$page = ISXM_Migrate::scan_source_batch( '' );
+t( 'Original and every size of the -scaled image belong to it', array_keys( $page['items'][1] ?? [] ) === [ 'big.jpg', 'big-1536x1536.jpg', 'big-300x200.jpg', 'big-scaled.jpg', 'big-scaled-800x800.jpg' ], json_encode( $page['items'] ) );
+t( 'Same for -rotated', array_keys( $page['items'][2] ?? [] ) === [ 'rot.jpg', 'rot-150x150.jpg', 'rot-rotated.jpg' ] );
+t( 'Objects no attachment uses are reported, not silently dropped', $page['unmatched'] === [ 'nobody-uses-this.jpg' ] );
+$job = migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$db->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (1,'_wp_attached_file','m1.jpg')" );
+$GLOBALS['isxm_t']['http_provider'] = function () { return migration_listing( [ 'm1.jpg', 'stray-1.jpg', 'stray-2.jpg' ] ); };
+pipeline_drain();
+$sk = ISXM_Job::get( 'migrate' )->migration['skipped'] ?? [];
+t( 'The run keeps a count and sample of unmatched objects', ( $sk['count'] ?? 0 ) === 2 && $sk['sample'] === [ 'stray-1.jpg', 'stray-2.jpg' ], json_encode( $sk ) );
+
+group( 'Re-run: one listing per migrated item, only missing sizes move' );
+$job = migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+list( $s3port ) = isxm_start_fake_s3(); // uploads stream through real cURL
+$GLOBALS['isxm_t']['options']['isxs_connections']['custom']['endpoint'] = "http://127.0.0.1:$s3port"; ISXM_Settings::flush_cache();
+$db->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (1,'_wp_attached_file','p-scaled.jpg')" );
+isxm_test_add_post( 1, [] ); update_post_meta( 1, '_wp_attached_file', 'p-scaled.jpg' );
+ISXM_Offload::set_record( 1, [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$s3port", 'base_key' => '19000009/', 'version' => '19000009', 'files' => [ 'p-scaled.jpg', 'p-scaled-800x800.jpg' ] ] );
+$lists = 0; $gets = [];
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$lists, &$gets ) {
+    parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q );
+    if ( isset( $q['list-type'] ) && ( $q['prefix'] ?? '' ) === '19000009/' ) { $lists++; return migration_listing( [ '19000009/p-scaled.jpg', '19000009/p-scaled-800x800.jpg' ] ); }
+    if ( isset( $q['list-type'] ) && ! empty( $q['prefix'] ) ) return migration_listing( [ $q['prefix'] ] );
+    if ( isset( $q['list-type'] ) ) return migration_listing( [ 'p.jpg', 'p-1536x1536.jpg', 'p-scaled.jpg', 'p-scaled-800x800.jpg' ] );
+    if ( ( $args['method'] ?? 'GET' ) === 'GET' ) { $gets[] = basename( parse_url( $url, PHP_URL_PATH ) ); if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], 'x' ); }
+    return [ 'response' => [ 'code' => 200 ], 'body' => '' ];
+};
+pipeline_step(); pipeline_step();
+ISXM_Items::flush_cache();
+$rec = ISXM_Offload::get_record( 1 );
+t( 'Already-present size verified with one listing, not one per file', $lists === 1, (string) $lists );
+t( 'Sizes already on the destination are not fetched again', ! in_array( 'p-scaled-800x800.jpg', $gets, true ) && in_array( 'p-1536x1536.jpg', $gets, true ) && in_array( 'p.jpg', $gets, true ), json_encode( $gets ) );
+t( 'Record keeps its version folder, keeps present files and gains the missing ones', ( $rec['base_key'] ?? '' ) === '19000009/' && ! array_diff( [ 'p.jpg', 'p-1536x1536.jpg', 'p-scaled.jpg', 'p-scaled-800x800.jpg' ], $rec['files'] ?? [] ), json_encode( $rec ) . ' ' . json_encode( ISXM_Job::get( 'migrate' )->errors ) );
+
 group( 'Indexed URL lookup forms' );
 foreach ( [ 'image.jpg', 'photo(1).jpg', 'my image.jpg', 'ภาพ.jpg' ] as $name ) {
     $old = 'https://source.test/version/' . $name; $new = 'https://dest.test/' . rawurlencode( $name );

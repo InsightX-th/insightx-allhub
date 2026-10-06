@@ -616,7 +616,7 @@
     }
     if (job.phase === "rewriting") {
       const cursor = job.rewrite_cursor;
-      return cfg.i18n.rewriting + (cursor ? " " + ["posts", "postmeta", "options"][cursor.table] + ": " + cursor.after : "");
+      return cfg.i18n.rewriting + (cursor ? " " + ["posts", "postmeta", "options", "termmeta"][cursor.table] + ": " + cursor.after : "");
     }
     return "";
   };

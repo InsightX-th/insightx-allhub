@@ -150,6 +150,21 @@ class ISXM_Tools {
             $settings['source_public_base_url'] = '';
         }
 
+        // The Source Public URL is where existing media is served from NOW
+        // (the old bucket/CDN). Pointing it at the destination makes the
+        // migration record old→new URL pairs that match nothing in the
+        // database, so the final rewrite silently leaves the old URLs in place.
+        if ( $settings['source_public_base_url'] !== '' ) {
+            $source_host = strtolower( (string) wp_parse_url( $settings['source_public_base_url'], PHP_URL_HOST ) );
+            $dest_hosts  = array_filter( [
+                strtolower( (string) wp_parse_url( 'https://' . preg_replace( '#^https?://#', '', $settings['cdn_domain'] ), PHP_URL_HOST ) ),
+                strtolower( (string) wp_parse_url( ISXM_Settings::public_base_url(), PHP_URL_HOST ) ),
+            ] );
+            if ( $source_host !== '' && in_array( $source_host, $dest_hosts, true ) ) {
+                wp_send_json_error( [ 'message' => __( 'Source Public URL must be where your existing media is served from now (for example the old S3 bucket or its CDN) — not the destination address', 'insightx-offload' ) ] );
+            }
+        }
+
         // Detect a destination switch before saving overwrites $current —
         // the frontend uses this to reset all 4 tools' UI/resume state,
         // since a stale "Resume" pointing at the previous destination is
@@ -2629,6 +2644,9 @@ class ISXM_Tools {
                     $job->processed, $job->batch_progress, (int) ( $job->activity['restarts'] ?? 0 ),
                     gmdate( 'Y-m-d H:i:s', (int) ( $job->activity['last_progress'] ?? $job->updated ) ),
                     wp_json_encode( $job->migration['rewrite'] ?? [] ) );
+                if ( ! empty( $job->migration['skipped']['count'] ) ) {
+                    $lines[] = sprintf( '    source objects not matched to any attachment: %d (e.g. %s)', (int) $job->migration['skipped']['count'], implode( ', ', array_slice( $job->migration['skipped']['sample'], 0, 5 ) ) );
+                }
                 if ( ! empty( $job->activity['finalize'] ) ) {
                     $f = $job->activity['finalize'];
                     $lines[] = sprintf( '    finalize %s: %d/%d, about %d min left', $job->activity['stage'] ?? '', (int) $f['done'], (int) $f['total'], (int) ceil( (int) $f['eta'] / 60 ) );

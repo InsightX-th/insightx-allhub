@@ -154,6 +154,46 @@ $r = ISXM_DB_Rewriter::update_attachment_guid( 11, [ [ 'old' => $old, 'new' => '
 t( 'A real write failure is reported with the database reason', is_wp_error( $r ) && strpos( $r->get_error_message(), 'injected write failure' ) !== false, is_wp_error( $r ) ? $r->get_error_message() : 'no error' );
 $db->fail_guid = false;
 
+group( 'D11 duplicate attachments share the objects of one file' );
+integrity_fixture( 12 ); // #12 owns 2025/09/i12.jpg
+$db = $GLOBALS['wpdb'];
+$db->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (12,'_wp_attached_file','2025/09/i12.jpg'),(13,'_wp_attached_file','2025/09/i12.jpg')" );
+isxm_test_add_post( 13, [] ); update_post_meta( 13, '_wp_attached_file', '2025/09/i12.jpg' );
+$twin = [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$port", 'base_key' => '2025/09/', 'files' => [ 'i12.jpg', 'i12-300x200.jpg' ] ];
+ISXM_Offload::set_record( 12, $twin );
+@unlink( ISXM_TEST_UPLOADS . '/2025/09/i12.jpg' ); @unlink( ISXM_TEST_UPLOADS . '/2025/09/i12-300x200.jpg' );
+@unlink( $log );
+$r = $o->offload_attachment( 13, null );
+ISXM_Items::flush_cache();
+t( 'The duplicate adopts its twin\'s record instead of failing', $r === true && ( ISXM_Offload::get_record( 13 )['files'] ?? [] ) === $twin['files'], is_wp_error( $r ) ? $r->get_error_message() : '' );
+t( 'Nothing is uploaded for it', ! is_file( $log ) );
+$deletes = [];
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$deletes ) {
+    if ( in_array( $args['method'] ?? '', [ 'DELETE', 'POST' ], true ) ) $deletes[] = $args['method'] . ' ' . $url . ' ' . ( $args['body'] ?? '' );
+    return [ 'response' => [ 'code' => 200 ], 'body' => '' ];
+};
+$GLOBALS['isxm_t']['options']['isxs_connections']['custom']['endpoint'] = 'https://s3.example.test'; ISXM_Settings::flush_cache();
+$shared = [ 'bucket' => 'media', 'endpoint' => 'https://s3.example.test', 'base_key' => '2025/09/', 'files' => [ 'i12.jpg', 'i12-300x200.jpg' ] ];
+ISXM_Offload::set_record( 12, $shared ); ISXM_Offload::set_record( 13, $shared );
+$o->delete_remote_on_delete( 13 );
+t( 'Deleting one duplicate keeps the objects the other still uses', $deletes === [], json_encode( $deletes ) );
+$o->delete_remote_on_delete( 12 );
+t( 'Deleting the last user removes them', count( $deletes ) === 1 && strpos( $deletes[0], 'i12-300x200.jpg' ) !== false, json_encode( $deletes ) );
+integrity_fixture( 12 );
+ISXM_Offload::set_record( 12, $shared ); ISXM_Offload::set_record( 13, $shared );
+$GLOBALS['isxm_t']['options']['isxs_connections']['custom']['endpoint'] = 'https://s3.example.test'; ISXM_Settings::flush_cache();
+$deletes = [];
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$deletes ) {
+    if ( in_array( $args['method'] ?? '', [ 'DELETE', 'POST' ], true ) ) $deletes[] = $args['method'];
+    if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], 'x' );
+    return [ 'response' => [ 'code' => 200 ], 'body' => '' ];
+};
+$r = $o->remove_remote_attachment( 13 );
+t( 'Remove from Bucket on a duplicate restores it but leaves the shared objects', $r === true && $deletes === [] && ISXM_Offload::get_record( 12 ) !== null, json_encode( [ $r, $deletes ] ) );
+integrity_fixture( 14 );
+@unlink( ISXM_TEST_UPLOADS . '/2025/09/i14.jpg' );
+t( 'No twin on the destination: still "missing local"', ( function () use ( $o ) { $r = $o->offload_attachment( 14, null ); return is_wp_error( $r ) && $r->get_error_code() === 'isxs_missing_local'; } )() );
+
 group( 'D9 replayed Sync pages are not double counted' );
 $run = 'integrity' . getmypid();
 ISXM_Sync::cleanup_run_files( $run );

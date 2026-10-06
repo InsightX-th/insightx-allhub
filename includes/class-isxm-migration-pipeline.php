@@ -36,6 +36,9 @@ class ISXM_Migration_Pipeline {
                 $m['index'] = (int) ( $parts[2] ?? 0 );
                 $m['next'] = $page['next_token']; $m['done'] = $page['done'];
                 $m['unmatched'] = $page['scanned_keys'] - $matched;
+                // Source objects no attachment claims: kept visible (count +
+                // sample) instead of only folded into the progress counter.
+                $m['page_unmatched'] = $page['unmatched'] ?? [];
                 self::save( $job );
             }
             $group = max( 1, (int) apply_filters( 'isxm_migrate_parallel_items', 4 ) ); $prefetched = $m['index'];
@@ -60,8 +63,12 @@ class ISXM_Migration_Pipeline {
             }
             if ( $m['index'] >= count( $m['items'] ) ) {
                 $job->processed += $m['unmatched']; $job->cursor = 'run|' . $m['next'];
+                $skipped = $m['skipped'] ?? [ 'count' => 0, 'sample' => [] ];
+                $skipped['count'] += count( $m['page_unmatched'] ?? [] );
+                $skipped['sample'] = array_slice( array_merge( $skipped['sample'], $m['page_unmatched'] ?? [] ), 0, 20 );
+                $m['skipped'] = $skipped;
                 if ( $m['done'] ) $m['stage'] = 'rewrite';
-                unset( $m['items'], $m['index'], $m['next'], $m['done'], $m['unmatched'] );
+                unset( $m['items'], $m['index'], $m['next'], $m['done'], $m['unmatched'], $m['page_unmatched'] );
                 self::save( $job );
             }
             return self::result( $job );
@@ -129,14 +136,24 @@ class ISXM_Migration_Pipeline {
         $s = ISXM_Settings::all(); $info = ISXM_Offload::get_record( $id );
         $same = is_array( $info ) && ( $info['bucket'] ?? '' ) === $s['bucket'] && ( $info['endpoint'] ?? '' ) === $s['endpoint'];
         $verified = [];
+        // One listing of the record's folder, not one request per file.
+        $present = $same ? ISXM_Sync::list_record_folder( $info ) : null;
         foreach ( array_unique( array_values( $keys ) ) as $name ) {
-            if ( $same && in_array( $name, $info['files'] ?? [], true ) ) {
+            if ( ! $same || ! in_array( $name, $info['files'] ?? [], true ) ) continue;
+            if ( $present !== null ) {
+                if ( isset( $present[ $info['base_key'] . $name ] ) ) $verified[] = $name;
+            } else {
                 $probe = $info; $probe['files'] = [ $name ];
                 if ( ISXM_Sync::primary_exists_on_destination( $probe ) ) $verified[] = $name;
             }
         }
         if ( count( $verified ) !== count( array_unique( array_values( $keys ) ) ) ) {
-            $result = ISXM_Migrate::migrate_staged( $id, $keys, $job->run_id );
+            // Only what the destination lacks (the original is fetched again
+            // when needed: the offload step reads it). Present files are
+            // kept from the record without being sent twice.
+            $todo   = array_filter( $keys, function ( $name ) use ( $verified ) { return ! in_array( $name, $verified, true ); } );
+            $result = ISXM_Migrate::migrate_staged( $id, $todo, $job->run_id );
+            ISXM_Sync::forget_listings(); // the folder now holds the new uploads
             if ( is_wp_error( $result ) ) return $result;
             $info = ISXM_Offload::get_record( $id );
         }

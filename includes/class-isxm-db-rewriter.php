@@ -84,7 +84,7 @@ class ISXM_DB_Rewriter {
 
     /**
      * Rewrite one primary-key window for a durable migration batch.
-     * Cursor is {table: 0..3, after: row ID}; callers persist it only on success.
+     * Cursor is {table: 0..4, after: row ID}; callers persist it only on success.
      * @return array{cursor:array,done:bool}|WP_Error
      */
     public static function replace_urls_window( array $pairs, array $cursor, $deadline = 0, $map_builder = null ) {
@@ -93,6 +93,9 @@ class ISXM_DB_Rewriter {
             [ $wpdb->posts, 'ID', 'post_content', 'ID', 'posts' ],
             [ $wpdb->postmeta, 'meta_id', 'meta_value', 'post_id', 'postmeta' ],
             [ $wpdb->options, 'option_id', 'option_value', 'option_name', 'options' ],
+            // Last, so cursors saved before it existed stay valid: category
+            // and other term images stored as URLs live here.
+            [ $wpdb->termmeta, 'meta_id', 'meta_value', 'term_id', 'termmeta' ],
         ];
         $index = (int) $cursor['table'];
         if ( $index >= count( $tables ) ) return [ 'cursor' => $cursor, 'done' => true ];
@@ -497,6 +500,13 @@ class ISXM_DB_Rewriter {
         if ( $kind === 'postmeta' ) {
             foreach ( $refs as $post_id ) {
                 wp_cache_delete( (int) $post_id, 'post_meta' );
+            }
+            return;
+        }
+
+        if ( $kind === 'termmeta' ) {
+            foreach ( $refs as $term_id ) {
+                wp_cache_delete( (int) $term_id, 'term_meta' );
             }
             return;
         }

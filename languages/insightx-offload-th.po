@@ -650,8 +650,8 @@ msgid "Leave empty to infer it from the Endpoint/Bucket above"
 msgstr "เว้นว่างเพื่อเดาจาก Endpoint/Bucket ด้านบน"
 
 #: includes/class-isxm-admin.php:465
-msgid "e.g. https://old-bucket.s3.amazonaws.com or https://cdn.old-domain.com — leave empty if existing media still uses this site's local URLs (wp-content/uploads)"
-msgstr "เช่น https://old-bucket.s3.amazonaws.com หรือ https://cdn.เดิม.com — เว้นว่างถ้า media เดิมยังเป็น URL local (wp-content/uploads) ของเว็บนี้"
+msgid "Where the existing media is served from NOW, before migrating — e.g. https://old-bucket.s3.ap-southeast-1.amazonaws.com or the old CDN domain. Not the destination address. Leave empty if existing media still uses this site's local URLs (wp-content/uploads)"
+msgstr "ที่อยู่ที่รูปเดิมเสิร์ฟอยู่ *ตอนนี้* ก่อนย้าย — เช่น https://old-bucket.s3.ap-southeast-1.amazonaws.com หรือโดเมน CDN เดิม · ไม่ใช่ที่อยู่ปลายทาง · เว้นว่างถ้ารูปเดิมยังใช้ URL บนเว็บนี้ (wp-content/uploads)"
 
 #: includes/class-isxm-admin.php:472
 msgid "Migrate from Source to Destination"
@@ -1343,3 +1343,7 @@ msgstr "Bucket"
 #: includes/class-isxm-media-library.php
 msgid "All buckets"
 msgstr "ทุก bucket"
+
+#: includes/class-isxm-tools.php
+msgid "Source Public URL must be where your existing media is served from now (for example the old S3 bucket or its CDN) — not the destination address"
+msgstr "Source Public URL ต้องเป็นที่อยู่ที่รูปเดิมเสิร์ฟอยู่ตอนนี้ (เช่น S3 bucket เดิมหรือ CDN ของมัน) ไม่ใช่ที่อยู่ปลายทาง"

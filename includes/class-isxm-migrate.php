@@ -168,10 +168,14 @@ class ISXM_Migrate {
                 $year_month = $segments[0] . '/' . $segments[1] . '/';
             }
 
+            // Sizes and the original of a big (-scaled) or EXIF-rotated
+            // (-rotated) image keep the bare name, while the attachment is
+            // recorded as name-scaled.ext — try those forms too, or every
+            // such size is silently left behind on the source.
             $resolved[] = [
-                'candidate' => $year_month . self::canonical_filename( $filename ),
-                'key'       => $key,
-                'filename'  => $filename,
+                'candidates' => ISXM_Offload::lookup_paths( $year_month . $filename ),
+                'key'        => $key,
+                'filename'   => $filename,
             ];
         }
 
@@ -185,7 +189,7 @@ class ISXM_Migrate {
             ];
         }
 
-        $candidates   = array_values( array_unique( wp_list_pluck( $resolved, 'candidate' ) ) );
+        $candidates   = array_values( array_unique( array_merge( ...wp_list_pluck( $resolved, 'candidates' ) ) ) );
         if ( $indexed ) {
             $by_candidate = ISXM_Migration_Store::resolve( $candidates );
         } else {
@@ -209,11 +213,20 @@ class ISXM_Migrate {
 
         }
 
+        $unmatched = [];
         foreach ( $resolved as $entry ) {
-            if ( empty( $by_candidate[ $entry['candidate'] ] ) ) {
+            $id = 0;
+            foreach ( $entry['candidates'] as $candidate ) {
+                if ( ! empty( $by_candidate[ $candidate ] ) ) {
+                    $id = $by_candidate[ $candidate ];
+                    break;
+                }
+            }
+            if ( ! $id ) {
+                $unmatched[] = $entry['key'];
                 continue;
             }
-            $items[ $by_candidate[ $entry['candidate'] ] ][ $entry['key'] ] = $entry['filename'];
+            $items[ $id ][ $entry['key'] ] = $entry['filename'];
         }
         $items = self::pick_versions( $items, $page['modified'] ?? [], $s['source_bucket'] );
 
@@ -232,6 +245,7 @@ class ISXM_Migrate {
             'next_token'   => $page['next_token'],
             'done'         => $page['next_token'] === '',
             'scanned_keys' => $scanned_keys,
+            'unmatched'    => $unmatched, // inside the prefix, but no attachment uses them
         ];
     }
 

@@ -114,7 +114,7 @@ $changed = (int) $db->get_var( "SELECT COUNT(*) FROM wp_posts WHERE post_content
 $old_left = (int) $db->get_var( "SELECT COUNT(*) FROM wp_posts WHERE post_content LIKE '%source.test%'" );
 t( 'All matching large-table URLs replaced', $changed === 52 && $old_left === 0 );
 t( 'Each SELECT returns at most 200 rows', $db->max_rows <= 200 );
-t( 'Rewrite resumes through 2,622 bounded windows', $windows === 2622 );
+t( 'Rewrite resumes through 2,623 bounded windows (incl. the empty termmeta table)', $windows === 2623 );
 t( 'Replaying windows preserves serialized data', unserialize( $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=10000' ) )['url'] === $new && $replays > 20 );
 printf( "  SQL rewrite: %.2fs; %d windows; %d replayed windows; PHP peak %.1f MiB\n", microtime( true ) - $rewrite_started, $windows, $replays, memory_get_peak_usage( true ) / 1048576 );
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";

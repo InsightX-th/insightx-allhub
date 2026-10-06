@@ -127,10 +127,63 @@ class ISXM_Sync {
      * @param array $info The `_isxs_offload` meta array.
      * @return bool
      */
+    /** @var array<string,array<string,true>> folder => keys present, this request only. */
+    private static $listed = [];
+
+    /**
+     * Every key present under a record's key folder, from as few listing
+     * pages as it takes (one, for a normal attachment), remembered for
+     * this request so per-file existence checks need no further requests.
+     *
+     * @param array $info Tracking record.
+     * @return array<string,true>|null Keys present, or null when the listing
+     *         failed or the folder is too broad to list (bucket root, or a
+     *         shared content-type folder) — callers then check per file.
+     */
+    public static function list_record_folder( array $info ) {
+        if ( ! isset( $info['base_key'] ) || $info['base_key'] === '' ) {
+            return null;
+        }
+        $folder = ( $info['endpoint'] ?? '' ) . '|' . ( $info['bucket'] ?? '' ) . '|' . $info['base_key'];
+        if ( isset( self::$listed[ $folder ] ) ) {
+            return self::$listed[ $folder ];
+        }
+        $client = ISXM_Offload::client_for_info( $info );
+        $keys   = [];
+        $token  = '';
+        $pages  = 0;
+        do {
+            if ( ++$pages > 3 ) {
+                return null; // not one attachment's folder; don't walk it
+            }
+            $page = $client->list_objects_keys_page( $token, 1000, $info['base_key'] );
+            if ( is_wp_error( $page ) ) {
+                return null;
+            }
+            foreach ( $page['keys'] as $key ) {
+                $keys[ $key ] = true;
+            }
+            $token = $page['next_token'];
+        } while ( $token !== '' );
+        if ( count( self::$listed ) > 200 ) {
+            self::$listed = []; // bounded: a long run must not grow this forever
+        }
+        return self::$listed[ $folder ] = $keys;
+    }
+
+    /** Drop remembered listings (after uploads changed what a folder holds). */
+    public static function forget_listings() {
+        self::$listed = [];
+    }
+
     public static function primary_exists_on_destination( array $info ) {
         $primary = self::primary_key( $info );
         if ( $primary === '' || ! isset( $info['base_key'] ) ) {
             return false;
+        }
+        $folder = ( $info['endpoint'] ?? '' ) . '|' . ( $info['bucket'] ?? '' ) . '|' . $info['base_key'];
+        if ( isset( self::$listed[ $folder ] ) ) {
+            return isset( self::$listed[ $folder ][ $primary ] );
         }
 
         $client = ISXM_Offload::client_for_info( $info );

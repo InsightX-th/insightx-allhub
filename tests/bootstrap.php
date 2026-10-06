@@ -15,6 +15,8 @@ error_reporting( E_ALL );
 
 define( 'ABSPATH', sys_get_temp_dir() . '/isxm_wp/' );
 define( 'ISXM_TEST_UPLOADS', sys_get_temp_dir() . '/isxm_wp/wp-content/uploads' );
+// Suites must not depend on another suite having created it first.
+if ( ! is_dir( ISXM_TEST_UPLOADS ) ) mkdir( ISXM_TEST_UPLOADS, 0777, true );
 define( 'OBJECT', 'OBJECT' );
 define( 'WPINC', 'wp-includes' );
 define( 'MINUTE_IN_SECONDS', 60 );

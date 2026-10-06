@@ -48,6 +48,31 @@ t( 'No exception on a changed mapping', $thrown === null, (string) $thrown );
 t( 'Newest mapping stored, row id kept', $db->get_var( "SELECT id FROM wp_isxs_migration_work WHERE run_id='conflict'" ) === $id
     && ISXM_Migration_Store::url_map( 'conflict', $old )[ $old ] === 'https://cdn.test/22222222/x.jpg' );
 
+group( 'Several version folders of one file: keep the live one' );
+migration_fixture( 2 ); $db = $GLOBALS['wpdb'];
+$keys = [ 'v100/m1.jpg', 'v200/m1.jpg', 'v100/m2.jpg' ];
+$scan = function ( array $modified = [] ) use ( &$keys ) {
+    $GLOBALS['isxm_t']['http_provider'] = function () use ( $keys, $modified ) { return migration_listing( $keys, '', $modified ); };
+    return ISXM_Migrate::scan_source_batch( '' );
+};
+$page = $scan();
+t( 'No dates, no WP Offload data: both copies kept (item reports the collision, no guessing)', array_keys( $page['items'][1] ) === [ 'v100/m1.jpg', 'v200/m1.jpg' ] );
+$page = $scan( [ 'v100/m1.jpg' => 1000, 'v200/m1.jpg' => 2000, 'v100/m2.jpg' => 1000 ] );
+t( 'Newest LastModified wins', array_keys( $page['items'][1] ) === [ 'v200/m1.jpg' ], json_encode( $page['items'] ) );
+t( 'Attachments without duplicates untouched', array_keys( $page['items'][2] ) === [ 'v100/m2.jpg' ] );
+$db->db->exec( 'CREATE TABLE wp_as3cf_items (id INTEGER PRIMARY KEY, bucket TEXT, path TEXT, source_type TEXT, source_id INTEGER)' );
+$db->db->exec( "INSERT INTO wp_as3cf_items(bucket,path,source_type,source_id) VALUES ('media','v100/m1.jpg','media-library',1)" );
+$page = $scan( [ 'v100/m1.jpg' => 1000, 'v200/m1.jpg' => 2000 ] );
+t( 'WP Offload Media\'s recorded folder beats a newer stray copy', array_keys( $page['items'][1] ) === [ 'v100/m1.jpg' ], json_encode( $page['items'] ) );
+$db->db->exec( "UPDATE wp_as3cf_items SET path = 'v200/m1.jpg'" );
+$keys = [ 'v100/m1.jpg', 'v100/m2.jpg' ]; // the live copy is on the NEXT page
+$page = $scan();
+t( 'A page holding only stale copies sends nothing for that item', ! isset( $page['items'][1] ) && isset( $page['items'][2] ) );
+t( 'Dropped keys still count as scanned objects', $page['scanned_keys'] === 2 );
+$db->db->exec( "UPDATE wp_as3cf_items SET bucket = 'other-bucket'" );
+$page = $scan();
+t( 'Rows for another bucket are ignored', isset( $page['items'][1] ) );
+
 group( 'Indexed URL lookup forms' );
 foreach ( [ 'image.jpg', 'photo(1).jpg', 'my image.jpg', 'ภาพ.jpg' ] as $name ) {
     $old = 'https://source.test/version/' . $name; $new = 'https://dest.test/' . rawurlencode( $name );

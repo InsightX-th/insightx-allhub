@@ -38,6 +38,10 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
     }
     public function get_var( $sql ) {
         $this->last_error = '';
+        if ( preg_match( "/^SHOW TABLES LIKE '(.+)'$/", $sql, $m ) ) {
+            $name = stripslashes( $m[1] );
+            return $this->db->query( 'SELECT name FROM sqlite_master WHERE type = ' . $this->db->quote( 'table' ) . ' AND name = ' . $this->db->quote( $name ) )->fetchColumn() ?: null;
+        }
         if ( strpos( $sql, 'SHOW ' ) === 0 ) return null;
         $value = $this->db->query( $sql )->fetchColumn();
         return $value === false ? null : $value;
@@ -108,9 +112,9 @@ function migration_fixture( $count = 3, $persist = true ) {
     };
     return ISXM_Job::start( 'migrate', $count, 'run|' );
 }
-function migration_listing( array $keys, $next = '' ) {
+function migration_listing( array $keys, $next = '', array $modified = [] ) {
     $xml = '<ListBucketResult><IsTruncated>' . ( $next === '' ? 'false' : 'true' ) . '</IsTruncated>';
-    foreach ( $keys as $key ) $xml .= '<Contents><Key>' . htmlspecialchars( $key, ENT_XML1 ) . '</Key></Contents>';
+    foreach ( $keys as $key ) $xml .= '<Contents><Key>' . htmlspecialchars( $key, ENT_XML1 ) . '</Key>' . ( isset( $modified[ $key ] ) ? '<LastModified>' . gmdate( 'Y-m-d\\TH:i:s.000\\Z', $modified[ $key ] ) . '</LastModified>' : '' ) . '</Contents>';
     if ( $next !== '' ) $xml .= '<NextContinuationToken>' . htmlspecialchars( $next, ENT_XML1 ) . '</NextContinuationToken>';
     return [ 'response' => [ 'code' => 200 ], 'body' => $xml . '</ListBucketResult>' ];
 }

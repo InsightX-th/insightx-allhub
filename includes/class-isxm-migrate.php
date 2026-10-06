@@ -215,6 +215,7 @@ class ISXM_Migrate {
             }
             $items[ $by_candidate[ $entry['candidate'] ] ][ $entry['key'] ] = $entry['filename'];
         }
+        $items = self::pick_versions( $items, $page['modified'] ?? [], $s['source_bucket'] );
 
         // run_migrate_batch() resumes an interrupted page by POSITION within
         // this array, so the order has to be reproducible when the same page
@@ -275,6 +276,78 @@ class ISXM_Migrate {
         }
         if ( is_file( $local ) ) $paths[ $primary ] = $local;
         return [ 'dir' => $dir, 'local' => $local, 'primary' => $primary, 'paths' => $paths, 'downloads' => $downloads ];
+    }
+
+    /**
+     * With object versioning, a source bucket can hold one attachment's file
+     * under several version folders (re-offloaded, edited, regenerated — the
+     * old copies stay behind): .../2024/05/16834567/photo.jpg and
+     * .../2024/05/17000123/photo.jpg. Keep the copy the site really uses:
+     *  1. the folder WP Offload Media records for the attachment
+     *     (as3cf_items.path) — also drops stale copies that sit on a
+     *     different listing page, which would otherwise overwrite;
+     *  2. else, per file name, the newest object by LastModified.
+     * With neither, duplicates are left as they are and the item reports
+     * isxs_source_collision rather than guessing.
+     *
+     * @param array  $items    attachment_id => [ key => filename ].
+     * @param array  $modified key => unix time, from the listing page.
+     * @param string $bucket   Source bucket name.
+     * @return array
+     */
+    public static function pick_versions( array $items, array $modified, $bucket ) {
+        if ( ! $items ) return $items;
+        $dirs = self::as3cf_dirs( array_keys( $items ), $bucket );
+        foreach ( $items as $id => $keys ) {
+            if ( isset( $dirs[ $id ] ) ) {
+                // Only stale copies on this page: skip them. Older version
+                // folders list first, and once their files are on the
+                // destination the live ones would be taken as already there.
+                // An item whose live folder is missing everywhere stays
+                // "not in the cloud" in the Media Library, never silently wrong.
+                $items[ $id ] = array_filter( $keys, function ( $key ) use ( $dirs, $id ) { return dirname( $key ) === $dirs[ $id ]; }, ARRAY_FILTER_USE_KEY );
+                if ( ! $items[ $id ] ) unset( $items[ $id ] );
+                continue;
+            }
+            $by_name = [];
+            foreach ( $keys as $key => $name ) $by_name[ $name ][] = $key;
+            foreach ( $by_name as $name => $candidates ) {
+                if ( count( $candidates ) < 2 ) continue;
+                $dated = array_filter( $candidates, function ( $key ) use ( $modified ) { return isset( $modified[ $key ] ); } );
+                if ( count( $dated ) !== count( $candidates ) ) continue; // can't tell which is newer
+                usort( $candidates, function ( $a, $b ) use ( $modified ) { return $modified[ $b ] <=> $modified[ $a ]; } );
+                foreach ( array_slice( $candidates, 1 ) as $stale ) unset( $items[ $id ][ $stale ] );
+            }
+        }
+        return $items;
+    }
+
+    /**
+     * Folder of each attachment's original in WP Offload Media's own table,
+     * when that plugin's data is present.
+     *
+     * @param int[]  $ids
+     * @param string $bucket
+     * @return array<int,string> attachment_id => key folder
+     */
+    private static function as3cf_dirs( array $ids, $bucket ) {
+        global $wpdb;
+        static $exists = false; // only a hit is cached: the table can appear mid-run
+        $table = $wpdb->prefix . 'as3cf_items';
+        if ( ! $exists ) {
+            $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+        }
+        if ( ! $exists || ! $ids ) return [];
+        $marks = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $rows  = $wpdb->get_results( $wpdb->prepare(
+            "SELECT source_id, path FROM {$table} WHERE source_type = 'media-library' AND bucket = %s AND source_id IN ({$marks})", // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array
+            array_merge( [ $bucket ], array_map( 'intval', $ids ) )
+        ) );
+        $dirs = [];
+        foreach ( (array) $rows as $row ) {
+            if ( (string) $row->path !== '' ) $dirs[ (int) $row->source_id ] = dirname( (string) $row->path );
+        }
+        return $dirs;
     }
 
     /**

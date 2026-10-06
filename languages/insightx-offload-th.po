@@ -1335,3 +1335,7 @@ msgstr "แก้ GUID %1$s/%2$s"
 #: includes/class-isxm-admin.php
 msgid "removing local copies %1$s/%2$s"
 msgstr "ลบไฟล์บนเซิร์ฟเวอร์ %1$s/%2$s"
+
+#: includes/class-isxm-media-library.php
+msgid "Bucket"
+msgstr "Bucket"

@@ -122,6 +122,10 @@ switch ( $stage ) {
 		$check( 'post_content URL rewritten permanently', strpos( $content, $remote ) !== false, $content );
 		$check( 'a look-alike path is left alone', strpos( $content, '/wp-content/uploads-old/' ) !== false, $content );
 		$el = json_decode( (string) get_post_meta( $ids['post'], '_elementor_data', true ), true );
+		ob_start();
+		( new ISXM_Media_Library() )->render_column( 'isxs_bucket', $ids['attachments'][0] );
+		$cell = ob_get_clean();
+		$check( 'Media Library Bucket column shows the bucket', strpos( $cell, '· e2e-media' ) !== false, $cell );
 		$check( 'Elementor JSON (escaped slashes) rewritten and still valid', is_array( $el ) && $el[0]['settings']['image']['url'] === $remote, wp_json_encode( $el ) );
 		$finish();
 		break;

@@ -44,7 +44,34 @@ class ISXM_Media_Library {
 
     public function add_column( $columns ) {
         $columns['isxs_storage'] = 'Storage';
+        $columns['isxs_bucket']  = __( 'Bucket', 'insightx-offload' );
         return $columns;
+    }
+
+    /**
+     * Provider name for a record, from its endpoint host — no connection
+     * lookup, so no secret is decrypted and no query is run per row.
+     *
+     * @param array $info Tracking record.
+     * @return string
+     */
+    public static function provider_label( array $info ) {
+        $host = (string) wp_parse_url( (string) ( $info['endpoint'] ?? '' ), PHP_URL_HOST );
+        $known = [
+            'r2.cloudflarestorage.com' => 'r2',
+            'amazonaws.com'            => 'aws',
+            'digitaloceanspaces.com'   => 'spaces',
+            'storage.googleapis.com'   => 'gcs',
+        ];
+        $slug = $host === '' ? 'aws' : ''; // AWS records may keep no endpoint (derived from the region)
+        foreach ( $known as $suffix => $provider ) {
+            if ( $host === $suffix || substr( $host, -strlen( '.' . $suffix ) ) === '.' . $suffix ) {
+                $slug = $provider;
+                break;
+            }
+        }
+        $providers = ISXM_Connections::providers();
+        return $slug !== '' && isset( $providers[ $slug ] ) ? $providers[ $slug ]['label'] : $host;
     }
 
     /**
@@ -55,6 +82,22 @@ class ISXM_Media_Library {
      * per row.
      */
     public function render_column( $column, $post_id ) {
+        if ( $column === 'isxs_bucket' ) {
+            // Which provider and bucket the files are in — while two offload
+            // plugins coexist, Storage alone can't tell S3 from R2.
+            $info = ISXM_Offload::get_record( $post_id );
+            if ( ! ISXM_Offload::has_record( $info ) ) {
+                echo '<span aria-hidden="true">—</span>';
+                return;
+            }
+            printf(
+                '<span class="isxs-ml-bucket" title="%s">%s · %s</span>',
+                esc_attr( (string) $info['bucket'] . '/' . $info['base_key'] ),
+                esc_html( self::provider_label( $info ) ),
+                esc_html( (string) $info['bucket'] )
+            );
+            return;
+        }
         if ( $column !== 'isxs_storage' ) {
             return;
         }
@@ -99,8 +142,6 @@ class ISXM_Media_Library {
             }
         } elseif ( $state['status'] === 'partial' ) {
             $detail = __( 'Missing: ', 'insightx-offload' ) . implode( ', ', array_slice( $state['info']['missing'], 0, 5 ) );
-        } elseif ( $state['status'] === 'other_bucket' && ! empty( $state['info']['bucket'] ) ) {
-            $detail = 'bucket: ' . $state['info']['bucket'];
         }
 
         printf(

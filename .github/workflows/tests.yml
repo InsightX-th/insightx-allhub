@@ -73,6 +73,9 @@ jobs:
       - name: Offload ledger + Sync scan
         run: php tests/items.php
 
+      - name: Media Library columns
+        run: php tests/media-library.php
+
       - name: Bulk tools (offload / download / remove)
         run: php tests/bulk-tools.php
 

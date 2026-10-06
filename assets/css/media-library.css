@@ -36,6 +36,10 @@
     -webkit-box-orient: vertical;
 }
 
+/* Bucket column: "Cloudflare R2 · sounddd-shop", full key folder on hover. */
+.isxs-ml-bucket { color: #50575e; word-break: break-word; }
+.fixed .column-isxs_bucket { width: 14em; }
+
 .isxs-ml-offload.isxs-ml-busy {
     pointer-events: none;
     opacity: .6;

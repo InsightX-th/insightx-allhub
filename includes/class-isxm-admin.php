@@ -290,9 +290,9 @@ class ISXM_Admin {
                                 </div>
                                 <div class="isxs-card-body">
                                     <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy media files to storage automatically after upload', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete files from the server after a successful offload to save space (caution: some image-editing plugins need the local file)', 'insightx-offload' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy of files confirmed to be in the bucket, to save space. Applies to new uploads, to Offload (after the database URLs are updated) and to the end of a Migration. Nothing is deleted unless “Write permanent URLs to the database” or “Deliver Offloaded Media” is on, so pages never point at a deleted file. Caution: image editors and thumbnail regenerators need the local file', 'insightx-offload' ), 'warn' ); ?>
                                     <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating any intermediate sizes (thumbnail / medium / large / 1536 / 2048, including WooCommerce and theme sizes). Each upload becomes a single file in the bucket and the original is kept as-is without a -scaled copy — caution: srcset goes away and every request for a small image gets the full file. Suited to headless sites that resize images themselves. Only affects newly uploaded files', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Write the new (remote) URLs directly into post_content / postmeta / options / guid after offloading — Bulk Offload writes them in a single pass at the end of the job (scanning each table once) instead of scanning every table on every batch (URLs are still rewritten at render time if “Deliver Offloaded Media” is on)', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace the old URLs stored in post_content / postmeta / options / guid with the bucket URLs. Offload and Migrate do this once at the end of the job (each table is scanned once); a brand-new upload only needs its guid updated, since nothing references it yet. URLs are still rewritten at render time if “Deliver Offloaded Media” is on', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'use_prefix', $s['use_prefix'], 'Add Prefix to Bucket Path', __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
                                     <div class="isxs-field isxs-indent" id="isxs-prefix-field">
                                         <input type="text" id="isxs-prefix" value="<?php echo esc_attr( $s['prefix'] ); ?>" placeholder="wp-content/uploads/">
@@ -401,7 +401,7 @@ class ISXM_Admin {
                             $this->tool_card(
                                 'offload',
                                 __( 'Offload remaining media', 'insightx-offload' ),
-                                __( 'Upload every media item not yet offloaded to the bucket in batches — the job runs server-side, so you can close the tab and click "Resume" later to continue from the same point (if files were deleted from the bucket outside the plugin, run the Sync tool first)', 'insightx-offload' ),
+                                __( 'Upload every media item not yet offloaded to the bucket in batches. The job runs on the server, so you can close the tab (unless the site cannot call itself — the card then asks you to keep it open) and click "Resume" later to continue from the same point. If files were deleted from the bucket outside the plugin, run the Sync tool first', 'insightx-offload' ),
                                 __( 'Start Offload', 'insightx-offload' ),
                                 '',
                                 false
@@ -478,7 +478,7 @@ class ISXM_Admin {
                         <?php $this->tool_card(
                             'migrate',
                             __( 'Migrate from Source to Destination', 'insightx-offload' ),
-                            __( 'Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab, then update the URLs in the database right away — nothing is deleted from the source (the real bucket is always checked before skipping items already uploaded)', 'insightx-offload' ),
+                            __( 'Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab. The database URLs are replaced once, at the end of the run. Nothing is deleted from the source; if “Remove Local Media” is on, the server copies are deleted at the very end. Items already on the destination are checked against the real bucket before being skipped', 'insightx-offload' ),
                             __( 'Start Migration', 'insightx-offload' ),
                             '',
                             false

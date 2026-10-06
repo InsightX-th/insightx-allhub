@@ -442,8 +442,8 @@ msgid "Copy media files to storage automatically after upload"
 msgstr "คัดลอกไฟล์ media ขึ้น storage อัตโนมัติหลังอัปโหลด"
 
 #: includes/class-isxm-admin.php:285
-msgid "Delete files from the server after a successful offload to save space (caution: some image-editing plugins need the local file)"
-msgstr "ลบไฟล์บนเซิร์ฟเวอร์หลัง offload สำเร็จ เพื่อประหยัดพื้นที่ (ระวัง: ปลั๊กอินแก้รูปบางตัวต้องใช้ไฟล์ local)"
+msgid "Delete the server copy of files confirmed to be in the bucket, to save space. Applies to new uploads, to Offload (after the database URLs are updated) and to the end of a Migration. Nothing is deleted unless “Write permanent URLs to the database” or “Deliver Offloaded Media” is on, so pages never point at a deleted file. Caution: image editors and thumbnail regenerators need the local file"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์ของรูปที่ยืนยันแล้วว่าอยู่ใน bucket เพื่อประหยัดพื้นที่ — มีผลกับรูปที่อัปโหลดใหม่, เครื่องมือ Offload (ลบหลังแก้ URL ในฐานข้อมูลเสร็จ) และตอนจบงาน Migrate · จะไม่ลบอะไรถ้าปิดทั้ง “เขียน URL ถาวรลงฐานข้อมูล” และ “Deliver Offloaded Media” เพื่อไม่ให้หน้าเว็บชี้ไปไฟล์ที่ถูกลบ · ระวัง: ปลั๊กอินแก้รูปหรือสร้าง thumbnail ใหม่ต้องใช้ไฟล์บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php:286
 msgid "Disable intermediate image sizes"
@@ -458,8 +458,8 @@ msgid "Write permanent URLs to the database"
 msgstr "เขียน URL ถาวรลงฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:287
-msgid "Write the new (remote) URLs directly into post_content / postmeta / options / guid after offloading — Bulk Offload writes them in a single pass at the end of the job (scanning each table once) instead of scanning every table on every batch (URLs are still rewritten at render time if “Deliver Offloaded Media” is on)"
-msgstr "เขียน URL ใหม่ (remote) ลงใน post_content / postmeta / options / guid โดยตรงหลัง offload — Bulk Offload เขียนแบบหนึ่ง-pass ตอนท้ายงาน (สแกนแต่ละตารางครั้งเดียว) ไม่สแกนทั้งตารางทุก batch (URL ยังถูก rewrite ตอนแสดงผลอยู่ดีถ้าเปิด “Deliver Offloaded Media”)"
+msgid "Replace the old URLs stored in post_content / postmeta / options / guid with the bucket URLs. Offload and Migrate do this once at the end of the job (each table is scanned once); a brand-new upload only needs its guid updated, since nothing references it yet. URLs are still rewritten at render time if “Deliver Offloaded Media” is on"
+msgstr "แทน URL เดิมที่เก็บใน post_content / postmeta / options / guid ด้วย URL ใน bucket — Offload และ Migrate ทำรอบเดียวตอนจบงาน (สแกนแต่ละตารางครั้งเดียว) ส่วนรูปที่อัปโหลดใหม่แก้แค่ guid เพราะยังไม่มีที่ไหนอ้างถึง (ถ้าเปิด “Deliver Offloaded Media” URL ยังถูกแปลงตอนแสดงผลอยู่ดี)"
 
 #: includes/class-isxm-admin.php:288
 msgid "Group this site's files under a prefix in the bucket"
@@ -546,8 +546,8 @@ msgid "Offload remaining media"
 msgstr "Offload media ที่เหลือ"
 
 #: includes/class-isxm-admin.php:396
-msgid "Upload every media item not yet offloaded to the bucket in batches — the job runs server-side, so you can close the tab and click \"Resume\" later to continue from the same point (if files were deleted from the bucket outside the plugin, run the Sync tool first)"
-msgstr "อัปโหลด media ทั้งหมดที่ยังไม่ได้ offload ขึ้น bucket ทีละชุด — งานทำงานฝั่งเซิร์ฟเวอร์ ปิดแท็บได้ กลับมากด \"ทำต่อ\" ได้จากจุดเดิม (ถ้าไฟล์ถูกลบออกจาก bucket นอกปลั๊กอิน ให้ใช้เครื่องมือ Sync ตรวจก่อน)"
+msgid "Upload every media item not yet offloaded to the bucket in batches. The job runs on the server, so you can close the tab (unless the site cannot call itself — the card then asks you to keep it open) and click \"Resume\" later to continue from the same point. If files were deleted from the bucket outside the plugin, run the Sync tool first"
+msgstr "อัปโหลด media ทั้งหมดที่ยังไม่ได้ offload ขึ้น bucket ทีละชุด — งานรันบนเซิร์ฟเวอร์ ปิดแท็บได้ (ยกเว้นเว็บเรียกตัวเองไม่ได้ การ์ดจะบอกให้เปิดหน้าไว้) กลับมากด \"ทำต่อ\" ได้จากจุดเดิม · ถ้าไฟล์ถูกลบออกจาก bucket นอกปลั๊กอิน ให้ใช้เครื่องมือ Sync ตรวจก่อน"
 
 #: includes/class-isxm-admin.php:397
 msgid "Start Offload"
@@ -658,8 +658,8 @@ msgid "Migrate from Source to Destination"
 msgstr "Migrate จาก Source มา Destination"
 
 #: includes/class-isxm-admin.php:473
-msgid "Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab, then update the URLs in the database right away — nothing is deleted from the source (the real bucket is always checked before skipping items already uploaded)"
-msgstr "ดึงไฟล์ทั้งหมดที่มีอยู่จริงใน source bucket มา upload ขึ้น storage ปลายทางที่ตั้งค่าไว้ในแท็บ “การเชื่อมต่อ” แล้วเปลี่ยน URL ในฐานข้อมูลให้ทันที — ไม่ลบไฟล์จาก source (ตรวจสอบกับ bucket จริงก่อนข้ามรายการที่ขึ้นไว้แล้วเสมอ)"
+msgid "Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab. The database URLs are replaced once, at the end of the run. Nothing is deleted from the source; if “Remove Local Media” is on, the server copies are deleted at the very end. Items already on the destination are checked against the real bucket before being skipped"
+msgstr "ดึงไฟล์ทั้งหมดที่มีอยู่จริงใน source bucket ขึ้น storage ปลายทางที่ตั้งไว้ในแท็บ “การเชื่อมต่อ” แล้วแก้ URL ในฐานข้อมูลรอบเดียวตอนจบงาน — ไม่ลบอะไรใน source แต่ถ้าเปิด “Remove Local Media” จะลบไฟล์บนเซิร์ฟเวอร์เป็นขั้นสุดท้าย · รูปที่อยู่ปลายทางแล้วจะเช็กกับ bucket จริงก่อนข้ามเสมอ"
 
 #: includes/class-isxm-admin.php:474
 msgid "Start Migration"

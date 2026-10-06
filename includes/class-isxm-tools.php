@@ -2687,6 +2687,11 @@ class ISXM_Tools {
             $lines[] = '  (no runs recorded)';
         }
 
+        if ( class_exists( 'ISXM_Media_Library' ) ) {
+            $lines[] = '';
+            $lines[] = 'User profile pictures in the Media Library: ' . ISXM_Media_Library::count_avatars();
+        }
+
         $lines = array_merge( $lines, [
             '',
             '--- Recent Log ---',

@@ -18,6 +18,7 @@ class ISXM_Media_Library {
     /** Query var for the status filter (also linked to from the Tools page). */
     const FILTER_VAR = 'isxs_status';
     const BUCKET_VAR = 'isxs_bucket';
+    const AVATAR_VAR = 'isxs_avatar';
     const BUCKETS_TRANSIENT = 'isxs_ml_buckets';
 
     /** Bulk action id + the query arg its result notice is passed back in. */
@@ -187,6 +188,17 @@ class ISXM_Media_Library {
         }
         echo '</select>';
 
+        $avatar = isset( $_GET[ self::AVATAR_VAR ] ) ? sanitize_key( wp_unslash( $_GET[ self::AVATAR_VAR ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- read-only list filter
+        echo '<select name="' . esc_attr( self::AVATAR_VAR ) . '">';
+        foreach ( [
+            ''        => __( 'All image types', 'insightx-offload' ),
+            'only'    => __( 'User profile pictures', 'insightx-offload' ),
+            'exclude' => __( 'Without user profile pictures', 'insightx-offload' ),
+        ] as $value => $label ) {
+            printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $avatar, $value, false ), esc_html( $label ) );
+        }
+        echo '</select>';
+
         $buckets = self::bucket_options();
         if ( ! $buckets ) {
             return;
@@ -234,6 +246,43 @@ class ISXM_Media_Library {
         }
         set_transient( self::BUCKETS_TRANSIENT, $out, 5 * MINUTE_IN_SECONDS );
         return $out;
+    }
+
+    /**
+     * SQL condition matching attachments used as a user's profile picture.
+     * Covers how avatar plugins link them: Nextend Social Login and WP/One
+     * User Avatar ({prefix}user_avatar user meta + the attachment's
+     * _wp_attachment_wp_user_avatar post meta) and Simple Local Avatars
+     * (simple_local_avatar user meta array). More keys via the
+     * isxm_avatar_meta_keys filter.
+     *
+     * @return string
+     */
+    public static function avatar_condition() {
+        global $wpdb;
+        $keys  = (array) apply_filters( 'isxm_avatar_meta_keys', [ $wpdb->get_blog_prefix() . 'user_avatar', 'wp_user_avatar' ] );
+        $marks = implode( ',', array_fill( 0, count( $keys ), '%s' ) );
+        $parts = [
+            $wpdb->prepare( "{$wpdb->posts}.ID IN ( SELECT CAST( um.meta_value AS UNSIGNED ) FROM {$wpdb->usermeta} um WHERE um.meta_key IN ({$marks}) )", $keys ), // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array
+            "{$wpdb->posts}.ID IN ( SELECT pm.post_id FROM {$wpdb->postmeta} pm WHERE pm.meta_key = '_wp_attachment_wp_user_avatar' )",
+        ];
+        $ids = [];
+        foreach ( (array) $wpdb->get_col( "SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'simple_local_avatar'" ) as $value ) {
+            $value = maybe_unserialize( $value );
+            if ( is_array( $value ) && ! empty( $value['media_id'] ) ) {
+                $ids[] = (int) $value['media_id'];
+            }
+        }
+        if ( $ids ) {
+            $parts[] = "{$wpdb->posts}.ID IN (" . implode( ',', array_unique( $ids ) ) . ')';
+        }
+        return '( ' . implode( ' OR ', $parts ) . ' )';
+    }
+
+    /** How many attachments are user profile pictures (Diagnostic). */
+    public static function count_avatars() {
+        global $wpdb;
+        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE {$wpdb->posts}.post_type = 'attachment' AND " . self::avatar_condition() ); // phpcs:ignore WordPress.DB.PreparedSQL -- condition built from prepared parts
     }
 
     /** The Bucket filter value from the request, or '' (never trusted beyond the option list). */
@@ -289,6 +338,13 @@ class ISXM_Media_Library {
                     $options[ $bucket_value ]['bucket']
                 );
             }
+        }
+
+        $avatar = isset( $_GET[ self::AVATAR_VAR ] ) ? sanitize_key( wp_unslash( $_GET[ self::AVATAR_VAR ] ) ) : '';
+        if ( $avatar === 'only' ) {
+            $clauses['where'] .= ' AND ' . self::avatar_condition() . ' ';
+        } elseif ( $avatar === 'exclude' ) {
+            $clauses['where'] .= ' AND NOT ' . self::avatar_condition() . ' ';
         }
 
         $status = isset( $_GET[ self::FILTER_VAR ] ) ? sanitize_key( wp_unslash( $_GET[ self::FILTER_VAR ] ) ) : '';

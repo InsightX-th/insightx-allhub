@@ -14,6 +14,7 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         $this->db->exec( 'CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT)' );
         $this->db->exec( 'CREATE TABLE wp_postmeta (meta_id INTEGER PRIMARY KEY, post_id INTEGER, meta_key TEXT, meta_value TEXT)' );
         $this->db->exec( 'CREATE TABLE wp_termmeta (meta_id INTEGER PRIMARY KEY, term_id INTEGER, meta_key TEXT, meta_value TEXT)' );
+        $this->db->exec( 'CREATE TABLE wp_usermeta (umeta_id INTEGER PRIMARY KEY, user_id INTEGER, meta_key TEXT, meta_value TEXT)' );
         $this->db->exec( 'CREATE INDEX attached_files ON wp_postmeta(meta_key,meta_value)' );
         $this->db->exec( 'CREATE TABLE wp_isxs_migration_paths (attachment_id INTEGER PRIMARY KEY, path_hash TEXT, path TEXT)' );
         $this->db->exec( 'CREATE INDEX path_lookup ON wp_isxs_migration_paths(path_hash,attachment_id)' );

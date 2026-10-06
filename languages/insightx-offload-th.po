@@ -1347,3 +1347,15 @@ msgstr "ทุก bucket"
 #: includes/class-isxm-tools.php
 msgid "Source Public URL must be where your existing media is served from now (for example the old S3 bucket or its CDN) — not the destination address"
 msgstr "Source Public URL ต้องเป็นที่อยู่ที่รูปเดิมเสิร์ฟอยู่ตอนนี้ (เช่น S3 bucket เดิมหรือ CDN ของมัน) ไม่ใช่ที่อยู่ปลายทาง"
+
+#: includes/class-isxm-media-library.php
+msgid "All image types"
+msgstr "ทุกประเภทรูป"
+
+#: includes/class-isxm-media-library.php
+msgid "User profile pictures"
+msgstr "รูปโปรไฟล์ผู้ใช้"
+
+#: includes/class-isxm-media-library.php
+msgid "Without user profile pictures"
+msgstr "ไม่รวมรูปโปรไฟล์ผู้ใช้"

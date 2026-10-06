@@ -72,5 +72,29 @@ $_GET = [ 'isxs_bucket' => "x' OR 1=1 --" ];
 t( 'A value that is not an option is ignored (no filter, no SQL)', count( $run() ) === 5 );
 $_GET = [];
 
+group( 'User profile picture filter' );
+$GLOBALS['wpdb'] = new ISXM_Migration_Test_DB(); $db = $GLOBALS['wpdb'];
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_test_configure( [], [] );
+for ( $i = 1; $i <= 6; $i++ ) $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($i)" );
+// 1: Nextend Social Login (user meta + attachment marker), 2: WP User Avatar (user meta only),
+// 3: attachment marker only, 4: Simple Local Avatars, 5-6: product images.
+$db->db->exec( "INSERT INTO wp_usermeta(user_id,meta_key,meta_value) VALUES (10,'wp_user_avatar','1'),(11,'wp_user_avatar','2'),(13,'simple_local_avatar'," . $db->db->quote( serialize( [ 'media_id' => 4, 'full' => 'x' ] ) ) . ")" );
+$db->db->exec( "INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (1,'_wp_attachment_wp_user_avatar','10'),(3,'_wp_attachment_wp_user_avatar','12')" );
+$GLOBALS['isxm_is_admin'] = true; $GLOBALS['pagenow'] = 'upload.php';
+$run = function ( array $get ) use ( $db, $query ) {
+    $_GET = $get;
+    $c = ( new ISXM_Media_Library() )->filter_clauses( [ 'join' => '', 'where' => " AND wp_posts.post_type = 'attachment' AND wp_posts.post_status <> 'trash' " ], $query );
+    $_GET = [];
+    return array_map( 'intval', $db->db->query( "SELECT wp_posts.ID FROM wp_posts {$c['join']} WHERE 1=1 {$c['where']} ORDER BY wp_posts.ID" )->fetchAll( PDO::FETCH_COLUMN ) );
+};
+t( 'Profile pictures from every supported plugin', $run( [ 'isxs_avatar' => 'only' ] ) === [ 1, 2, 3, 4 ], json_encode( $run( [ 'isxs_avatar' => 'only' ] ) ) );
+t( '"Without" leaves only site images', $run( [ 'isxs_avatar' => 'exclude' ] ) === [ 5, 6 ] );
+t( 'Unknown value -> no filter', count( $run( [ 'isxs_avatar' => "'; DROP" ] ) ) === 6 );
+t( 'Diagnostic count', ISXM_Media_Library::count_avatars() === 4 );
+ob_start(); ( new ISXM_Media_Library() )->render_filter( 'attachment' ); $html = ob_get_clean();
+t( 'Dropdown offered', strpos( $html, 'name="isxs_avatar"' ) !== false && strpos( $html, 'User profile pictures' ) !== false );
+
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

@@ -225,6 +225,8 @@ class ISXM_Test_WPDB {
 	public $postmeta = 'wp_postmeta';
 	public $options  = 'wp_options';
 	public $termmeta = 'wp_termmeta';
+	public $usermeta = 'wp_usermeta';
+	public function get_blog_prefix( $blog_id = null ) { return $this->prefix; }
 	public function prepare( $query, ...$args ) {
 		$this->prepared_args = isset( $args[0] ) && is_array( $args[0] ) ? $args[0] : $args;
 		return $query;

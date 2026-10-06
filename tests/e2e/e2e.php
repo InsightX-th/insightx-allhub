@@ -260,6 +260,11 @@ switch ( $stage ) {
 		$diag = ISXM_Tools::diagnostic_text();
 		$check( 'Diagnostic lists failed items with their reason', strpos( $diag, '--- Failed items' ) !== false && strpos( $diag, '[isxs_e2e] e2e reason (tries 2' ) !== false, $diag );
 		$check( 'Diagnostic shows the migrate run', strpos( $diag, '  migrate: ' ) !== false );
+		// A social-login avatar exactly as Nextend Social Login stores it.
+		global $wpdb;
+		update_user_meta( 1, $wpdb->get_blog_prefix() . 'user_avatar', $ids['attachments'][1] );
+		update_post_meta( $ids['attachments'][1], '_wp_attachment_wp_user_avatar', 1 );
+		$check( 'user profile pictures are found (SQL runs on real MySQL)', ISXM_Media_Library::count_avatars() === 1 && strpos( ISXM_Tools::diagnostic_text(), 'User profile pictures in the Media Library: 1' ) !== false );
 		$finish();
 		break;
 }

@@ -2629,6 +2629,10 @@ class ISXM_Tools {
                     $job->processed, $job->batch_progress, (int) ( $job->activity['restarts'] ?? 0 ),
                     gmdate( 'Y-m-d H:i:s', (int) ( $job->activity['last_progress'] ?? $job->updated ) ),
                     wp_json_encode( $job->migration['rewrite'] ?? [] ) );
+                if ( ! empty( $job->activity['finalize'] ) ) {
+                    $f = $job->activity['finalize'];
+                    $lines[] = sprintf( '    finalize %s: %d/%d, about %d min left', $job->activity['stage'] ?? '', (int) $f['done'], (int) $f['total'], (int) ceil( (int) $f['eta'] / 60 ) );
+                }
             }
             // Why the run stopped, and which items failed and why — the
             // card only ever showed a count.

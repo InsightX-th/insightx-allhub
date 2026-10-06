@@ -105,6 +105,10 @@ class ISXM_Admin {
                 // this phase rewrites stored URLs table by table.
                 'indexing'      => __( 'Building attachment index…', 'insightx-offload' ),
                 'finalizing'    => __( 'Finalizing migration…', 'insightx-offload' ),
+                /* translators: 1: rows done, 2: rows in total */
+                'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-offload' ),
+                /* translators: 1: files checked, 2: files in total */
+                'finalizeCleanup' => __( 'removing local copies %1$s/%2$s', 'insightx-offload' ),
                 'rewriting'     => __( 'Writing URLs to the database…', 'insightx-offload' ),
                 'keepTabOpen'   => __( 'This site cannot call itself — keep this page open until the job finishes', 'insightx-offload' ),
                 'sessionExpired' => __( 'Session expired or logged out — refresh this page and try again (all work so far is saved)', 'insightx-offload' ),

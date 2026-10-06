@@ -83,6 +83,53 @@ $job = ISXM_Job::get( 'migrate' );
 t( 'Run reaches complete despite GUID write failures', $job->migration['stage'] === 'complete' );
 t( 'Each failed GUID is reported per item', $job->error_count === 2 && strpos( implode( ' ', $job->errors ), 'GUID' ) !== false, json_encode( $job->errors ) );
 
+group( 'Only key/URL settings guard a run, and a stop names them' );
+$job = migration_fixture( 3 );
+$set = function ( array $over ) {
+    $GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( $GLOBALS['isxm_t']['options']['isxs_settings'], $over );
+    ISXM_Settings::flush_cache();
+};
+pipeline_step(); // index
+$set( [ 'assets_enabled' => true, 'assets_cdn_domain' => 'cdn.example.test', 'offload_enabled' => true ] );
+$r = pipeline_step();
+t( 'Toggling Asset URLs / auto-offload mid-run does not stop it', ! is_wp_error( $r ), is_wp_error( $r ) ? $r->get_error_message() : '' );
+$set( [ 'cdn_domain' => 'media.example.test' ] );
+$r = pipeline_step();
+t( 'Changing the CDN domain stops the run and names it', is_wp_error( $r ) && strpos( $r->get_error_message(), 'cdn_domain "" -> "media.example.test"' ) !== false, is_wp_error( $r ) ? $r->get_error_message() : 'no error' );
+$set( [ 'cdn_domain' => '' ] );
+t( 'Restoring it lets the run continue', ! is_wp_error( pipeline_step() ) );
+
+group( 'A run started by an older version (whole-settings hash) still resumes' );
+$job = migration_fixture( 3 );
+pipeline_step(); pipeline_step();
+$j = ISXM_Job::get( 'migrate' );
+unset( $j->migration['settings'] );
+$j->migration['configuration'] = 'hash-written-by-0.2.18-before-assets-was-toggled';
+$j->save();
+$r = pipeline_step();
+t( 'Hash mismatch from an unrelated setting is accepted when the URLs still match', ! is_wp_error( $r ) && isset( ISXM_Job::get( 'migrate' )->migration['settings'] ), is_wp_error( $r ) ? $r->get_error_message() : '' );
+$j = ISXM_Job::get( 'migrate' );
+unset( $j->migration['settings'] ); $j->migration['configuration'] = 'stale'; $j->save();
+$GLOBALS['isxm_t']['options']['isxs_connections']['custom']['bucket'] = 'another-bucket'; ISXM_Settings::flush_cache();
+$r = pipeline_step();
+t( 'A changed destination bucket is still refused', is_wp_error( $r ) && $r->get_error_code() === 'isxs_migration_settings' );
+
+group( 'Finalize shows progress and checkpoints per chunk' );
+$job = migration_fixture( 3 );
+$writes = 0; $seen = [];
+$GLOBALS['isxm_t']['on_option_write'] = function ( $key, $value ) use ( &$writes, &$seen ) {
+    if ( $key !== 'isxs_job_migrate' ) return;
+    if ( in_array( $value['migration']['stage'] ?? '', [ 'guid', 'cleanup' ], true ) ) { $writes++; if ( ! empty( $value['activity']['finalize'] ) ) $seen[] = $value['activity']['finalize']; }
+};
+$entries = [];
+for ( $i = 0; $i < 250; $i++ ) $entries[ "/nowhere/$i.jpg" ] = [ 'path' => "/nowhere/$i.jpg", 'hash' => 'x', 'covered' => true ];
+ISXM_Migration_Store::put_many( ISXM_Job::get( 'migrate' )->run_id, 'cleanup', $entries );
+pipeline_drain();
+unset( $GLOBALS['isxm_t']['on_option_write'] );
+$last = end( $seen );
+t( 'Card gets done/total for the finalize stage', $last && $last['total'] >= 250 && $last['done'] >= 200 && $last['done'] <= $last['total'], json_encode( $last ) );
+t( 'One checkpoint per 100-row chunk, not one per row', $writes <= 8, (string) $writes );
+
 group( 'Indexed URL lookup forms' );
 foreach ( [ 'image.jpg', 'photo(1).jpg', 'my image.jpg', 'ภาพ.jpg' ] as $name ) {
     $old = 'https://source.test/version/' . $name; $new = 'https://dest.test/' . rawurlencode( $name );

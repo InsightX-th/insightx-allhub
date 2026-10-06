@@ -1327,3 +1327,11 @@ msgstr "บันทึกข้อมูลการอัปโหลดลง
 #: includes/class-isxm-offload.php
 msgid "Another process is uploading this item right now — it will be picked up again later"
 msgstr "มีอีกงานกำลังอัปโหลดไฟล์นี้อยู่ เดี๋ยวระบบจะทำรายการนี้ใหม่อีกครั้ง"
+
+#: includes/class-isxm-admin.php
+msgid "updating GUIDs %1$s/%2$s"
+msgstr "แก้ GUID %1$s/%2$s"
+
+#: includes/class-isxm-admin.php
+msgid "removing local copies %1$s/%2$s"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์ %1$s/%2$s"

@@ -160,6 +160,18 @@ class ISXM_Migration_Store {
         }
     }
 
+    /** Work rows of one kind, optionally only those up to an id (already handled). */
+    public static function count( $run, $kind, $upto = null ) {
+        global $wpdb;
+        $table = self::table( 'work' );
+        $sql = $upto === null
+            ? $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE run_id=%s AND kind=%s", $run, $kind )
+            : $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE run_id=%s AND kind=%s AND id<=%d", $run, $kind, $upto );
+        $n = $wpdb->get_var( $sql );
+        if ( $wpdb->last_error ) throw new RuntimeException( 'Migration ledger database operation failed; checkpoint retained.' );
+        return (int) $n;
+    }
+
     public static function rows( $run, $kind, $after = 0, $limit = 100 ) {
         global $wpdb;
         $table = self::table( 'work' );

@@ -595,7 +595,21 @@
     Object.keys(jobs).some((tool) => jobs[tool].state === "running");
 
   const phaseLabel = (job) => {
-    if (job.activity && ["guid", "cleanup"].includes(job.activity.stage)) return cfg.i18n.finalizing;
+    if (job.activity && ["guid", "cleanup"].includes(job.activity.stage)) {
+      // Finalize used to show a bare label for what can be hundreds of
+      // thousands of rows: show the count and, once measured, the time left.
+      const f = job.activity.finalize;
+      if (!f || !f.total) return cfg.i18n.finalizing;
+      const step = fmt(
+        job.activity.stage === "guid" ? cfg.i18n.finalizeGuid : cfg.i18n.finalizeCleanup,
+        f.done.toLocaleString(),
+        f.total.toLocaleString(),
+      );
+      const eta = f.eta > 0
+        ? " · " + fmt(cfg.i18n.eta, formatDuration(f.eta * 1000), formatFinishTime(f.eta))
+        : "";
+      return cfg.i18n.finalizing + " " + step + eta;
+    }
     if (job.phase === "index") return cfg.i18n.indexing + " " + (job.index_after || 0);
     if (job.phase === "counting") {
       return cfg.i18n.counting;

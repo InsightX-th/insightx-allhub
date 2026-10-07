@@ -260,7 +260,12 @@
 .isxs-status-num {
   font-weight: 700;
   color: var(--isxs-ink);
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* Numeric columns: header and value centred on the same axis. */
+.isxs-status-table .isxs-status-num,
+.isxs-status-table th.is-num {
+  text-align: center;
 }
 
 .isxs-status-action {

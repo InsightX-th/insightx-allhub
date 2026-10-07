@@ -220,7 +220,7 @@ class ISXM_Admin {
                             </div>
                             <table class="isxs-status-table">
                                 <thead>
-                                    <tr><th><?php esc_html_e( 'Source', 'insightx-offload' ); ?></th><th><?php esc_html_e( 'Offloaded', 'insightx-offload' ); ?></th><th><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
+                                    <tr><th><?php esc_html_e( 'Source', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Offloaded', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
                                 </thead>
                                 <tbody>
                                     <tr>
@@ -249,7 +249,7 @@ class ISXM_Admin {
                             </div>
                             <table class="isxs-status-table">
                                 <thead>
-                                    <tr><th><?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></th><th><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
+                                    <tr><th class="is-num"><?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
                                 </thead>
                                 <tbody>
                                     <tr>

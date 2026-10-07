@@ -442,24 +442,24 @@ msgid "Copy media files to storage automatically after upload"
 msgstr "คัดลอกไฟล์ media ขึ้น storage อัตโนมัติหลังอัปโหลด"
 
 #: includes/class-isxm-admin.php:285
-msgid "Delete the server copy of files confirmed to be in the bucket, to save space. Applies to new uploads, to Offload (after the database URLs are updated) and to the end of a Migration. Nothing is deleted unless “Write permanent URLs to the database” or “Deliver Offloaded Media” is on, so pages never point at a deleted file. Caution: image editors and thumbnail regenerators need the local file"
-msgstr "ลบไฟล์บนเซิร์ฟเวอร์ของรูปที่ยืนยันแล้วว่าอยู่ใน bucket เพื่อประหยัดพื้นที่ — มีผลกับรูปที่อัปโหลดใหม่, เครื่องมือ Offload (ลบหลังแก้ URL ในฐานข้อมูลเสร็จ) และตอนจบงาน Migrate · จะไม่ลบอะไรถ้าปิดทั้ง “เขียน URL ถาวรลงฐานข้อมูล” และ “Deliver Offloaded Media” เพื่อไม่ให้หน้าเว็บชี้ไปไฟล์ที่ถูกลบ · ระวัง: ปลั๊กอินแก้รูปหรือสร้าง thumbnail ใหม่ต้องใช้ไฟล์บนเซิร์ฟเวอร์"
+msgid "Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์เมื่อยืนยันแล้วว่าไฟล์อยู่ใน bucket เพื่อประหยัดพื้นที่ ระบบจะลบเฉพาะเมื่อเปิด “เขียน URL ถาวรลงฐานข้อมูล” หรือ “Deliver Offloaded Media” ไว้ หมายเหตุ: ปลั๊กอินแก้ไขรูปภาพต้องใช้ไฟล์บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php:286
 msgid "Disable intermediate image sizes"
 msgstr "ไม่สร้างรูปขนาดย่อ"
 
 #: includes/class-isxm-admin.php:286
-msgid "Stop WordPress from generating any intermediate sizes (thumbnail / medium / large / 1536 / 2048, including WooCommerce and theme sizes). Each upload becomes a single file in the bucket and the original is kept as-is without a -scaled copy — caution: srcset goes away and every request for a small image gets the full file. Suited to headless sites that resize images themselves. Only affects newly uploaded files"
-msgstr "ให้ WordPress หยุดสร้างขนาดย่อทั้งหมด (thumbnail / medium / large / 1536 / 2048 รวมถึงขนาดของ WooCommerce และธีม) อัปโหลดหนึ่งครั้งได้ไฟล์เดียวบน bucket และเก็บไฟล์ต้นฉบับไว้ตามเดิมโดยไม่ย่อเป็น -scaled — ระวัง: srcset จะหายและทุกจุดที่ขอรูปเล็กจะได้ไฟล์เต็ม เหมาะกับเว็บที่ดึงรูปแบบ headless แล้วไปย่อเอง มีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
+msgid "Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only"
+msgstr "ปิดการสร้างรูปขนาดย่อของ WordPress อัปโหลดหนึ่งครั้งจะได้ไฟล์เดียวบน bucket แต่จะไม่มี srcset สำหรับรูปแบบ responsive เหมาะกับเว็บแบบ headless ที่ย่อรูปเอง มีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
 
 #: includes/class-isxm-admin.php:287
 msgid "Write permanent URLs to the database"
 msgstr "เขียน URL ถาวรลงฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:287
-msgid "Replace the old URLs stored in post_content / postmeta / options / guid with the bucket URLs. Offload and Migrate do this once at the end of the job (each table is scanned once); a brand-new upload only needs its guid updated, since nothing references it yet. URLs are still rewritten at render time if “Deliver Offloaded Media” is on"
-msgstr "แทน URL เดิมที่เก็บใน post_content / postmeta / options / guid ด้วย URL ใน bucket — Offload และ Migrate ทำรอบเดียวตอนจบงาน (สแกนแต่ละตารางครั้งเดียว) ส่วนรูปที่อัปโหลดใหม่แก้แค่ guid เพราะยังไม่มีที่ไหนอ้างถึง (ถ้าเปิด “Deliver Offloaded Media” URL ยังถูกแปลงตอนแสดงผลอยู่ดี)"
+msgid "Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run"
+msgstr "แทนที่ URL ของไฟล์เดิมในฐานข้อมูลด้วย URL บน bucket โดย Offload และ Migrate จะดำเนินการครั้งเดียวเมื่องานเสร็จ"
 
 #: includes/class-isxm-admin.php:288
 msgid "Group this site's files under a prefix in the bucket"
@@ -486,20 +486,20 @@ msgid "Folders by content type"
 msgstr "แยกโฟลเดอร์ตามประเภทเนื้อหา"
 
 #: includes/class-isxm-admin.php:308
-msgid "Bucket folder names per content type — changes only affect newly uploaded files; files already uploaded keep their old path"
-msgstr "ชื่อโฟลเดอร์บน bucket แยกตามประเภทเนื้อหา — เปลี่ยนแล้วมีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น ไฟล์เก่าที่อัปโหลดไปแล้วยังอยู่ path เดิม"
+msgid "Bucket folder name for each content type. Changes apply to new uploads only"
+msgstr "ชื่อโฟลเดอร์บน bucket แยกตามประเภทเนื้อหา การเปลี่ยนแปลงมีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
 
 #: includes/class-isxm-admin.php:319
-msgid "When on, matching files skip Year & Month and Object Version automatically, giving short paths like <code>products/product-name/file.jpg</code> — also turn off Prefix in the “File Storage Settings” card for the shortest paths"
-msgstr "เปิดแล้วไฟล์ที่เข้าเงื่อนไขจะข้าม Year & Month กับ Object Version อัตโนมัติ ได้ path สั้นแบบ <code>products/ชื่อสินค้า/ไฟล์.jpg</code> — ปิด Prefix ในการ์ด “การตั้งค่าจัดเก็บไฟล์” ด้วยถ้าอยากได้สั้นที่สุด"
+msgid "Matching files skip Year & Month and Object Version, giving short paths such as <code>products/product-name/file.jpg</code>. For the shortest paths, also turn off Prefix under “File Storage Settings”"
+msgstr "ไฟล์ที่เข้าเงื่อนไขจะไม่ใช้ Year & Month และ Object Version ทำให้ได้ path สั้น เช่น <code>products/ชื่อสินค้า/ไฟล์.jpg</code> หากต้องการ path สั้นที่สุด ให้ปิด Prefix ใน “การตั้งค่าจัดเก็บไฟล์” ด้วย"
 
 #: includes/class-isxm-admin.php:320
-msgid "Files whose type cannot be determined (not attached to a product/post/category) still use Year & Month and Object Version as before"
-msgstr "ไฟล์ที่ระบุประเภทไม่ได้ (ไม่ได้ผูกกับสินค้า/บทความ/หมวดหมู่) ยังใช้ Year & Month และ Object Version ตามเดิม"
+msgid "Files not linked to a product, post or category keep Year & Month and Object Version"
+msgstr "ไฟล์ที่ไม่ได้ผูกกับสินค้า บทความ หรือหมวดหมู่ ยังคงใช้ Year & Month และ Object Version ตามเดิม"
 
 #: includes/class-isxm-admin.php:321
-msgid "Caution: without Year & Month and Object Version, different files with the same name under the same product can overwrite each other in the bucket"
-msgstr "ข้อควรระวัง: พอตัด Year & Month กับ Object Version ออก ไฟล์คนละตัวที่ชื่อซ้ำกันใต้สินค้าเดียวกันจะทับกันบน bucket ได้"
+msgid "Caution: without Year & Month and Object Version, two files with the same name under the same product overwrite each other"
+msgstr "ข้อควรระวัง: เมื่อไม่ใช้ Year & Month และ Object Version ไฟล์ชื่อเดียวกันภายใต้สินค้าเดียวกันจะเขียนทับกัน"
 
 #: includes/class-isxm-admin.php:331
 msgid "Delivery"
@@ -518,24 +518,24 @@ msgid "Always use https for every rewritten URL"
 msgstr "ใช้ https กับทุก URL ที่ rewrite เสมอ"
 
 #: includes/class-isxm-admin.php:345
-msgid "If a CDN already points at the bucket, enter its domain here — leave empty to use the bucket URL directly"
-msgstr "ถ้ามี CDN ชี้ที่ bucket อยู่แล้ว ใส่โดเมนที่นี่ — เว้นว่างเพื่อใช้ URL ของ bucket ตรงๆ"
+msgid "Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL"
+msgstr "ระบุโดเมน CDN หากมี CDN ชี้ไปที่ bucket อยู่แล้ว เว้นว่างไว้เพื่อใช้ URL ของ bucket"
 
 #: includes/class-isxm-admin.php:365
 msgid "Serve theme and plugin CSS / JS through a CDN"
 msgstr "เสิร์ฟไฟล์ CSS / JS ของธีมและปลั๊กอินผ่าน CDN"
 
 #: includes/class-isxm-admin.php:370
-msgid "Rewrite URLs of enqueued theme and plugin assets (styles/scripts) to point at the CDN domain"
-msgstr "เปลี่ยน URL ของไฟล์ asset ที่ enqueue (style/script) ของธีมและปลั๊กอินให้ชี้ไปที่โดเมน CDN"
+msgid "Serve theme and plugin CSS/JS files from the CDN domain"
+msgstr "ให้ไฟล์ CSS/JS ของธีมและปลั๊กอินโหลดผ่านโดเมน CDN"
 
 #: includes/class-isxm-admin.php:371
 msgid "Always use https for every rewritten asset URL"
 msgstr "ใช้ https กับทุก URL ของ asset ที่ rewrite เสมอ"
 
 #: includes/class-isxm-admin.php:375
-msgid "Must be a CDN in front of this site (e.g. CloudFront with this site as origin) — asset files are not in the bucket. Note: fonts/images referenced inside CSS files are still served from the server as usual"
-msgstr "ต้องเป็น CDN ที่อยู่หน้าเว็บนี้ (เช่น CloudFront ชี้ origin ที่เว็บ) — ไฟล์ asset ไม่ได้อยู่ใน bucket หมายเหตุ: font/รูปที่อ้างอิงภายในไฟล์ CSS จะยังเสิร์ฟจากเซิร์ฟเวอร์ตามปกติ"
+msgid "Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site"
+msgstr "ต้องใช้ CDN ที่ดึงไฟล์จากเว็บนี้ (origin) เช่น CloudFront ส่วนฟอนต์และรูปที่อ้างอิงในไฟล์ CSS ยังโหลดจากเว็บนี้ตามปกติ"
 
 #: includes/class-isxm-admin.php:377
 msgid "Sample asset URLs after rewrite (live preview):"
@@ -546,8 +546,8 @@ msgid "Offload remaining media"
 msgstr "Offload media ที่เหลือ"
 
 #: includes/class-isxm-admin.php:396
-msgid "Upload every media item not yet offloaded to the bucket in batches. The job runs on the server, so you can close the tab (unless the site cannot call itself — the card then asks you to keep it open) and click \"Resume\" later to continue from the same point. If files were deleted from the bucket outside the plugin, run the Sync tool first"
-msgstr "อัปโหลด media ทั้งหมดที่ยังไม่ได้ offload ขึ้น bucket ทีละชุด — งานรันบนเซิร์ฟเวอร์ ปิดแท็บได้ (ยกเว้นเว็บเรียกตัวเองไม่ได้ การ์ดจะบอกให้เปิดหน้าไว้) กลับมากด \"ทำต่อ\" ได้จากจุดเดิม · ถ้าไฟล์ถูกลบออกจาก bucket นอกปลั๊กอิน ให้ใช้เครื่องมือ Sync ตรวจก่อน"
+msgid "Upload all media not yet in the bucket. The job runs on the server, so you can close this tab and resume later from the same point"
+msgstr "อัปโหลด media ทั้งหมดที่ยังไม่อยู่ใน bucket งานทำงานบนเซิร์ฟเวอร์ สามารถปิดแท็บนี้แล้วกลับมาทำต่อจากจุดเดิมได้"
 
 #: includes/class-isxm-admin.php:397
 msgid "Start Offload"
@@ -558,8 +558,8 @@ msgid "Retry failed offloads"
 msgstr "ลองใหม่เฉพาะที่ Offload ไม่ผ่าน"
 
 #: includes/class-isxm-admin.php:407
-msgid "Re-upload only the files that failed to reach the bucket last time — see them one by one on the Media page (filter “Offload failed”)"
-msgstr "ไล่อัปโหลดซ้ำเฉพาะไฟล์ที่ครั้งก่อนขึ้น bucket ไม่สำเร็จ — ดูรายตัวได้ในหน้าสื่อ (กรอง “Offload ไม่ผ่าน”)"
+msgid "Upload again only the files that failed last time. Review them with the “Offload failed” filter on the Media page"
+msgstr "อัปโหลดซ้ำเฉพาะไฟล์ที่ไม่สำเร็จในครั้งก่อน ดูรายการได้จากตัวกรอง “Offload ไม่ผ่าน” ในหน้าสื่อ"
 
 #: includes/class-isxm-admin.php:408
 msgid "Retry"
@@ -570,8 +570,8 @@ msgid "Download files back from the bucket"
 msgstr "ดาวน์โหลดไฟล์กลับจาก bucket"
 
 #: includes/class-isxm-admin.php:412
-msgid "If \"Remove Local Media\" was ever enabled, files may be missing from the server — use this tool to pull the missing files back"
-msgstr "ถ้าเคยเปิด \"Remove Local Media\" ไฟล์บนเซิร์ฟเวอร์อาจหายไป — ใช้เครื่องมือนี้ดึงไฟล์ที่ขาดกลับมา"
+msgid "Download files back to the server, for example after “Remove Local Media” has deleted them"
+msgstr "ดาวน์โหลดไฟล์กลับมาที่เซิร์ฟเวอร์ เช่น หลังจาก “Remove Local Media” ลบไฟล์ไปแล้ว"
 
 #: includes/class-isxm-admin.php:412
 msgid "Download Files"
@@ -582,8 +582,8 @@ msgid "Remove all files from the bucket"
 msgstr "ลบไฟล์ทั้งหมดออกจาก bucket"
 
 #: includes/class-isxm-admin.php:413
-msgid "Remove every media file from the bucket — files missing from the server are downloaded back before removal"
-msgstr "ลบไฟล์ของทุก media ออกจาก bucket — ถ้าไฟล์ไม่มีบนเซิร์ฟเวอร์ ระบบจะดาวน์โหลดกลับมาก่อนลบ"
+msgid "Delete all media files from the bucket. Files missing from the server are downloaded first"
+msgstr "ลบไฟล์ media ทั้งหมดออกจาก bucket โดยไฟล์ที่ไม่มีบนเซิร์ฟเวอร์จะถูกดาวน์โหลดกลับมาก่อน"
 
 #: includes/class-isxm-admin.php:413
 msgid "Remove from Bucket"
@@ -594,8 +594,8 @@ msgid "Check and update WooCommerce downloadable products"
 msgstr "ตรวจสอบและอัปเดต WooCommerce Downloadable Products"
 
 #: includes/class-isxm-admin.php:415
-msgid "Check every downloadable product, make its files in the bucket private and update their URLs"
-msgstr "ตรวจสอบสินค้าที่ดาวน์โหลดได้ทั้งหมด ตั้งไฟล์ในบัคเก็ตให้เป็น private และอัปเดต URL ให้ถูกต้อง"
+msgid "Make downloadable product files private in the bucket and update their URLs"
+msgstr "ตั้งค่าไฟล์ของสินค้าแบบดาวน์โหลดให้เป็น private ใน bucket และอัปเดต URL"
 
 #: includes/class-isxm-admin.php:415
 msgid "Check and Update"
@@ -606,8 +606,8 @@ msgid "Choose Providers to Migrate"
 msgstr "เลือก Provider สำหรับ Migrate"
 
 #: includes/class-isxm-admin.php:429
-msgid "Choose which provider to pull files from (left) and which provider to upload them to (right) — both sides come from the connections configured in the “Connections” tab. Files are <strong>only copied, never deleted from the source</strong>"
-msgstr "เลือกว่าจะดึงไฟล์มาจาก provider ไหน (ซ้าย) แล้วอัปโหลดไปยัง provider ไหน (ขวา) — ทั้งสองฝั่งเลือกจาก connection ที่ตั้งค่าไว้แล้วในแท็บ “การเชื่อมต่อ” ระบบจะ<strong>ดึงไฟล์มาเท่านั้น ไม่ลบไฟล์ที่ต้นทาง"
+msgid "Choose the provider to copy from (left) and to (right), from the connections set up in the “Connections” tab. Files are <strong>copied only — the source is never modified</strong>"
+msgstr "เลือก provider ต้นทาง (ซ้าย) และปลายทาง (ขวา) จาก connection ในแท็บ “การเชื่อมต่อ” ระบบจะ<strong>คัดลอกเท่านั้น ไม่แก้ไขไฟล์ต้นทาง</strong>"
 
 #: includes/class-isxm-admin.php:432
 msgid "From (Source)"
@@ -622,8 +622,8 @@ msgid "Source Path Structure"
 msgstr "โครงสร้าง Path บน Source"
 
 #: includes/class-isxm-admin.php:449
-msgid "Must match the real key structure in the source bucket. Files are fetched using this path; if it is wrong, you will see an error with the attempted key in the list below after clicking Migrate"
-msgstr "ต้องตรงกับโครงสร้าง key จริงบน source bucket ระบบจะลองดึงตาม path นี้ ถ้าผิดจะเห็น error พร้อม key ที่ลองในรายการด้านล่างหลังกด Migrate"
+msgid "Choose the folders on the source bucket to migrate"
+msgstr "เลือกโฟลเดอร์บน source bucket ที่ต้องการย้าย"
 
 #: includes/class-isxm-admin.php:454
 msgid "Year & Month in path"
@@ -638,8 +638,8 @@ msgid "Replace URLs in the Database"
 msgstr "เปลี่ยน URL ในฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:461
-msgid "The URL the existing media is <strong>actually served from right now</strong> (embedded in posts, ACF fields, widgets, etc.) — after the migration it is replaced with the new destination URL throughout the database automatically, not just rewritten at render time"
-msgstr "URL ที่ media เดิม<strong>ถูกเสิร์ฟอยู่จริงตอนนี้</strong> (ที่ฝังอยู่ใน post, ACF field, widget ฯลฯ) — หลัง Migrate ระบบจะแทนที่ URL นี้ด้วย URL ปลายทางใหม่ทั่วทั้งฐานข้อมูลให้อัตโนมัติ ไม่ใช่แค่ rewrite ตอนแสดงผล"
+msgid "The URL your existing media is <strong>served from today</strong>. After migrating, it is replaced with the destination URL throughout the database"
+msgstr "URL ที่ไฟล์เดิม<strong>ใช้งานอยู่ในปัจจุบัน</strong> หลัง Migrate ระบบจะแทนที่ด้วย URL ปลายทางทั่วทั้งฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:463
 msgid "Source Public URL (current)"
@@ -650,16 +650,16 @@ msgid "Leave empty to infer it from the Endpoint/Bucket above"
 msgstr "เว้นว่างเพื่อเดาจาก Endpoint/Bucket ด้านบน"
 
 #: includes/class-isxm-admin.php:465
-msgid "Where the existing media is served from NOW, before migrating — e.g. https://old-bucket.s3.ap-southeast-1.amazonaws.com or the old CDN domain. Not the destination address. Leave empty if existing media still uses this site's local URLs (wp-content/uploads)"
-msgstr "ที่อยู่ที่รูปเดิมเสิร์ฟอยู่ *ตอนนี้* ก่อนย้าย — เช่น https://old-bucket.s3.ap-southeast-1.amazonaws.com หรือโดเมน CDN เดิม · ไม่ใช่ที่อยู่ปลายทาง · เว้นว่างถ้ารูปเดิมยังใช้ URL บนเว็บนี้ (wp-content/uploads)"
+msgid "For example https://old-bucket.s3.ap-southeast-1.amazonaws.com or your current CDN domain. Leave empty if media still uses this site's URLs (wp-content/uploads)"
+msgstr "เช่น https://old-bucket.s3.ap-southeast-1.amazonaws.com หรือโดเมน CDN ที่ใช้อยู่ เว้นว่างไว้หากไฟล์ยังใช้ URL ของเว็บนี้ (wp-content/uploads)"
 
 #: includes/class-isxm-admin.php:472
 msgid "Migrate from Source to Destination"
 msgstr "Migrate จาก Source มา Destination"
 
 #: includes/class-isxm-admin.php:473
-msgid "Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab. The database URLs are replaced once, at the end of the run. Nothing is deleted from the source; if “Remove Local Media” is on, the server copies are deleted at the very end. Items already on the destination are checked against the real bucket before being skipped"
-msgstr "ดึงไฟล์ทั้งหมดที่มีอยู่จริงใน source bucket ขึ้น storage ปลายทางที่ตั้งไว้ในแท็บ “การเชื่อมต่อ” แล้วแก้ URL ในฐานข้อมูลรอบเดียวตอนจบงาน — ไม่ลบอะไรใน source แต่ถ้าเปิด “Remove Local Media” จะลบไฟล์บนเซิร์ฟเวอร์เป็นขั้นสุดท้าย · รูปที่อยู่ปลายทางแล้วจะเช็กกับ bucket จริงก่อนข้ามเสมอ"
+msgid "Copy files from the source bucket to the destination and update database URLs at the end. The source is never modified"
+msgstr "คัดลอกไฟล์จาก source bucket ไปยังปลายทาง และอัปเดต URL ในฐานข้อมูลเมื่องานเสร็จ ไฟล์ต้นทางจะไม่ถูกแก้ไข"
 
 #: includes/class-isxm-admin.php:474
 msgid "Start Migration"
@@ -670,8 +670,8 @@ msgid "Diagnostics"
 msgstr "ข้อมูลวินิจฉัย (Diagnostic)"
 
 #: includes/class-isxm-admin.php:587
-msgid "🔐 Encrypted with AES-256-GCM (with an auth tag against tampering) before being saved to the database — the dots shown are a placeholder, not the real Secret Key, and cannot be copied"
-msgstr "🔐 เข้ารหัส AES-256-GCM (มี Auth tag ป้องกันการแก้ค่า) ก่อนบันทึกลงฐานข้อมูล — ค่าที่โชว์เป็นจุดคือตัวยึดตำแหน่ง ไม่ใช่ Secret Key จริง คัดลอกไปใช้ไม่ได้"
+msgid "🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key"
+msgstr "🔐 เข้ารหัสด้วย AES-256-GCM ก่อนบันทึก จุดที่แสดงเป็นเพียงตัวแทน ไม่ใช่ Secret Key จริง"
 
 #: includes/class-isxm-admin.php:591
 msgid "Required for Minio/Garage — off for AWS S3 (virtual-hosted)"
@@ -682,8 +682,8 @@ msgid "Send ACL public-read"
 msgstr "ส่ง ACL public-read"
 
 #: includes/class-isxm-admin.php:592
-msgid "Enable when the bucket supports ACLs — turn it off if the bucket already uses a public policy"
-msgstr "เปิดเมื่อ bucket รองรับ ACL — ถ้า bucket ใช้ policy สาธารณะอยู่แล้วให้ปิดไว้"
+msgid "Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy"
+msgstr "เปิดเมื่อ bucket รองรับ ACL และปิดหาก bucket ตั้ง policy ให้อ่านแบบสาธารณะไว้แล้ว"
 
 #: includes/class-isxm-admin.php:610 includes/class-isxm-connections.php:242
 msgid "Not configured"
@@ -711,8 +711,8 @@ msgid "Last checked %s ago"
 msgstr "ตรวจล่าสุดเมื่อ %sที่แล้ว"
 
 #: includes/class-isxm-admin.php:867
-msgid "Check the real bucket against what the plugin tracks — files deleted from the bucket outside the plugin (console, CLI, cleanup scripts) have their stale meta cleared so Offload/Migrate re-upload them"
-msgstr "ตรวจ bucket จริงเทียบกับข้อมูลที่ปลั๊กอินติดตามไว้ — เจอไฟล์ที่ถูกลบออกจาก bucket นอกปลั๊กอิน (console, CLI, สคริปต์ลบไฟล์) จะล้าง meta ค้างให้ Offload/ย้ายข้อมูลอัปโหลดใหม่ให้เอง"
+msgid "Compare the bucket with the plugin's records. Files deleted from the bucket outside the plugin are marked for upload again"
+msgstr "ตรวจสอบไฟล์ใน bucket เทียบกับข้อมูลของปลั๊กอิน ไฟล์ที่ถูกลบออกจาก bucket จากภายนอกจะถูกตั้งให้อัปโหลดใหม่"
 
 #: includes/class-isxm-admin.php:881
 msgid "Objects in the current prefix with no matching WordPress media"
@@ -1401,8 +1401,8 @@ msgid "Up one level"
 msgstr "ขึ้นไปหนึ่งระดับ"
 
 #: includes/class-isxm-admin.php
-msgid "Tick every folder on the source bucket to migrate. The one holding your uploads (e.g. wp-content/uploads/) is detected as the Media Library and moved into the destination layout; the others are copied as-is with their keys, and links to them in content are rewritten too"
-msgstr "ติ๊กทุกโฟลเดอร์บน source bucket ที่อยากย้าย โฟลเดอร์ที่เก็บไฟล์อัปโหลด (เช่น wp-content/uploads/) ระบบจะตรวจเจอเองว่าเป็น Media Library แล้วย้ายตามโครงสร้างปลายทาง ส่วนโฟลเดอร์อื่นจะถูกคัดลอกไปทั้งโฟลเดอร์ด้วย key เดิม และลิงก์ในเนื้อหาที่ชี้ไปที่ไฟล์เหล่านั้นจะถูกเปลี่ยนให้ด้วย"
+msgid "Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated"
+msgstr "เลือกได้หลายโฟลเดอร์ โฟลเดอร์ที่เก็บไฟล์อัปโหลด (เช่น wp-content/uploads/) จะย้ายแบบ Media Library ส่วนโฟลเดอร์อื่นจะคัดลอกโดยใช้ path เดิม และอัปเดตลิงก์ที่อ้างถึงให้"
 
 #: includes/class-isxm-admin.php
 msgid "Loading folders…"
@@ -1437,8 +1437,8 @@ msgid "Upload missing sizes"
 msgstr "อัปโหลดขนาดที่ขาด"
 
 #: includes/class-isxm-admin.php
-msgid "Upload only the image sizes that did not reach the bucket (Media page filter “Not all sizes uploaded”), from the copies still on the server — the original does not need to be here"
-msgstr "อัปโหลดเฉพาะขนาดรูปที่ยังไม่ขึ้น bucket (ดูได้ในหน้า Media ตัวกรอง “ขึ้นไม่ครบทุกขนาด”) จากไฟล์ที่ยังอยู่บน server — ไม่จำเป็นต้องมีไฟล์ต้นฉบับอยู่บน server"
+msgid "Upload the image sizes missing from the bucket, using the copies still on the server"
+msgstr "อัปโหลดขนาดรูปที่ยังไม่มีใน bucket โดยใช้ไฟล์ที่ยังอยู่บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-offload.php
 msgid "This item has no missing sizes on the current bucket"

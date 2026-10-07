@@ -327,9 +327,9 @@ class ISXM_Admin {
                                 </div>
                                 <div class="isxs-card-body">
                                     <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy media files to storage automatically after upload', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy of files confirmed to be in the bucket, to save space. Applies to new uploads, to Offload (after the database URLs are updated) and to the end of a Migration. Nothing is deleted unless “Write permanent URLs to the database” or “Deliver Offloaded Media” is on, so pages never point at a deleted file. Caution: image editors and thumbnail regenerators need the local file', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating any intermediate sizes (thumbnail / medium / large / 1536 / 2048, including WooCommerce and theme sizes). Each upload becomes a single file in the bucket and the original is kept as-is without a -scaled copy — caution: srcset goes away and every request for a small image gets the full file. Suited to headless sites that resize images themselves. Only affects newly uploaded files', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace the old URLs stored in post_content / postmeta / options / guid with the bucket URLs. Offload and Migrate do this once at the end of the job (each table is scanned once); a brand-new upload only needs its guid updated, since nothing references it yet. URLs are still rewritten at render time if “Deliver Offloaded Media” is on', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-offload' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'use_prefix', $s['use_prefix'], 'Add Prefix to Bucket Path', __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
                                     <div class="isxs-field isxs-indent" id="isxs-prefix-field">
                                         <input type="text" id="isxs-prefix" value="<?php echo esc_attr( $s['prefix'] ); ?>" placeholder="wp-content/uploads/">
@@ -350,7 +350,7 @@ class ISXM_Admin {
                                     </div>
                                 </div>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'use_type_folder', $s['use_type_folder'], __( 'Folders by content type', 'insightx-offload' ), __( 'Bucket folder names per content type — changes only affect newly uploaded files; files already uploaded keep their old path', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_type_folder', $s['use_type_folder'], __( 'Folders by content type', 'insightx-offload' ), __( 'Bucket folder name for each content type. Changes apply to new uploads only', 'insightx-offload' ) ); ?>
                                     <div class="isxs-grid-2 isxs-indent" id="isxs-typefolder-fields">
                                         <?php foreach ( ISXM_Settings::type_folder_fields() as $isxm_folder_key => $isxm_folder_meta ) :
                                             $isxm_folder_id = 'isxs-' . str_replace( '_', '-', $isxm_folder_key );
@@ -361,9 +361,9 @@ class ISXM_Admin {
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
-                                    <p class="isxs-hint isxs-indent"><?php echo wp_kses( __( 'When on, matching files skip Year & Month and Object Version automatically, giving short paths like <code>products/product-name/file.jpg</code> — also turn off Prefix in the “File Storage Settings” card for the shortest paths', 'insightx-offload' ), [ 'code' => [] ] ); ?></p>
-                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Files whose type cannot be determined (not attached to a product/post/category) still use Year & Month and Object Version as before', 'insightx-offload' ); ?></p>
-                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Caution: without Year & Month and Object Version, different files with the same name under the same product can overwrite each other in the bucket', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php echo wp_kses( __( 'Matching files skip Year & Month and Object Version, giving short paths such as <code>products/product-name/file.jpg</code>. For the shortest paths, also turn off Prefix under “File Storage Settings”', 'insightx-offload' ), [ 'code' => [] ] ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Files not linked to a product, post or category keep Year & Month and Object Version', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Caution: without Year & Month and Object Version, two files with the same name under the same product overwrite each other', 'insightx-offload' ); ?></p>
                                 </div>
                             </div>
 
@@ -387,7 +387,7 @@ class ISXM_Admin {
                                     <div class="isxs-field">
                                         <label for="isxs-cdn-domain">Custom Delivery Domain (CDN)</label>
                                         <input type="text" id="isxs-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['cdn_domain'] ); ?>">
-                                        <p class="isxs-hint"><?php esc_html_e( 'If a CDN already points at the bucket, enter its domain here — leave empty to use the bucket URL directly', 'insightx-offload' ); ?></p>
+                                        <p class="isxs-hint"><?php esc_html_e( 'Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL', 'insightx-offload' ); ?></p>
                                     </div>
                                 </div>
                             </div>
@@ -412,12 +412,12 @@ class ISXM_Admin {
                                 </div>
                             </div>
                             <div class="isxs-card-body">
-                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], 'Rewrite Asset URLs', __( 'Rewrite URLs of enqueued theme and plugin assets (styles/scripts) to point at the CDN domain', 'insightx-offload' ) ); ?>
+                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], 'Rewrite Asset URLs', __( 'Serve theme and plugin CSS/JS files from the CDN domain', 'insightx-offload' ) ); ?>
                                 <?php $this->toggle( 'assets_force_https', $s['assets_force_https'], 'Force HTTPS', __( 'Always use https for every rewritten asset URL', 'insightx-offload' ) ); ?>
                                 <div class="isxs-field">
                                     <label for="isxs-assets-cdn-domain">CDN Domain (Assets)</label>
                                     <input type="text" id="isxs-assets-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['assets_cdn_domain'] ); ?>">
-                                    <p class="isxs-hint"><?php esc_html_e( 'Must be a CDN in front of this site (e.g. CloudFront with this site as origin) — asset files are not in the bucket. Note: fonts/images referenced inside CSS files are still served from the server as usual', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site', 'insightx-offload' ); ?></p>
                                 </div>
                                 <p class="isxs-hint"><?php esc_html_e( 'Sample asset URLs after rewrite (live preview):', 'insightx-offload' ); ?></p>
                                 <div class="isxs-url-preview" data-url-preview="assets">
@@ -438,7 +438,7 @@ class ISXM_Admin {
                             $this->tool_card(
                                 'offload',
                                 __( 'Offload remaining media', 'insightx-offload' ),
-                                __( 'Upload every media item not yet offloaded to the bucket in batches. The job runs on the server, so you can close the tab (unless the site cannot call itself — the card then asks you to keep it open) and click "Resume" later to continue from the same point. If files were deleted from the bucket outside the plugin, run the Sync tool first', 'insightx-offload' ),
+                                __( 'Upload all media not yet in the bucket. The job runs on the server, so you can close this tab and resume later from the same point', 'insightx-offload' ),
                                 __( 'Start Offload', 'insightx-offload' ),
                                 '',
                                 false
@@ -449,7 +449,7 @@ class ISXM_Admin {
                             $this->tool_card(
                                 'retry_failed',
                                 __( 'Retry failed offloads', 'insightx-offload' ),
-                                __( 'Re-upload only the files that failed to reach the bucket last time — see them one by one on the Media page (filter “Offload failed”)', 'insightx-offload' ),
+                                __( 'Upload again only the files that failed last time. Review them with the “Offload failed” filter on the Media page', 'insightx-offload' ),
                                 __( 'Retry', 'insightx-offload' ),
                                 '',
                                 empty( $stats['failed'] )
@@ -458,15 +458,15 @@ class ISXM_Admin {
                             $this->tool_card(
                                 'complete_partial',
                                 __( 'Upload missing sizes', 'insightx-offload' ),
-                                __( 'Upload only the image sizes that did not reach the bucket (Media page filter “Not all sizes uploaded”), from the copies still on the server — the original does not need to be here', 'insightx-offload' ),
+                                __( 'Upload the image sizes missing from the bucket, using the copies still on the server', 'insightx-offload' ),
                                 __( 'Upload missing sizes', 'insightx-offload' ),
                                 '',
                                 empty( $stats['partial'] )
                             );
-                            $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'If "Remove Local Media" was ever enabled, files may be missing from the server — use this tool to pull the missing files back', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
-                            $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Remove every media file from the bucket — files missing from the server are downloaded back before removal', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );
+                            $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
+                            $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );
                             if ( class_exists( 'WC_Product' ) ) {
-                                $this->tool_card( 'wc_downloads', __( 'Check and update WooCommerce downloadable products', 'insightx-offload' ), __( 'Check every downloadable product, make its files in the bucket private and update their URLs', 'insightx-offload' ), __( 'Check and Update', 'insightx-offload' ) );
+                                $this->tool_card( 'wc_downloads', __( 'Check and update WooCommerce downloadable products', 'insightx-offload' ), __( 'Make downloadable product files private in the bucket and update their URLs', 'insightx-offload' ), __( 'Check and Update', 'insightx-offload' ) );
                             }
                             ?>
                         </div>
@@ -480,7 +480,7 @@ class ISXM_Admin {
                         <div class="isxs-card">
                             <div class="isxs-card-head"><h2><?php esc_html_e( 'Choose Providers to Migrate', 'insightx-offload' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php echo wp_kses( __( 'Choose which provider to pull files from (left) and which provider to upload them to (right) — both sides come from the connections configured in the “Connections” tab. Files are <strong>only copied, never deleted from the source</strong>', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
+                                <p class="isxs-hint"><?php echo wp_kses( __( 'Choose the provider to copy from (left) and to (right), from the connections set up in the “Connections” tab. Files are <strong>copied only — the source is never modified</strong>', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
                                 <div class="isxs-migrate-columns">
                                     <div class="isxs-migrate-col">
                                         <h3><span class="isxs-migrate-col-dot isxs-migrate-col-dot-from"></span><?php esc_html_e( 'From (Source)', 'insightx-offload' ); ?></h3>
@@ -500,7 +500,7 @@ class ISXM_Admin {
                         <div class="isxs-card">
                             <div class="isxs-card-head"><h2><?php esc_html_e( 'Source Path Structure', 'insightx-offload' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php esc_html_e( 'Must match the real key structure in the source bucket. Files are fetched using this path; if it is wrong, you will see an error with the attempted key in the list below after clicking Migrate', 'insightx-offload' ); ?></p>
+                                <p class="isxs-hint"><?php esc_html_e( 'Choose the folders on the source bucket to migrate', 'insightx-offload' ); ?></p>
                                 <div class="isxs-field isxs-folder-field">
                                     <label for="isxs-source-folders"><?php esc_html_e( 'Folders to migrate', 'insightx-offload' ); ?></label>
                                     <div class="isxs-folder-row">
@@ -515,7 +515,7 @@ class ISXM_Admin {
                                         <ul class="isxs-folder-list"></ul>
                                         <p class="isxs-folder-status"></p>
                                     </div>
-                                    <p class="isxs-hint"><?php esc_html_e( 'Tick every folder on the source bucket to migrate. The one holding your uploads (e.g. wp-content/uploads/) is detected as the Media Library and moved into the destination layout; the others are copied as-is with their keys, and links to them in content are rewritten too', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated', 'insightx-offload' ); ?></p>
                                 </div>
                                 <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-offload' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-offload' ) ); ?>
                             </div>
@@ -524,11 +524,11 @@ class ISXM_Admin {
                         <div class="isxs-card">
                             <div class="isxs-card-head"><h2><?php esc_html_e( 'Replace URLs in the Database', 'insightx-offload' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php echo wp_kses( __( 'The URL the existing media is <strong>actually served from right now</strong> (embedded in posts, ACF fields, widgets, etc.) — after the migration it is replaced with the new destination URL throughout the database automatically, not just rewritten at render time', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
+                                <p class="isxs-hint"><?php echo wp_kses( __( 'The URL your existing media is <strong>served from today</strong>. After migrating, it is replaced with the destination URL throughout the database', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
                                 <div class="isxs-field">
                                     <label for="isxs-source-public-url"><?php esc_html_e( 'Source Public URL (current)', 'insightx-offload' ); ?></label>
                                     <input type="url" id="isxs-source-public-url" placeholder="<?php esc_attr_e( 'Leave empty to infer it from the Endpoint/Bucket above', 'insightx-offload' ); ?>" value="<?php echo esc_attr( $s['source_public_base_url'] ); ?>">
-                                    <p class="isxs-hint"><?php esc_html_e( 'Where the existing media is served from NOW, before migrating — e.g. https://old-bucket.s3.ap-southeast-1.amazonaws.com or the old CDN domain. Not the destination address. Leave empty if existing media still uses this site\'s local URLs (wp-content/uploads)', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'For example https://old-bucket.s3.ap-southeast-1.amazonaws.com or your current CDN domain. Leave empty if media still uses this site\'s URLs (wp-content/uploads)', 'insightx-offload' ); ?></p>
                                 </div>
                             </div>
                         </div>
@@ -536,7 +536,7 @@ class ISXM_Admin {
                         <?php $this->tool_card(
                             'migrate',
                             __( 'Migrate from Source to Destination', 'insightx-offload' ),
-                            __( 'Copy every file that actually exists in the source bucket to the destination storage configured in the “Connections” tab. The database URLs are replaced once, at the end of the run. Nothing is deleted from the source; if “Remove Local Media” is on, the server copies are deleted at the very end. Items already on the destination are checked against the real bucket before being skipped', 'insightx-offload' ),
+                            __( 'Copy files from the source bucket to the destination and update database URLs at the end. The source is never modified', 'insightx-offload' ),
                             __( 'Start Migration', 'insightx-offload' ),
                             '',
                             false
@@ -650,12 +650,12 @@ class ISXM_Admin {
                     <div class="isxs-field isxs-col-span">
                         <label>Secret Key</label>
                         <input type="password" class="isxs-conn-secret-key" autocomplete="new-password" data-has-secret="<?php echo $has_secret ? '1' : '0'; ?>" value="<?php echo $has_secret ? esc_attr( str_repeat( '•', 16 ) ) : ''; ?>" placeholder="<?php echo esc_attr( $meta['secret_key_placeholder'] ); ?>">
-                        <p class="isxs-hint"><?php esc_html_e( '🔐 Encrypted with AES-256-GCM (with an auth tag against tampering) before being saved to the database — the dots shown are a placeholder, not the real Secret Key, and cannot be copied', 'insightx-offload' ); ?></p>
+                        <p class="isxs-hint"><?php esc_html_e( '🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key', 'insightx-offload' ); ?></p>
                     </div>
                 </div>
                 <div class="isxs-toggle-row">
                     <?php $this->toggle( 'path_style', $config['path_style'], 'Path-style URL', __( 'Required for Minio/Garage — off for AWS S3 (virtual-hosted)', 'insightx-offload' ) ); ?>
-                    <?php $this->toggle( 'send_public_acl', $config['send_public_acl'], __( 'Send ACL public-read', 'insightx-offload' ), __( 'Enable when the bucket supports ACLs — turn it off if the bucket already uses a public policy', 'insightx-offload' ) ); ?>
+                    <?php $this->toggle( 'send_public_acl', $config['send_public_acl'], __( 'Send ACL public-read', 'insightx-offload' ), __( 'Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy', 'insightx-offload' ) ); ?>
                 </div>
                 <div class="isxs-card-foot">
                     <button type="button" class="isxs-btn isxs-btn-primary isxs-conn-save-btn"><?php esc_html_e( 'Save', 'insightx-offload' ); ?></button>
@@ -933,7 +933,7 @@ class ISXM_Admin {
                 </div>
             </div>
             <div class="isxs-tool-body">
-                <p><?php esc_html_e( 'Check the real bucket against what the plugin tracks — files deleted from the bucket outside the plugin (console, CLI, cleanup scripts) have their stale meta cleared so Offload/Migrate re-upload them', 'insightx-offload' ); ?></p>
+                <p><?php esc_html_e( 'Compare the bucket with the plugin\'s records. Files deleted from the bucket outside the plugin are marked for upload again', 'insightx-offload' ); ?></p>
                 <div class="isxs-tool-progress" hidden>
                     <div class="isxs-progress-track"><div class="isxs-progress-fill"></div></div>
                     <span class="isxs-tool-percent"></span>

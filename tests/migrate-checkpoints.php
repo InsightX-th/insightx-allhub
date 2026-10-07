@@ -184,6 +184,8 @@ ISXM_Background::run();
 $finished = ISXM_Job::get( 'migrate' );
 t( 'Production runner reloads checkpoint and does not double-count', $finished->state === ISXM_Job::STATE_DONE && $finished->processed === 3, $finished->message );
 t( 'Production runner releases its lease', ! ISXM_Background::runner_lock_held() );
+$last = get_option( ISXM_Job::MIGRATE_LAST_OPTION );
+t( 'Completed migration totals outlive the pruned record', is_array( $last ) && $last['processed'] === 3 && $last['total'] === 3, json_encode( $last ) );
 
 group( 'Healthcheck drives the run when loopback is unavailable' );
 $job = migration_fixture( 3 );

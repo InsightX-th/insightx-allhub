@@ -888,6 +888,8 @@ class ISXM_Background {
             // ...and whether that run found everything in sync, so the badge
             // keeps its green/red verdict across page loads and polls.
             'sync_clean'    => ISXM_Sync::last_clean(),
+            // Header "Migrated" widget fallback once the done record is pruned.
+            'migrate_last'  => get_option( ISXM_Job::MIGRATE_LAST_OPTION ) ?: null,
             // Every response re-mints the nonce: a run can outlive the 24h
             // nonce lifetime, and so can an admin page left open overnight.
             'nonce'     => wp_create_nonce( ISXM_Tools::NONCE_ACTION ),

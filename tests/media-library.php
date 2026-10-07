@@ -96,5 +96,40 @@ t( 'Diagnostic count', ISXM_Media_Library::count_avatars() === 4 );
 ob_start(); ( new ISXM_Media_Library() )->render_filter( 'attachment' ); $html = ob_get_clean();
 t( 'Dropdown offered', strpos( $html, 'name="isxs_avatar"' ) !== false && strpos( $html, 'User profile pictures' ) !== false );
 
+group( 'Not all sizes uploaded filter' );
+$GLOBALS['wpdb'] = new ISXM_Migration_Test_DB(); $db = $GLOBALS['wpdb'];
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_test_configure( [], [] );
+delete_option( ISXM_Items::BACKFILLED_OPTION ); // left over from the Bucket filter group
+$run = function ( array $get ) use ( $query ) {
+    $_GET = $get;
+    $c = ( new ISXM_Media_Library() )->filter_clauses( [ 'join' => '', 'where' => " AND wp_posts.post_type = 'attachment' AND wp_posts.post_status <> 'trash' " ], $query );
+    $_GET = [];
+    return array_map( 'intval', $GLOBALS['wpdb']->db->query( "SELECT wp_posts.ID FROM wp_posts {$c['join']} WHERE 1=1 {$c['where']} ORDER BY wp_posts.ID" )->fetchAll( PDO::FETCH_COLUMN ) );
+};
+$dest = [ 'https://s3.example.test', 'media' ];
+// 1-2: complete, 3-4: partial on this destination, 5: partial on another bucket, 6: local only.
+$records = [
+    1 => record( $dest[0], $dest[1] ),
+    2 => record( $dest[0], $dest[1] ),
+    3 => record( $dest[0], $dest[1] ) + [ 'missing' => [ 'a-300x300.webp' ] ],
+    4 => record( $dest[0], $dest[1] ) + [ 'missing' => [ 'a-150x150.webp', 'a-768x768.webp' ] ],
+    5 => record( 'https://other.example', 'old' ) + [ 'missing' => [ 'a-300x300.webp' ] ],
+];
+for ( $i = 1; $i <= 6; $i++ ) $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($i)" );
+foreach ( $records as $id => $rec ) {
+    $db->db->exec( 'INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (' . $id . ',' . $db->db->quote( ISXM_Offload::META_KEY ) . ',' . $db->db->quote( serialize( $rec ) ) . ')' );
+}
+t( 'Legacy (no ledger): only partials on the current destination', $run( [ 'isxs_status' => 'partial' ] ) === [ 3, 4 ], json_encode( $run( [ 'isxs_status' => 'partial' ] ) ) );
+t( 'Legacy: "In the cloud" still includes partials', $run( [ 'isxs_status' => 'offloaded' ] ) === [ 1, 2, 3, 4 ] );
+isxm_items_table( $db );
+update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+foreach ( $records as $id => $rec ) ISXM_Items::put( $id, $rec );
+t( 'Ledger: only partials on the current destination', $run( [ 'isxs_status' => 'partial' ] ) === [ 3, 4 ], json_encode( $run( [ 'isxs_status' => 'partial' ] ) ) );
+t( 'Ledger: "In the cloud" still includes partials', $run( [ 'isxs_status' => 'offloaded' ] ) === [ 1, 2, 3, 4 ] );
+ob_start(); ( new ISXM_Media_Library() )->render_filter( 'attachment' ); $html = ob_get_clean();
+t( 'Status dropdown offers it', strpos( $html, 'value="partial"' ) !== false && strpos( $html, 'Not all sizes uploaded' ) !== false );
+
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

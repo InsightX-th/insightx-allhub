@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.27
+ * Version:     0.2.28
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.27' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.28' );
 
 /*
  * GitHub update checker.
@@ -227,6 +227,7 @@ function isxm_plugin_uninstall() {
     delete_option( 'isxs_bulk_progress' );
     delete_option( 'isxs_bulk_progress_cleaned' );
     delete_option( 'isxs_jobs' );
+    delete_option( 'isxs_migrate_last' );
     delete_option( 'isxs_items_db_version' );
     delete_option( 'isxs_items_backfilled' );
     delete_option( 'isxs_bg_token' );

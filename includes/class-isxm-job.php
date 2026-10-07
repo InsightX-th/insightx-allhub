@@ -328,6 +328,16 @@ class ISXM_Job {
             $this->phase = '';
         }
         $this->save();
+        // The record itself is pruned after TERMINAL_TTL; keep the last
+        // completed migration's totals so the header widget can still say
+        // "100% Migrated" afterwards.
+        if ( $state === self::STATE_DONE && $this->tool === 'migrate' ) {
+            update_option( self::MIGRATE_LAST_OPTION, [
+                'processed' => (int) $this->processed,
+                'total'     => (int) max( $this->total, $this->processed ),
+                'finished'  => time(),
+            ], false );
+        }
     }
 
     /**
@@ -474,6 +484,9 @@ class ISXM_Job {
      * to resume from.
      */
     const TERMINAL_TTL = 1800;
+
+    /** Totals of the last completed migration — outlives the pruned record. */
+    const MIGRATE_LAST_OPTION = 'isxs_migrate_last';
 
     /**
      * Drop finished/cancelled records that have aged out.

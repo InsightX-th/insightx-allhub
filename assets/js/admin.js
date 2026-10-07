@@ -864,8 +864,13 @@
   };
 
   // Header "Migrated" widget — same numbers as the Migrate card, compact.
-  const renderMigrateWidget = (job) => {
+  const renderMigrateWidget = (job, last) => {
     const $state = $("#isxs-migrate-state");
+    // The done record is pruned after 30 min — fall back to the last
+    // completed migration so the widget keeps showing 100%.
+    if (!job && last) {
+      job = { state: "done", percent: 100, total: last.total, processed: last.processed };
+    }
     if (!job) {
       $("#isxs-migrate-percent").text("0%");
       $("#isxs-migrate-fill").css("width", "0%");
@@ -926,7 +931,7 @@
     // Jobs first: applyStats() below decides whether the retry card is
     // visible, and that decision reads the running state from here.
     jobs = data.jobs || {};
-    renderMigrateWidget(jobs.migrate);
+    renderMigrateWidget(jobs.migrate, data.migrate_last);
 
     // Keep the header's quick-offload button honest while a run is going.
     const offJob = jobs.offload;

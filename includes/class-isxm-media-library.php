@@ -173,6 +173,7 @@ class ISXM_Media_Library {
         $options = [
             ''          => __( 'All Storage statuses', 'insightx-offload' ),
             'offloaded' => __( 'In the cloud', 'insightx-offload' ),
+            'partial'   => __( 'Not all sizes uploaded', 'insightx-offload' ),
             'pending'   => __( 'Not in the cloud yet', 'insightx-offload' ),
             'failed'    => __( 'Offload failed', 'insightx-offload' ),
         ];
@@ -348,7 +349,7 @@ class ISXM_Media_Library {
         }
 
         $status = isset( $_GET[ self::FILTER_VAR ] ) ? sanitize_key( wp_unslash( $_GET[ self::FILTER_VAR ] ) ) : '';
-        if ( ! in_array( $status, [ 'offloaded', 'pending', 'failed' ], true ) ) {
+        if ( ! in_array( $status, [ 'offloaded', 'partial', 'pending', 'failed' ], true ) ) {
             // Nothing to filter — leave the query completely untouched rather
             // than touching every Media Library load.
             return $clauses;
@@ -376,6 +377,11 @@ class ISXM_Media_Library {
             $clauses['where'] .= $status === 'pending'
                 ? ' AND isxs_m.id IS NULL '
                 : ' AND isxs_m.id IS NOT NULL ';
+            // "Partial" is "in the cloud" with at least one size missing —
+            // the same is_partial flag the Overview count reads.
+            if ( $status === 'partial' ) {
+                $clauses['where'] .= ' AND isxs_m.is_partial = 1 ';
+            }
 
             return $clauses;
         } else {
@@ -408,6 +414,10 @@ class ISXM_Media_Library {
         $clauses['where'] .= $status === 'pending'
             ? ' AND isxs_m.post_id IS NULL '
             : ' AND isxs_m.post_id IS NOT NULL ';
+        if ( $status === 'partial' ) {
+            // Same needle ISXM_Tools::get_stats() counts partials with.
+            $clauses['where'] .= $wpdb->prepare( ' AND isxs_m.meta_value LIKE %s ', '%' . $wpdb->esc_like( 's:7:"missing";' ) . '%' );
+        }
 
         return $clauses;
     }

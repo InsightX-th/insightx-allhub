@@ -67,9 +67,53 @@ class ISXM_Migration_Pipeline {
                 $skipped['count'] += count( $m['page_unmatched'] ?? [] );
                 $skipped['sample'] = array_slice( array_merge( $skipped['sample'], $m['page_unmatched'] ?? [] ), 0, 20 );
                 $m['skipped'] = $skipped;
-                if ( $m['done'] ) $m['stage'] = 'rewrite';
+                if ( $m['done'] ) {
+                    // No extra folders configured: straight to the rewrite,
+                    // exactly as before the extras stage existed.
+                    $m['stage'] = ISXM_Settings::extra_prefixes() ? 'extras' : 'rewrite';
+                    if ( $m['stage'] === 'extras' ) $m['extras'] = [ 'p' => 0, 'token' => '', 'keys' => null, 'index' => 0, 'copied' => 0 ];
+                }
                 unset( $m['items'], $m['index'], $m['next'], $m['done'], $m['unmatched'], $m['page_unmatched'] );
                 self::save( $job );
+            }
+            return self::result( $job );
+        }
+        if ( $m['stage'] === 'extras' ) {
+            // Folders no attachment owns (Source Path Structure → extra
+            // folders): copied key-for-key, their URLs queued for the same
+            // final rewrite as the Media Library's.
+            $x =& $m['extras']; $prefixes = ISXM_Settings::extra_prefixes();
+            if ( $x['p'] >= count( $prefixes ) ) {
+                $m['stage'] = 'rewrite'; unset( $m['extras'] );
+                self::save( $job );
+                return self::result( $job );
+            }
+            if ( $x['keys'] === null ) {
+                $page = ISXM_Migrate::list_extra_keys( $prefixes[ $x['p'] ], $x['token'] );
+                if ( is_wp_error( $page ) ) return $page;
+                $x['keys'] = $page['keys']; $x['index'] = 0; $x['next'] = $page['next_token'];
+                self::save( $job, false );
+            }
+            while ( $x['index'] < count( $x['keys'] ) && ! self::stop( $job, $deadline ) ) {
+                $key = $x['keys'][ $x['index'] ];
+                if ( substr( $key, -1 ) !== '/' ) {
+                    $result = ISXM_Migrate::copy_extra_object( $key );
+                    if ( is_wp_error( $result ) ) {
+                        $job->errors[] = $key . ': ' . $result->get_error_message();
+                        $job->errors = array_slice( $job->errors, -ISXM_Job::MAX_ERRORS ); $job->error_count++;
+                    } else {
+                        self::queue_extra_urls( $job, $key );
+                        $x['copied']++;
+                    }
+                }
+                $x['index']++;
+                $job->activity['extras_copied'] = $x['copied'];
+                self::save( $job );
+            }
+            if ( $x['index'] >= count( $x['keys'] ) ) {
+                if ( $x['next'] !== '' ) { $x['token'] = $x['next']; } else { $x['p']++; $x['token'] = ''; }
+                $x['keys'] = null;
+                self::save( $job, false );
             }
             return self::result( $job );
         }
@@ -129,6 +173,25 @@ class ISXM_Migration_Pipeline {
             self::save( $job, $handled > 0 );
         }
         return self::result( $job );
+    }
+
+    /**
+     * Old → new URL pairs for one copied extra-folder object, raw and
+     * percent-encoded (a "Spec Sheet.pdf" link is usually written
+     * encoded). Only when URLs are persisted and the source URL is known.
+     */
+    private static function queue_extra_urls( ISXM_Job $job, $key ) {
+        $source = ISXM_Settings::source_public_base_url();
+        if ( ! ISXM_Settings::get( 'persist_urls' ) || $source === '' ) return;
+        $encoded = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
+        $new     = ISXM_Settings::public_base_url() . '/' . $encoded;
+        $urls = []; $replays = [ $new => [ 'old' => $new, 'new' => $new ] ];
+        foreach ( array_unique( [ $key, $encoded ] ) as $path ) {
+            $old = trailingslashit( $source ) . $path;
+            $urls[ $old ] = [ 'old' => $old, 'new' => $new ];
+        }
+        ISXM_Migration_Store::put_many( $job->run_id, 'url', $urls );
+        ISXM_Migration_Store::put_many( $job->run_id, 'replay', $replays );
     }
 
     private static function transfer( ISXM_Job $job, $id, array $keys ) {
@@ -192,7 +255,7 @@ class ISXM_Migration_Pipeline {
         $s = ISXM_Settings::all();
         $keys = [ 'provider', 'endpoint', 'bucket', 'region', 'path_style', 'use_prefix', 'prefix', 'use_year_month', 'use_object_version',
             'use_type_folder', 'persist_urls', 'cdn_domain', 'force_https',
-            'source_endpoint', 'source_bucket', 'source_prefix', 'source_use_year_month', 'source_public_base_url' ];
+            'source_endpoint', 'source_bucket', 'source_prefix', 'source_use_year_month', 'source_public_base_url', 'source_extra_prefixes' ];
         if ( ! empty( $s['use_type_folder'] ) ) {
             $keys = array_merge( $keys, [ 'product_folder', 'download_folder', 'post_folder', 'promotion_folder', 'category_folder', 'brand_folder' ] );
         }

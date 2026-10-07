@@ -105,6 +105,7 @@ class ISXM_Admin {
                 // this phase rewrites stored URLs table by table.
                 'indexing'      => __( 'Building attachment index…', 'insightx-offload' ),
                 'finalizing'    => __( 'Finalizing migration…', 'insightx-offload' ),
+                'copyingExtras' => __( 'Copying extra folders… %s files', 'insightx-offload' ),
                 /* translators: 1: rows done, 2: rows in total */
                 'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-offload' ),
                 /* translators: 1: files checked, 2: files in total */
@@ -488,6 +489,11 @@ class ISXM_Admin {
                                 <div class="isxs-field">
                                     <label for="isxs-source-prefix">Source Prefix</label>
                                     <input type="text" id="isxs-source-prefix" value="<?php echo esc_attr( $s['source_prefix'] ); ?>" placeholder="wp-content/uploads/">
+                                </div>
+                                <div class="isxs-field">
+                                    <label for="isxs-source-extra-prefixes"><?php esc_html_e( 'Extra folders', 'insightx-offload' ); ?></label>
+                                    <textarea id="isxs-source-extra-prefixes" rows="3" placeholder="download/"><?php echo esc_textarea( $s['source_extra_prefixes'] ); ?></textarea>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Folders outside the Media Library to copy as-is (one per line), e.g. download/ — every file in them keeps its key on the destination, and links to them in content are rewritten too', 'insightx-offload' ); ?></p>
                                 </div>
                                 <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-offload' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-offload' ) ); ?>
                             </div>

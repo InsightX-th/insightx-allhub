@@ -128,6 +128,9 @@ class ISXM_Tools {
 
         $settings['prefix']        = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
         $settings['source_prefix'] = isset( $_POST['source_prefix'] ) ? self::sanitize_prefix( $_POST['source_prefix'] ) : '';
+        $settings['source_extra_prefixes'] = isset( $_POST['source_extra_prefixes'] )
+            ? self::sanitize_extra_prefixes( wp_unslash( (string) $_POST['source_extra_prefixes'] ), $settings['source_prefix'] )
+            : '';
 
         // Folder names go straight into an object key, so they get
         // sanitize_title() rather than sanitize_text_field() — that also
@@ -241,6 +244,25 @@ class ISXM_Tools {
             return '';
         }
         return implode( '/', $segments ) . '/';
+    }
+
+    /**
+     * One sanitized folder per line for `source_extra_prefixes`. A folder
+     * inside the main Source Prefix is dropped: the Media Library pass
+     * already lists it, and copying it again would duplicate every file.
+     *
+     * @param string $value         Raw textarea value (already unslashed).
+     * @param string $source_prefix Sanitized Source Prefix being saved with it.
+     * @return string
+     */
+    public static function sanitize_extra_prefixes( $value, $source_prefix ) {
+        $out = [];
+        foreach ( preg_split( '/\R/', (string) $value ) as $line ) {
+            $prefix = self::sanitize_prefix( $line );
+            if ( $prefix === '' || ( $source_prefix !== '' && strpos( $prefix, $source_prefix ) === 0 ) ) continue;
+            $out[ $prefix ] = true;
+        }
+        return implode( "\n", array_keys( $out ) );
     }
 
     /**

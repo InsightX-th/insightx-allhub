@@ -185,5 +185,49 @@ $db->db->exec( "INSERT INTO wp_posts VALUES (5,'unrelated','')" );
 ISXM_DB_Rewriter::replace_urls_window( [], [ 'table' => 0, 'after' => 4 ], 0, function ( $v ) { return ISXM_Migration_Store::url_map( 'forms', $v ); } );
 t( 'Unrelated content does not purge caches', count( $GLOBALS['isxm_t']['purged_posts'] ?? [] ) === $before );
 
+group( 'Extra source folders are copied key-for-key and their links rewritten' );
+t( 'Sanitize: one folder per line, blanks dropped, inside-Source-Prefix dropped, duplicates merged',
+    ISXM_Tools::sanitize_extra_prefixes( "download/\n\n /x/y \nwp-content/uploads/2024/\ndownload", 'wp-content/uploads/' ) === "download/\nx/y/" );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_pipe_' . getmypid() . '.jsonl';
+$fake_port = 19000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+$job = migration_fixture( 1 ); $db = $GLOBALS['wpdb'];
+$conn = get_option( 'isxs_connections' );
+$conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port";
+$conn['minio'] = $conn['custom']; $conn['minio']['bucket'] = 'source';
+update_option( 'isxs_connections', $conn );
+$GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), [
+    'source_provider' => 'minio', 'source_extra_prefixes' => "download/", 'source_public_base_url' => 'https://src.example.com' ] );
+ISXM_Settings::flush_cache();
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) {
+    parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q );
+    if ( isset( $q['list-type'] ) ) {
+        $prefix = $q['prefix'] ?? '';
+        if ( $prefix === 'download/' ) return migration_listing( [ 'download/', 'download/Specification/a.pdf', 'download/Specification/Spec Sheet.pdf', 'download/Specification/broken.pdf' ] );
+        return migration_listing( $prefix !== '' ? [ $prefix ] : [ 'm1.jpg' ] );
+    }
+    if ( strpos( $url, 'broken' ) !== false ) return [ 'response' => [ 'code' => 403 ], 'body' => '<Error><Code>AccessDenied</Code></Error>' ];
+    $body = 'bytes of ' . rawurldecode( basename( parse_url( $url, PHP_URL_PATH ) ) );
+    if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], $body );
+    return [ 'response' => [ 'code' => 200 ], 'body' => $body ];
+};
+$src = 'https://src.example.com/download/Specification/';
+$db->db->exec( 'INSERT INTO wp_posts VALUES(50,' . $db->db->quote( '<a href="' . $src . 'a.pdf">A</a> <a href="' . $src . 'Spec%20Sheet.pdf">B</a>' ) . ",'')" );
+pipeline_drain();
+$puts = [];
+foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $r = json_decode( $line, true ); if ( $r['method'] === 'PUT' ) $puts[] = rawurldecode( $r['uri'] ); }
+proc_terminate( $fake ); @unlink( $fake_log );
+$done = ISXM_Job::get( 'migrate' );
+t( 'Both files PUT under their original key', in_array( '/media/download/Specification/a.pdf', $puts, true ) && in_array( '/media/download/Specification/Spec Sheet.pdf', $puts, true ), json_encode( $puts ) );
+t( 'Folder marker and failed download are not uploaded', ! preg_grep( '~/media/download/$|broken~', $puts ) );
+t( 'A failed file is an item error; the run still completes', $done->migration['stage'] === 'complete' && $done->error_count === 1 && strpos( implode( ' ', $done->errors ), 'broken.pdf' ) !== false, json_encode( [ $done->migration['stage'], $done->error_count, $done->errors ] ) );
+t( 'Copied count reported to the card', ( $done->activity['extras_copied'] ?? null ) === 2 );
+$content = $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=50' );
+$base = ISXM_Settings::public_base_url() . '/download/Specification/';
+t( 'Raw and percent-encoded links rewritten to the destination', strpos( $content, 'src.example.com' ) === false && strpos( $content, $base . 'a.pdf' ) !== false && strpos( $content, $base . 'Spec%20Sheet.pdf' ) !== false, $content );
+
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

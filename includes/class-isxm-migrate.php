@@ -409,6 +409,40 @@ class ISXM_Migrate {
         if ( $puts ) ( new ISXM_Client() )->transfer_many( 'PUT', $puts, $limit );
     }
 
+    /**
+     * One listing page of an extra source folder (see
+     * ISXM_Settings::extra_prefixes()).
+     *
+     * @return array{keys:string[],next_token:string}|WP_Error
+     */
+    public static function list_extra_keys( $prefix, $continuation_token = '' ) {
+        return self::source_client()->list_objects_keys_page( $continuation_token, 200, $prefix );
+    }
+
+    /**
+     * Copy one object no attachment owns to the destination under the SAME
+     * key. Streamed through a temp file; the source is only read.
+     *
+     * @return true|WP_Error
+     */
+    public static function copy_extra_object( $key ) {
+        // tempnam(get_temp_dir()), not wp_tempnam(): that lives in wp-admin
+        // includes, which a WP-Cron or WP-CLI runner doesn't load.
+        $tmp = tempnam( get_temp_dir(), 'isxs-extra-' );
+        if ( $tmp === false ) {
+            return new WP_Error( 'isxs_temp', 'Could not create a temporary file.' );
+        }
+        $got = self::source_client()->get_object_to_file( $key, $tmp );
+        if ( is_wp_error( $got ) ) {
+            @unlink( $tmp );
+            return $got;
+        }
+        $type = wp_check_filetype( wp_basename( $key ) );
+        $put  = ( new ISXM_Client() )->put_object( $key, $tmp, $type['type'] ?: 'application/octet-stream', (bool) ISXM_Settings::get( 'send_public_acl' ) );
+        @unlink( $tmp );
+        return is_wp_error( $put ) ? $put : true;
+    }
+
     /** Private staging keeps downloads separate from pre-existing local media. */
     public static function migrate_staged( $id, array $keys, $run ) {
         $plan = self::plan_staged( $id, $keys, $run );

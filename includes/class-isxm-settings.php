@@ -85,6 +85,7 @@ class ISXM_Settings {
             'source_prefix'          => 'wp-content/uploads/',
             'source_use_year_month'  => true,
             'source_public_base_url' => '',        // URL the existing media is actually served from now (as found in the DB) — empty = infer from source_endpoint/bucket
+            'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, one per line (e.g. download/)
         ];
     }
 
@@ -446,6 +447,22 @@ class ISXM_Settings {
         return ! empty( $info['path_style'] )
             ? $scheme . '://' . $host . '/' . $bucket
             : $scheme . '://' . $bucket . '.' . $host;
+    }
+
+    /**
+     * Source folders Migrate copies verbatim (same key on the destination)
+     * on top of the Media Library — files linked from content that no
+     * attachment owns, e.g. spec sheets under download/.
+     *
+     * @return string[] Normalised "folder/" prefixes, no leading slash.
+     */
+    public static function extra_prefixes() {
+        $out = [];
+        foreach ( preg_split( '/\R/', (string) self::get( 'source_extra_prefixes' ) ) as $line ) {
+            $line = trim( trim( $line ), '/' );
+            if ( $line !== '' ) $out[] = $line . '/';
+        }
+        return array_values( array_unique( $out ) );
     }
 
     /**

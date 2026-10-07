@@ -175,6 +175,7 @@ function add_option( $key, $value = '', $deprecated = '', $autoload = null ) {
     return update_option( $key, $value, $autoload );
 }
 function delete_option( $key ) { unset( $GLOBALS['isxm_t']['options'][ $key ] ); return true; }
+function get_temp_dir() { return trailingslashit( sys_get_temp_dir() ); }
 function get_transient( $key ) { return get_option( '_transient_' . $key ); }
 function set_transient( $key, $value, $expiration = 0 ) {
 	$GLOBALS['isxm_t']['transient_ttl'][ $key ] = $expiration;

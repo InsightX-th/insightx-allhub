@@ -34,6 +34,9 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
         $this->queries++;
         $this->last_error = '';
         if ( $this->fail_read ) { $this->last_error = 'injected read failure'; return null; }
+        // MySQL's LIKE treats esc_like()'s backslash as the escape character;
+        // SQLite only does with an explicit ESCAPE clause.
+        $sql  = preg_replace( "/LIKE ('(?:[^']|'')*')(?! ESCAPE)/", "LIKE $1 ESCAPE '\\\\'", $sql );
         $rows = $this->db->query( $sql )->fetchAll( $output === ARRAY_A ? PDO::FETCH_ASSOC : PDO::FETCH_OBJ );
         $this->max_rows = max( $this->max_rows, count( $rows ) );
         return $rows;

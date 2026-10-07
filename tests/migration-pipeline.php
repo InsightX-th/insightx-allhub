@@ -283,6 +283,40 @@ foreach ( [ 1, 2, 3, 4, 5 ] as $id ) {
 t( 'Legacy postmeta: same answer', ISXM_Tools::get_partial_ids( 10 )['ids'] === [ 2 ], json_encode( ISXM_Tools::get_partial_ids( 10 ) ) );
 proc_terminate( $fake ); @unlink( $fake_log );
 
+group( 'Upload server folders' );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_server_' . getmypid() . '.jsonl';
+$fake_port = 22000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn );
+ISXM_Settings::flush_cache();
+$spec = ABSPATH . 'download/Specification/';
+foreach ( [ 'a.pdf', 'sub/b.pdf', 'Spec Sheet.pdf', '.hidden', '.git/config' ] as $f ) { wp_mkdir_p( dirname( $spec . $f ) ); file_put_contents( $spec . $f, 'x' ); }
+foreach ( [ 'wp-admin', 'wp-content/plugins/p', 'wp-content/themes/t', 'wp-content/keep' ] as $d ) { wp_mkdir_p( ABSPATH . $d ); file_put_contents( ABSPATH . $d . '/f.txt', 'x' ); }
+$s = ISXM_Tools::sanitize_server_folders( "download/Specification/, ../etc/, wp-admin/, wp-content/plugins/, missing/, , download/Specification" );
+t( 'Sanitize: inside-the-site folders only, core code and traversal dropped', $s['value'] === 'download/Specification/' && $s['rejected'] === [ '../etc/', 'wp-admin/', 'wp-content/plugins/', 'missing/' ], json_encode( $s ) );
+t( 'wp-content itself may be picked, but its walk skips plugins/ and themes/', ISXM_Tools::server_folder_path( 'wp-content/' ) !== '' && ISXM_Tools::server_folder_files( 'wp-content/' ) === array_values( array_filter( ISXM_Tools::server_folder_files( 'wp-content/' ), function ( $f ) { return strpos( $f, 'wp-content/plugins/' ) !== 0 && strpos( $f, 'wp-content/themes/' ) !== 0; } ) ) && in_array( 'wp-content/keep/f.txt', ISXM_Tools::server_folder_files( 'wp-content/' ), true ) );
+t( 'Files listed sorted, relative to the site root, hidden ones skipped', ISXM_Tools::server_folder_files( 'download/Specification/' ) === [ 'download/Specification/Spec Sheet.pdf', 'download/Specification/a.pdf', 'download/Specification/sub/b.pdf' ] );
+$GLOBALS['isxm_t']['options']['isxs_settings']['offload_server_folders'] = 'download/Specification/'; ISXM_Settings::flush_cache();
+$db->db->exec( 'INSERT INTO wp_posts VALUES(70,' . $db->db->quote( '<a href="https://example.com/download/Specification/a.pdf">A</a> <a href="http://example.com/download/Specification/Spec%20Sheet.pdf">B</a> <a href="/download/Specification/a.pdf">rel</a>' ) . ",'')" );
+$batch = new ReflectionMethod( 'ISXM_Tools', 'batch_offload_folders' );
+if ( PHP_VERSION_ID < 80100 ) $batch->setAccessible( true );
+$r = $batch->invoke( new ISXM_Tools(), '0|download/Specification/Spec Sheet.pdf' );
+$puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = rawurldecode( $row['uri'] ); } return $o; };
+t( 'Resume from the cursor: only the files after it are uploaded', $r['done'] && $r['processed'] === 2 && $puts() === [ '/media/download/Specification/a.pdf', '/media/download/Specification/sub/b.pdf' ], json_encode( [ $r, $puts() ] ) );
+@unlink( $fake_log );
+$r = $batch->invoke( new ISXM_Tools(), 0 );
+t( 'Full run: every file under its own path, nothing hidden', $r['done'] && $r['errors'] === [] && $puts() === [ '/media/download/Specification/Spec Sheet.pdf', '/media/download/Specification/a.pdf', '/media/download/Specification/sub/b.pdf' ], json_encode( $puts() ) );
+t( 'Server copies are kept', is_file( $spec . 'a.pdf' ) && is_file( $spec . 'Spec Sheet.pdf' ) );
+$content = $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=70' );
+$base = ISXM_Settings::public_base_url() . '/download/Specification/';
+t( 'Site links (http and https, raw and encoded) now point at the bucket; relative link untouched', strpos( $content, 'href="' . $base . 'a.pdf"' ) !== false && strpos( $content, 'href="' . $base . 'Spec%20Sheet.pdf"' ) !== false && strpos( $content, 'href="/download/Specification/a.pdf"' ) !== false && strpos( $content, 'example.com/download' ) === false, $content );
+t( 'Total counts the files to upload', ISXM_Tools::tool_total( 'offload_folders' ) === 3 );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];

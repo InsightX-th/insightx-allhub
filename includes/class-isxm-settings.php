@@ -86,7 +86,8 @@ class ISXM_Settings {
             'source_use_year_month'  => true,
             'source_public_base_url' => '',        // URL the existing media is actually served from now (as found in the DB) — empty = infer from source_endpoint/bucket
             'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, comma-separated (e.g. download/)
-            'source_media'           => true,      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
+            'source_media'           => true,
+            'offload_server_folders' => '',        // Server folders outside the Media Library uploaded as-is (relative to ABSPATH), comma-separated      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
         ];
     }
 
@@ -461,6 +462,21 @@ class ISXM_Settings {
         $out = [];
         // Comma-separated (the input); line breaks still accepted from 0.2.29.
         foreach ( preg_split( '/[,\r\n]+/', (string) self::get( 'source_extra_prefixes' ) ) as $line ) {
+            $line = trim( trim( $line ), '/' );
+            if ( $line !== '' ) $out[] = $line . '/';
+        }
+        return array_values( array_unique( $out ) );
+    }
+
+    /**
+     * Server folders (relative to ABSPATH) the "Upload server folders" tool
+     * sends to the bucket under the same path. Already validated on save.
+     *
+     * @return string[] "folder/" entries.
+     */
+    public static function server_folders() {
+        $out = [];
+        foreach ( preg_split( '/[,\r\n]+/', (string) self::get( 'offload_server_folders' ) ) as $line ) {
             $line = trim( trim( $line ), '/' );
             if ( $line !== '' ) $out[] = $line . '/';
         }

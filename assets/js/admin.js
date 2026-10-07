@@ -270,7 +270,7 @@
   // 'change' (fires on blur/Enter, not per keystroke) auto-saves these —
   // 'input' above only drives the live preview.
   $(
-    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-source-public-url, [data-folder-field]",
+    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-server-folders, #isxs-source-public-url, [data-folder-field]",
   ).on("change", () => {
     saveSettingsDebounced();
   });
@@ -329,6 +329,7 @@
       assets_cdn_domain: $.trim($("#isxs-assets-cdn-domain").val()),
       source_provider: $("#isxs-source-provider").val(),
       source_folders: $.trim($("#isxs-source-folders").val()),
+      offload_server_folders: $.trim($("#isxs-server-folders").val()),
       source_public_base_url: $.trim($("#isxs-source-public-url").val()),
     };
     // Connection-card toggles (path_style/send_public_acl) are scoped
@@ -382,6 +383,7 @@
           showToast(res.data.message, !!res.data.warning);
           if (typeof res.data.source_prefix !== "undefined") {
             cfg.sourceMedia = res.data.source_prefix;
+            $("#isxs-source-folders").trigger("isxs:media");
           }
           $secretFields.each((index, el) => {
             const $el = $(el);
@@ -1657,79 +1659,128 @@
     });
   }
 
-  // Source folder picker (Migrate → Source Path Structure): browses the
-  // source bucket one level at a time; ticking a folder adds it to the
-  // comma-separated input, which stays editable by hand. The server decides
-  // on save which ticked folder is the Media Library root.
-  const $folderInput = $("#isxs-source-folders");
-  const $folderPicker = $("#isxs-folder-picker");
-  const $folderBrowse = $(".isxs-folder-browse");
-  let folderPrefix = "";
+  // Folder pickers: the picked folders show as removable chips; "+ Add
+  // folder" opens a tree that loads each level on demand (▸). A path can
+  // also be typed and added with Enter. The hidden input holds the saved
+  // comma-separated value. Two instances: the Migrate source bucket (the
+  // server decides on save which picked folder is the Media Library) and
+  // "Upload server folders".
+  const folderPicker = ($field, $input, action, mediaBadge) => {
+    const $chips = $field.find(".isxs-folder-chips");
+    const $type = $field.find(".isxs-folder-type");
+    const $browse = $field.find(".isxs-folder-browse");
+    const $picker = $field.find(".isxs-folder-picker");
+    const $tree = $picker.find(".isxs-folder-tree");
+    const $status = $picker.find(".isxs-folder-status");
+    let loadedRoot = false;
 
-  const selectedFolders = () =>
-    $folderInput
-      .val()
-      .split(/[,\n]+/)
-      .map((f) => $.trim(f).replace(/^\/+/, ""))
-      .filter(Boolean)
-      .map((f) => (f.endsWith("/") ? f : f + "/"));
+    const normalize = (f) => {
+      f = $.trim(f).replace(/^\/+/, "");
+      return f === "" ? "" : f.endsWith("/") ? f : f + "/";
+    };
+    const selected = () => $input.val().split(/[,\n]+/).map(normalize).filter(Boolean);
+    const media = () => (mediaBadge ? mediaBadge() : "");
 
-  const setFolderSelected = (folder, on) => {
-    const list = selectedFolders().filter((f) => f !== folder);
-    if (on) list.push(folder);
-    $folderInput.val(list.join(", ")).trigger("change");
-  };
-
-  const loadFolders = (prefix) => {
-    folderPrefix = prefix;
-    const $list = $folderPicker.find(".isxs-folder-list").empty();
-    const $status = $folderPicker.find(".isxs-folder-status").text(cfg.i18n.folderLoading);
-    $folderPicker.find(".isxs-folder-path").text("/" + prefix);
-    $folderPicker.find(".isxs-folder-up").prop("disabled", prefix === "");
-    $.post(cfg.ajaxUrl, { action: "isxs_source_folders", nonce: cfg.nonce, prefix: prefix })
-      .done((res) => {
-        if (folderPrefix !== prefix) return; // a newer level was opened meanwhile
-        if (!res || !res.success) {
-          $status.text((res && res.data && res.data.message) || cfg.i18n.error);
-          return;
+    const renderChips = () => {
+      $chips.find(".isxs-chip").remove();
+      selected().forEach((folder) => {
+        const $chip = $("<span class='isxs-chip'>").text(folder);
+        if (media() && folder === media()) {
+          $("<span class='isxs-folder-badge'>").text(cfg.i18n.folderMedia).appendTo($chip);
         }
-        const chosen = selectedFolders();
-        res.data.folders.forEach((folder) => {
-          const $li = $('<li class="isxs-folder-item">');
-          const $label = $("<label>");
-          $("<input type='checkbox'>")
-            .prop("checked", chosen.includes(folder))
-            .on("change", (e) => setFolderSelected(folder, e.currentTarget.checked))
-            .appendTo($label);
-          $("<span class='isxs-folder-name'>").text(folder.slice(prefix.length)).appendTo($label);
-          if (folder === cfg.sourceMedia) {
-            $("<span class='isxs-folder-badge'>").text(cfg.i18n.folderMedia).appendTo($label);
-          }
-          $li.append($label);
-          $("<button type='button' class='isxs-folder-open'>")
-            .attr("aria-label", cfg.i18n.folderOpen + " " + folder)
-            .text("›")
-            .on("click", () => loadFolders(folder))
-            .appendTo($li);
-          $list.append($li);
-        });
-        $status.text(
-          !res.data.folders.length ? cfg.i18n.folderEmpty : res.data.truncated ? cfg.i18n.folderMore : "",
-        );
-      })
-      .fail(() => {
-        if (folderPrefix === prefix) $status.text(cfg.i18n.error);
+        $("<button type='button' class='isxs-chip-remove'>")
+          .attr("aria-label", cfg.i18n.folderRemove + " " + folder)
+          .text("×")
+          .on("click", () => setSelected(folder, false))
+          .appendTo($chip);
+        $chip.insertBefore($type);
       });
+    };
+
+    const setSelected = (folder, on) => {
+      const list = selected().filter((f) => f !== folder);
+      if (on) list.push(folder);
+      $input.val(list.join(", ")).trigger("change");
+      $tree.find("input[type=checkbox]").filter((i, el) => $(el).data("folder") === folder).prop("checked", on);
+      renderChips();
+    };
+
+    // One level of the tree under $parent (the root <ul> or a node's <ul>).
+    const loadLevel = (prefix, $list) => {
+      $status.text(cfg.i18n.folderLoading);
+      return $.post(cfg.ajaxUrl, { action: action, nonce: cfg.nonce, prefix: prefix })
+        .done((res) => {
+          if (!res || !res.success) {
+            $status.text((res && res.data && res.data.message) || cfg.i18n.error);
+            return;
+          }
+          const chosen = selected();
+          res.data.folders.forEach((folder) => {
+            const $li = $("<li class='isxs-tree-node' role='treeitem' aria-expanded='false'>");
+            const $row = $("<div class='isxs-tree-row'>").appendTo($li);
+            const $children = $("<ul class='isxs-tree-children' role='group' hidden>").appendTo($li);
+            $("<button type='button' class='isxs-tree-toggle'>")
+              .attr("aria-label", cfg.i18n.folderOpen + " " + folder)
+              .text("▸")
+              .on("click", (e) => {
+                const open = $children.prop("hidden");
+                $children.prop("hidden", !open);
+                $li.attr("aria-expanded", open ? "true" : "false");
+                $(e.currentTarget).text(open ? "▾" : "▸");
+                if (open && !$li.data("loaded")) {
+                  $li.data("loaded", true);
+                  loadLevel(folder, $children).done((r) => {
+                    if (r && r.success && !r.data.folders.length) $(e.currentTarget).css("visibility", "hidden");
+                  });
+                }
+              })
+              .appendTo($row);
+            const $label = $("<label>").appendTo($row);
+            $("<input type='checkbox'>")
+              .data("folder", folder)
+              .prop("checked", chosen.includes(folder))
+              .on("change", (e) => setSelected(folder, e.currentTarget.checked))
+              .appendTo($label);
+            $("<span class='isxs-tree-name'>").text("📁 " + folder.slice(prefix.length).replace(/\/$/, "")).appendTo($label);
+            if (media() && folder === media()) {
+              $("<span class='isxs-folder-badge'>").text(cfg.i18n.folderMedia).appendTo($label);
+            }
+            $list.append($li);
+          });
+          $status.text(
+            prefix === "" && !res.data.folders.length ? cfg.i18n.folderEmpty : res.data.truncated ? cfg.i18n.folderMore : "",
+          );
+        })
+        .fail(() => $status.text(cfg.i18n.error));
+    };
+
+    $browse.on("click", () => {
+      const open = !$picker.prop("hidden");
+      $picker.prop("hidden", open);
+      $browse.attr("aria-expanded", open ? "false" : "true");
+      if (!open && !loadedRoot) {
+        loadedRoot = true;
+        loadLevel("", $tree);
+      }
+    });
+    $type.on("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== ",") return;
+      e.preventDefault();
+      const folder = normalize($type.val());
+      if (folder) setSelected(folder, true);
+      $type.val("");
+    });
+    // Badges follow the server's Media Library verdict after each save.
+    $input.on("isxs:media", renderChips);
+    renderChips();
   };
 
-  $folderBrowse.on("click", () => {
-    const open = !$folderPicker.prop("hidden");
-    $folderPicker.prop("hidden", open);
-    $folderBrowse.attr("aria-expanded", open ? "false" : "true");
-    if (!open) loadFolders(folderPrefix);
-  });
-  $folderPicker.find(".isxs-folder-up").on("click", () => {
-    loadFolders(folderPrefix.replace(/[^/]+\/$/, ""));
+  [
+    ["#isxs-source-folders", "isxs_source_folders", () => cfg.sourceMedia],
+    ["#isxs-server-folders", "isxs_server_folders", null],
+  ].forEach(([input, action, badge]) => {
+    const $field = $(input).closest(".isxs-folder-field");
+    if ($field.length) folderPicker($field, $(input), action, badge);
   });
 
   // Custom provider picker on the Storage card — a button + listbox

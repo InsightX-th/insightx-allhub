@@ -112,6 +112,7 @@ class ISXM_Admin {
                 'folderMore'    => __( 'Showing the first folders only — type deeper paths by hand', 'insightx-offload' ),
                 'folderMedia'   => __( 'Media Library', 'insightx-offload' ),
                 'folderOpen'    => __( 'Open', 'insightx-offload' ),
+                'folderRemove'  => __( 'Remove', 'insightx-offload' ),
                 /* translators: 1: rows done, 2: rows in total */
                 'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-offload' ),
                 /* translators: 1: files checked, 2: files in total */
@@ -444,6 +445,25 @@ class ISXM_Admin {
                                 false
                             );
 
+                            ob_start();
+                            ?>
+                            <div class="isxs-field isxs-folder-field">
+                                <label for="isxs-server-folders-type"><?php esc_html_e( 'Server folders', 'insightx-offload' ); ?></label>
+                                <input type="hidden" id="isxs-server-folders" value="<?php echo esc_attr( $s['offload_server_folders'] ); ?>">
+                                <?php $this->folder_picker_markup( 'isxs-server-folders-type' ); ?>
+                            </div>
+                            <?php
+                            $server_fields = ob_get_clean();
+                            $this->tool_card(
+                                'offload_folders',
+                                __( 'Upload server folders', 'insightx-offload' ),
+                                __( 'Upload folders on this server that are not part of the Media Library (e.g. download/). Files keep their path on the bucket, links to them are updated, and the server copies are kept', 'insightx-offload' ),
+                                __( 'Upload Folders', 'insightx-offload' ),
+                                '',
+                                false,
+                                $server_fields
+                            );
+
                             // Only worth showing when something actually failed —
                             // the card is also toggled live from JS after a run.
                             $this->tool_card(
@@ -502,19 +522,9 @@ class ISXM_Admin {
                             <div class="isxs-card-body">
                                 <p class="isxs-hint"><?php esc_html_e( 'Choose the folders on the source bucket to migrate', 'insightx-offload' ); ?></p>
                                 <div class="isxs-field isxs-folder-field">
-                                    <label for="isxs-source-folders"><?php esc_html_e( 'Folders to migrate', 'insightx-offload' ); ?></label>
-                                    <div class="isxs-folder-row">
-                                        <input type="text" id="isxs-source-folders" value="<?php echo esc_attr( ISXM_Settings::source_folders() ); ?>" placeholder="wp-content/uploads/">
-                                        <button type="button" class="isxs-btn isxs-btn-ghost isxs-folder-browse" aria-expanded="false"><?php esc_html_e( 'Browse bucket', 'insightx-offload' ); ?> ▾</button>
-                                    </div>
-                                    <div class="isxs-folder-picker" id="isxs-folder-picker" hidden>
-                                        <div class="isxs-folder-picker-head">
-                                            <button type="button" class="isxs-folder-up" aria-label="<?php esc_attr_e( 'Up one level', 'insightx-offload' ); ?>">↑</button>
-                                            <span class="isxs-folder-path"></span>
-                                        </div>
-                                        <ul class="isxs-folder-list"></ul>
-                                        <p class="isxs-folder-status"></p>
-                                    </div>
+                                    <label for="isxs-source-folders-type"><?php esc_html_e( 'Folders to migrate', 'insightx-offload' ); ?></label>
+                                    <input type="hidden" id="isxs-source-folders" value="<?php echo esc_attr( ISXM_Settings::source_folders() ); ?>">
+                                    <?php $this->folder_picker_markup( 'isxs-source-folders-type' ); ?>
                                     <p class="isxs-hint"><?php esc_html_e( 'Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated', 'insightx-offload' ); ?></p>
                                 </div>
                                 <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-offload' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-offload' ) ); ?>
@@ -814,6 +824,25 @@ class ISXM_Admin {
     }
 
     /**
+     * Chips of the picked folders + a lazy folder tree. admin.js fills both;
+     * the hidden input next to it holds the comma-separated value that is saved.
+     *
+     * @param string $type_id id of the "type a path" input (the label's target).
+     */
+    private function folder_picker_markup( $type_id ) {
+        ?>
+        <div class="isxs-folder-chips">
+            <input type="text" class="isxs-folder-type" id="<?php echo esc_attr( $type_id ); ?>" placeholder="<?php esc_attr_e( 'Type a path and press Enter', 'insightx-offload' ); ?>">
+            <button type="button" class="isxs-btn isxs-btn-ghost isxs-folder-browse" aria-expanded="false">+ <?php esc_html_e( 'Add folder', 'insightx-offload' ); ?></button>
+        </div>
+        <div class="isxs-folder-picker" hidden>
+            <ul class="isxs-folder-tree" role="tree"></ul>
+            <p class="isxs-folder-status"></p>
+        </div>
+        <?php
+    }
+
+    /**
      * Inline icon for a bulk-tool card (static markup, no user input).
      *
      * @param string $id Tool id.
@@ -825,6 +854,9 @@ class ISXM_Admin {
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 3v9"/><path d="m8.5 8.5 3.5-3.5 3.5 3.5"/></svg>';
             case 'retry_failed':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
+            case 'offload_folders':
+                // Folder with an up arrow.
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 17v-6"/><path d="m9 13 3-3 3 3"/></svg>';
             case 'complete_partial':
                 // Picture frame with a plus: fill in what's missing.
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 9v8"/><path d="M8 13h8"/></svg>';

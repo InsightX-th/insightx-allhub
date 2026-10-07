@@ -70,6 +70,7 @@ class ISXM_Tools {
         add_action( 'wp_ajax_isxs_save_settings', [ $this, 'ajax_save_settings' ] );
         add_action( 'wp_ajax_isxs_save_connection', [ $this, 'ajax_save_connection' ] );
         add_action( 'wp_ajax_isxs_source_folders', [ $this, 'ajax_source_folders' ] );
+        add_action( 'wp_ajax_isxs_server_folders', [ $this, 'ajax_server_folders' ] );
         add_action( 'wp_ajax_isxs_stats', [ $this, 'ajax_stats' ] );
         add_action( 'wp_ajax_isxs_offload_single', [ $this, 'ajax_offload_single' ] );
         add_action( 'wp_ajax_isxs_sync_scan', [ $this, 'ajax_sync_scan' ] );
@@ -175,6 +176,18 @@ class ISXM_Tools {
         // would just pollute the rewrite map.
         if ( $settings['source_public_base_url'] !== '' && ! preg_match( '#^https?://#i', $settings['source_public_base_url'] ) ) {
             $settings['source_public_base_url'] = '';
+        }
+
+        // Server folders for the "Upload server folders" tool. Not posted →
+        // keep what is stored (save() would otherwise reset it to default).
+        if ( isset( $_POST['offload_server_folders'] ) ) {
+            $server = self::sanitize_server_folders( wp_unslash( (string) $_POST['offload_server_folders'] ) );
+            $settings['offload_server_folders'] = $server['value'];
+            if ( $server['rejected'] ) {
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-offload' ), implode( ', ', $server['rejected'] ) ) );
+            }
+        } else {
+            $settings['offload_server_folders'] = $current['offload_server_folders'];
         }
 
         // A warning, not a refusal: the same host is legitimate when one CDN
@@ -359,6 +372,175 @@ class ISXM_Tools {
         $extras = array_values( array_diff( $folders, [ $root ] ) );
         $out['extras'] = self::sanitize_extra_prefixes( implode( ',', $extras ), $root );
         return $out;
+    }
+
+    /** Server folders that are never uploaded: core code, not content. */
+    const BLOCKED_SERVER_FOLDERS = [ 'wp-admin/', 'wp-includes/', 'wp-content/plugins/', 'wp-content/mu-plugins/', 'wp-content/themes/', 'wp-content/upgrade/' ];
+
+    /**
+     * Absolute path of a server folder (relative to ABSPATH) when it may be
+     * uploaded: an existing directory inside the WordPress root (symlinks
+     * resolved), not hidden and not core code.
+     *
+     * @param string $folder Sanitized "folder/" path.
+     * @return string Absolute path with trailing slash, or '' when not allowed.
+     */
+    public static function server_folder_path( $folder ) {
+        if ( $folder === '' || preg_match( '#(^|/)\.#', $folder ) ) return '';
+        foreach ( self::BLOCKED_SERVER_FOLDERS as $blocked ) {
+            if ( strpos( $folder, $blocked ) === 0 ) return '';
+        }
+        $root = realpath( ABSPATH );
+        $path = realpath( ABSPATH . $folder );
+        if ( ! $root || ! $path || ! is_dir( $path ) ) return '';
+        $root = trailingslashit( $root ); $path = trailingslashit( $path );
+        return ( strpos( $path, $root ) === 0 && $path !== $root ) ? $path : '';
+    }
+
+    /**
+     * @return array{value:string,rejected:string[]} Comma-joined allowed folders, and the ones dropped.
+     */
+    public static function sanitize_server_folders( $value ) {
+        $ok = []; $rejected = [];
+        foreach ( preg_split( '/[,\r\n]+/', (string) $value ) as $part ) {
+            if ( trim( $part ) === '' ) continue;
+            $folder = self::sanitize_prefix( $part );
+            if ( $folder !== '' && self::server_folder_path( $folder ) !== '' ) {
+                $ok[ $folder ] = true;
+            } else {
+                $rejected[] = trim( $part );
+            }
+        }
+        return [ 'value' => implode( ', ', array_keys( $ok ) ), 'rejected' => $rejected ];
+    }
+
+    /**
+     * Every file under a server folder, as paths relative to ABSPATH, sorted
+     * so a cursor (the last path done) can resume the walk exactly. Hidden
+     * files and folders are skipped.
+     *
+     * @return string[]
+     */
+    public static function server_folder_files( $folder ) {
+        $base = self::server_folder_path( $folder );
+        if ( $base === '' ) return [];
+        $root  = trailingslashit( realpath( ABSPATH ) );
+        $files = [];
+        $iter  = new RecursiveIteratorIterator( new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator( $base, FilesystemIterator::SKIP_DOTS ),
+            function ( $item ) use ( $root ) {
+                if ( strpos( $item->getFilename(), '.' ) === 0 ) return false;
+                // Picking "wp-content/" must not walk into plugins/ or themes/.
+                if ( $item->isDir() ) {
+                    $relative = substr( $item->getPathname(), strlen( $root ) ) . '/';
+                    foreach ( self::BLOCKED_SERVER_FOLDERS as $blocked ) {
+                        if ( strpos( $relative, $blocked ) === 0 ) return false;
+                    }
+                }
+                return true;
+            }
+        ) );
+        foreach ( $iter as $item ) {
+            if ( $item->isFile() ) $files[] = substr( $item->getPathname(), strlen( $root ) );
+        }
+        sort( $files, SORT_STRING );
+        return $files;
+    }
+
+    /**
+     * One batch of "Upload server folders": files go up under their path
+     * relative to the WordPress root, and links to them in content move to
+     * the bucket. Local files are kept — nothing in WordPress manages them.
+     *
+     * Cursor: "<folder index>|<last relative path done>".
+     *
+     * @return array|WP_Error
+     */
+    private function batch_offload_folders( $cursor ) {
+        $folders = ISXM_Settings::server_folders();
+        $parts   = explode( '|', (string) $cursor, 2 );
+        $index   = (int) $parts[0];
+        $after   = $parts[1] ?? '';
+        $started = microtime( true );
+        $budget  = self::time_budget();
+        $client  = new ISXM_Client();
+        $acl     = (bool) ISXM_Settings::get( 'send_public_acl' );
+        $processed = 0; $errors = []; $pairs = [];
+
+        while ( $index < count( $folders ) && microtime( true ) - $started < $budget ) {
+            $pending = array_values( array_filter( self::server_folder_files( $folders[ $index ] ), function ( $f ) use ( $after ) {
+                return $after === '' || strcmp( $f, $after ) > 0;
+            } ) );
+            foreach ( $pending as $relative ) {
+                if ( microtime( true ) - $started >= $budget || ISXM_Job::signal( 'offload_folders' ) !== '' ) break 2;
+                $type   = wp_check_filetype( wp_basename( $relative ) );
+                $result = $client->put_object( $relative, ABSPATH . $relative, $type['type'] ?: 'application/octet-stream', $acl );
+                if ( is_wp_error( $result ) ) {
+                    $errors[] = $relative . ': ' . $result->get_error_message();
+                } else {
+                    $pairs = array_merge( $pairs, self::server_file_url_pairs( $relative ) );
+                }
+                $processed++;
+                $after = $relative;
+            }
+            $index++; $after = '';
+        }
+
+        // ponytail: one full-table rewrite per batch; fine for hundreds or a
+        // few thousand files. Queue pairs and rewrite once at the end (as
+        // Migrate does) if a site ever offloads far more than that.
+        if ( $pairs && ISXM_Offload::should_persist_urls() ) {
+            ISXM_DB_Rewriter::replace_urls_bulk( $pairs );
+        }
+
+        return [
+            'processed' => $processed,
+            'cursor'    => $index . '|' . $after,
+            'done'      => $index >= count( $folders ),
+            'errors'    => $errors,
+        ];
+    }
+
+    /**
+     * Old → new URL pairs for one server file: the site's http and https
+     * URL, raw and percent-encoded, to the bucket (or CDN) URL. Relative
+     * links ("/download/x.pdf") are left alone — matching a bare path would
+     * also hit text that is not a link.
+     *
+     * @return array<int,array{old:string,new:string}>
+     */
+    public static function server_file_url_pairs( $relative ) {
+        $encoded = implode( '/', array_map( 'rawurlencode', explode( '/', $relative ) ) );
+        $new     = ISXM_Settings::public_base_url() . '/' . $encoded;
+        $home    = preg_replace( '#^https?://#', '', untrailingslashit( home_url( '/' ) ) );
+        $pairs   = [];
+        foreach ( [ 'https://', 'http://' ] as $scheme ) {
+            foreach ( array_unique( [ $relative, $encoded ] ) as $path ) {
+                $old = $scheme . $home . '/' . $path;
+                if ( $old !== $new ) $pairs[] = [ 'old' => $old, 'new' => $new ];
+            }
+        }
+        return $pairs;
+    }
+
+    /**
+     * Folder picker for "Upload server folders": one level of sub-folders
+     * under ABSPATH . prefix, only ones that may be uploaded.
+     */
+    public function ajax_server_folders() {
+        $this->guard();
+        $prefix = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
+        $base   = $prefix === '' ? trailingslashit( (string) realpath( ABSPATH ) ) : self::server_folder_path( $prefix );
+        if ( $base === '' || $base === '/' ) {
+            wp_send_json_error( [ 'message' => __( 'This folder cannot be browsed', 'insightx-offload' ) ] );
+        }
+        $folders = [];
+        foreach ( (array) scandir( $base ) as $name ) {
+            if ( $name === '' || $name[0] === '.' || ! is_dir( $base . $name ) ) continue;
+            $folder = $prefix . $name . '/';
+            if ( self::server_folder_path( $folder ) !== '' ) $folders[] = $folder;
+        }
+        wp_send_json_success( [ 'folders' => $folders, 'truncated' => false, 'prefix' => $prefix, 'media' => '' ] );
     }
 
     /**
@@ -1133,6 +1315,7 @@ class ISXM_Tools {
             'offload'      => __( 'Upload remaining files to the cloud', 'insightx-offload' ),
             'retry_failed' => __( 'Retry only the failed items', 'insightx-offload' ),
             'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
+            'offload_folders' => __( 'Upload server folders', 'insightx-offload' ),
             'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
             'remove'       => __( 'Remove files from the bucket', 'insightx-offload' ),
             'migrate'      => __( 'Move files from the source bucket', 'insightx-offload' ),
@@ -1248,6 +1431,9 @@ class ISXM_Tools {
                 return new WP_Error( 'isxs_same_bucket', __( 'Source and destination point at the same bucket and prefix — choose a different source provider (or change the prefix) first', 'insightx-offload' ) );
             }
         }
+        if ( $tool === 'offload_folders' && ! ISXM_Settings::server_folders() ) {
+            return new WP_Error( 'isxs_no_server_folders', __( 'Choose at least one server folder first', 'insightx-offload' ) );
+        }
         if ( $tool === 'wc_downloads' && ! class_exists( 'WC_Product' ) ) {
             return new WP_Error( 'isxs_no_woocommerce', __( 'WooCommerce not found on this site', 'insightx-offload' ) );
         }
@@ -1320,6 +1506,10 @@ class ISXM_Tools {
      * @return int Item count, or 0 when it is not known up front.
      */
     public static function tool_total( $tool ) {
+        if ( $tool === 'offload_folders' ) {
+            // Files on disk, not attachments: no reason to run the stats queries.
+            return array_sum( array_map( function ( $f ) { return count( self::server_folder_files( $f ) ); }, ISXM_Settings::server_folders() ) );
+        }
         $stats = self::get_stats( true );
 
         switch ( $tool ) {
@@ -1371,6 +1561,8 @@ class ISXM_Tools {
                     return $instance->batch_offload( $cursor );
                 case 'retry_failed':
                     return $instance->batch_retry_failed( $cursor );
+                case 'offload_folders':
+                    return $instance->batch_offload_folders( $cursor );
                 case 'complete_partial':
                     return $instance->batch_pending_phased( $cursor, $instance->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ] );
                 case 'download':

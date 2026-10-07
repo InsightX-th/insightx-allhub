@@ -105,16 +105,54 @@
 
 /* ---------- Offload Status widget (top-right) ---------- */
 
-/* ---------- Source folder picker (Migrate) ---------- */
+/* ---------- Folder picker: chips + lazy tree ---------- */
 
-.isxs-folder-row {
+.isxs-folder-chips {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--isxs-line);
+  border-radius: 10px;
+  background: var(--isxs-bg);
+  min-height: 44px;
 }
-.isxs-folder-row input[type="text"] {
+.isxs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 4px 4px 10px;
+  border-radius: 999px;
+  background: var(--isxs-accent-soft);
+  border: 1px solid var(--isxs-accent-line);
+  color: var(--isxs-ink);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.isxs-chip-remove {
+  border: 0;
+  background: transparent;
+  color: var(--isxs-muted);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 14px;
+}
+.isxs-chip-remove:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--isxs-ink);
+}
+.isxs-field .isxs-folder-chips .isxs-folder-type {
   flex: 1;
-  min-width: 0;
+  min-width: 160px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 6px;
 }
 .isxs-folder-browse {
   white-space: nowrap;
@@ -125,53 +163,42 @@
   border-radius: 12px;
   background: var(--isxs-card);
   box-shadow: var(--isxs-shadow-sm);
-  padding: 8px;
+  padding: 6px 8px;
+  max-height: 320px;
+  overflow-y: auto;
 }
-.isxs-folder-picker-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 4px 8px;
-  border-bottom: 1px solid var(--isxs-line);
-  font-size: 12.5px;
-  color: var(--isxs-muted);
-  word-break: break-all;
-}
-.isxs-folder-up,
-.isxs-folder-open {
-  border: 1px solid var(--isxs-line);
-  background: var(--isxs-bg);
-  border-radius: 8px;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  cursor: pointer;
-  color: var(--isxs-ink);
-}
-.isxs-folder-up:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.isxs-folder-list {
+.isxs-folder-tree,
+.isxs-tree-children {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 260px;
-  overflow-y: auto;
 }
-.isxs-folder-item {
+.isxs-tree-children {
+  padding-left: 22px;
+}
+.isxs-tree-node {
+  margin: 0;
+}
+.isxs-tree-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 4px;
-  margin: 0;
-  border-bottom: 1px solid var(--isxs-line);
+  gap: 4px;
+  padding: 3px 0;
+  border-radius: 8px;
 }
-.isxs-folder-item:last-child {
-  border-bottom: none;
+.isxs-tree-row:hover {
+  background: var(--isxs-bg);
 }
-.isxs-field .isxs-folder-item label {
+.isxs-tree-toggle {
+  border: 0;
+  background: transparent;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  cursor: pointer;
+  color: var(--isxs-muted);
+}
+.isxs-field .isxs-tree-row label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -180,20 +207,21 @@
   font-weight: 400;
   cursor: pointer;
 }
-.isxs-folder-name {
+.isxs-tree-name {
   word-break: break-all;
 }
 .isxs-folder-badge {
   font-size: 11px;
   font-weight: 600;
   color: var(--isxs-accent);
-  background: var(--isxs-accent-soft);
+  background: var(--isxs-card);
+  border: 1px solid var(--isxs-accent-line);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 1px 8px;
   white-space: nowrap;
 }
 .isxs-folder-status {
-  margin: 6px 4px 0;
+  margin: 6px 4px 2px;
   font-size: 12px;
   color: var(--isxs-muted);
 }

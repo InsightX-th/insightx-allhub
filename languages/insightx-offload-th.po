@@ -1463,3 +1463,47 @@ msgstr "ไม่ได้เลือกโฟลเดอร์ Media Library 
 #: includes/class-isxm-tools.php
 msgid "Saved. Note: the Source Public URL uses the same address as the destination — fine if the same CDN domain serves your media before and after the move; otherwise set it to where the old files are served from now, or links will not be rewritten."
 msgstr "บันทึกแล้ว — หมายเหตุ: Source Public URL ใช้ที่อยู่เดียวกับปลายทาง ถ้าใช้ CDN domain เดิมทั้งก่อนและหลังย้ายก็ใช้ได้ แต่ถ้าไม่ใช่ ให้ใส่ที่อยู่ที่ไฟล์เดิมเสิร์ฟอยู่ตอนนี้ ไม่อย่างนั้นลิงก์จะไม่ถูกเปลี่ยน"
+
+#: includes/class-isxm-tools.php
+msgid "Upload server folders"
+msgstr "อัปโหลดโฟลเดอร์บนเซิร์ฟเวอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Upload folders on this server that are not part of the Media Library (e.g. download/). Files keep their path on the bucket, links to them are updated, and the server copies are kept"
+msgstr "อัปโหลดโฟลเดอร์บนเซิร์ฟเวอร์ที่ไม่ได้อยู่ใน Media Library (เช่น download/) ไฟล์จะใช้ path เดิมบน bucket ลิงก์ที่อ้างถึงจะถูกอัปเดต และไฟล์บนเซิร์ฟเวอร์ยังเก็บไว้ตามเดิม"
+
+#: includes/class-isxm-admin.php
+msgid "Upload Folders"
+msgstr "อัปโหลดโฟลเดอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Server folders"
+msgstr "โฟลเดอร์บนเซิร์ฟเวอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Choose folder"
+msgstr "เลือกโฟลเดอร์"
+
+#: includes/class-isxm-tools.php
+msgid "These server folders cannot be uploaded and were removed: %s"
+msgstr "โฟลเดอร์เหล่านี้อัปโหลดไม่ได้และถูกนำออก: %s"
+
+#: includes/class-isxm-tools.php
+msgid "Choose at least one server folder first"
+msgstr "กรุณาเลือกโฟลเดอร์บนเซิร์ฟเวอร์อย่างน้อย 1 โฟลเดอร์"
+
+#: includes/class-isxm-tools.php
+msgid "This folder cannot be browsed"
+msgstr "ไม่สามารถเปิดดูโฟลเดอร์นี้ได้"
+
+#: includes/class-isxm-admin.php
+msgid "Type a path and press Enter"
+msgstr "พิมพ์ path แล้วกด Enter"
+
+#: includes/class-isxm-admin.php
+msgid "Add folder"
+msgstr "เพิ่มโฟลเดอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Remove"
+msgstr "นำออก"

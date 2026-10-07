@@ -705,10 +705,26 @@ class ISXM_Offload {
             $uploaded[] = $name;
         }
 
+        // Sizes WordPress lists but never wrote to disk (sizes registered
+        // later, items migrated without them): build them from the original.
+        $built = [ 'uploaded' => [], 'failed' => [] ];
+        if ( $absent ) {
+            $built    = self::generate_sizes( $attachment_id, $record, $absent, $client, ! empty( $settings['send_public_acl'] ) );
+            $uploaded = array_merge( $uploaded, $built['uploaded'] );
+        }
+
         if ( ! $uploaded ) {
-            return new WP_Error( 'isxs_missing_sizes_unavailable', $failed
-                ? sprintf( __( 'Could not upload the missing sizes: %s', 'insightx-offload' ), implode( ', ', $failed ) )
-                : sprintf( __( 'The missing sizes are not on the server either: %s', 'insightx-offload' ), implode( ', ', $absent ) ) );
+            // Say where we looked, so the folder can be checked by hand, and
+            // why the sizes could not be rebuilt either.
+            $parts = [];
+            if ( $absent ) {
+                $parts[] = sprintf( __( 'Not found in %1$s: %2$s', 'insightx-offload' ), self::display_dir( $local_dir ), implode( ', ', $absent ) )
+                    . ( $built['failed'] ? ' — ' . implode( '; ', array_unique( $built['failed'] ) ) : '' );
+            }
+            if ( $failed ) {
+                $parts[] = sprintf( __( 'Could not upload the missing sizes: %s', 'insightx-offload' ), implode( ', ', $failed ) );
+            }
+            return new WP_Error( 'isxs_missing_sizes_unavailable', implode( ' ', $parts ) );
         }
 
         $record['files']   = array_values( array_unique( array_merge( $record['files'] ?? [], $uploaded ) ) );
@@ -729,6 +745,90 @@ class ISXM_Offload {
             }
         }
         return true;
+    }
+
+    /**
+     * Build sizes listed in the attachment metadata from the original and
+     * upload them into the record's folder. The original is the local copy,
+     * or — when "Remove Local Media" already took it — a temporary download
+     * from the bucket. Nothing generated is kept on the server.
+     *
+     * @param string[] $names Missing size filenames with no local file.
+     * @return array{uploaded:string[],failed:string[]}
+     */
+    private static function generate_sizes( $attachment_id, array $record, array $names, ISXM_Client $client, $acl ) {
+        $out  = [ 'uploaded' => [], 'failed' => [] ];
+        // A reason shared by every size (no editor, no original) is said once.
+        $fail = function ( $reason ) use ( &$out ) {
+            $out['failed'][] = sprintf( __( 'could not be created: %s', 'insightx-offload' ), $reason );
+            return $out;
+        };
+        if ( ! function_exists( 'wp_get_image_editor' ) || ! wp_attachment_is_image( $attachment_id ) ) {
+            return $fail( __( 'not an image, or no image editor on this server', 'insightx-offload' ) );
+        }
+
+        $meta    = wp_get_attachment_metadata( $attachment_id );
+        $by_file = [];
+        foreach ( (array) ( $meta['sizes'] ?? [] ) as $size_name => $size ) {
+            if ( ! empty( $size['file'] ) ) $by_file[ $size['file'] ] = [ 'name' => $size_name ] + $size;
+        }
+
+        $original = self::local_path( $attachment_id );
+        $temp     = '';
+        if ( $original === '' || ! is_file( $original ) ) {
+            $primary = wp_basename( (string) get_post_meta( $attachment_id, '_wp_attached_file', true ) );
+            $ext     = pathinfo( $primary, PATHINFO_EXTENSION );
+            $base    = tempnam( get_temp_dir(), 'isxs-orig-' );
+            if ( $base === false ) return $fail( __( 'could not create a temporary file', 'insightx-offload' ) );
+            @unlink( $base );
+            $temp = $base . ( $ext !== '' ? '.' . $ext : '' ); // image editors read the type from the extension
+            $got  = $client->get_object_to_file( $record['base_key'] . $primary, $temp );
+            if ( is_wp_error( $got ) ) {
+                @unlink( $temp );
+                return $fail( sprintf( __( 'the original could not be downloaded from the bucket (%s)', 'insightx-offload' ), $got->get_error_message() ) );
+            }
+            $original = $temp;
+        }
+
+        $subsizes = function_exists( 'wp_get_registered_image_subsizes' ) ? wp_get_registered_image_subsizes() : [];
+        $orig_dim = @getimagesize( $original );
+        $work_dir = trailingslashit( get_temp_dir() );
+        foreach ( $names as $name ) {
+            if ( ! isset( $by_file[ $name ] ) ) {
+                $out['failed'][] = sprintf( __( 'Could not create size %1$s: %2$s', 'insightx-offload' ), $name, __( 'it is not in the image data', 'insightx-offload' ) );
+                continue;
+            }
+            $size = $by_file[ $name ];
+            $w = (int) $size['width']; $h = (int) $size['height'];
+            $crop = $subsizes[ $size['name'] ]['crop'] ?? (
+                // Unregistered size: crop when it doesn't keep the original's shape.
+                $orig_dim && $h > 0 && abs( $orig_dim[0] / max( 1, $orig_dim[1] ) - $w / $h ) > 0.01
+            );
+            $editor = wp_get_image_editor( $original );
+            $saved  = is_wp_error( $editor ) ? $editor : $editor->resize( $w, $h, $crop );
+            $saved  = is_wp_error( $saved ) ? $saved : $editor->save( $work_dir . $name );
+            if ( is_wp_error( $saved ) ) {
+                $out['failed'][] = sprintf( __( 'Could not create size %1$s: %2$s', 'insightx-offload' ), $name, $saved->get_error_message() );
+                continue;
+            }
+            $type = wp_check_filetype( $name );
+            $put  = $client->put_object( $record['base_key'] . $name, $saved['path'], $type['type'] ?: 'application/octet-stream', $acl );
+            @unlink( $saved['path'] );
+            if ( is_wp_error( $put ) ) {
+                $out['failed'][] = $name . ' (' . $put->get_error_message() . ')';
+                continue;
+            }
+            $out['uploaded'][] = $name;
+        }
+        if ( $temp !== '' ) @unlink( $temp );
+        return $out;
+    }
+
+    /** "wp-content/uploads/2021/05/" — a local folder as shown in messages (no absolute path). */
+    private static function display_dir( $dir ) {
+        $root = wp_normalize_path( ABSPATH );
+        $dir  = wp_normalize_path( $dir );
+        return strpos( $dir, $root ) === 0 ? substr( $dir, strlen( $root ) ) : wp_basename( untrailingslashit( $dir ) ) . '/';
     }
 
     /* ---------------------------------------------------------------------

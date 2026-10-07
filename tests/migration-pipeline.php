@@ -283,6 +283,73 @@ foreach ( [ 1, 2, 3, 4, 5 ] as $id ) {
 t( 'Legacy postmeta: same answer', ISXM_Tools::get_partial_ids( 10 )['ids'] === [ 2 ], json_encode( ISXM_Tools::get_partial_ids( 10 ) ) );
 proc_terminate( $fake ); @unlink( $fake_log );
 
+group( 'Missing sizes that never existed are built from the original' );
+if ( ! function_exists( 'imagecreatetruecolor' ) ) {
+    t( 'SKIPPED: GD not available', true );
+} else {
+    // Minimal stand-ins for WordPress' image editor API, backed by GD.
+    if ( ! class_exists( 'ISXM_Test_Editor' ) ) {
+        class ISXM_Test_Editor {
+            private $im;
+            public function __construct( $file ) { $this->im = imagecreatefromjpeg( $file ); }
+            public function resize( $w, $h, $crop ) { $this->im = imagescale( $this->im, $w, $h ); return true; }
+            public function save( $path ) { imagejpeg( $this->im, $path ); return [ 'path' => $path ]; }
+        }
+    }
+    if ( ! function_exists( 'wp_get_image_editor' ) ) {
+        function wp_get_image_editor( $file ) { return is_file( $file ) && @getimagesize( $file ) ? new ISXM_Test_Editor( $file ) : new WP_Error( 'image_no_editor', 'no editor' ); }
+        function wp_attachment_is_image( $id ) { return true; }
+        function wp_get_registered_image_subsizes() { return [ 'thumbnail' => [ 'width' => 150, 'height' => 150, 'crop' => true ] ]; }
+    }
+    $fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_gen_' . getmypid() . '.jsonl';
+    $fake_port = 23000 + ( getmypid() % 1000 );
+    @unlink( $fake_log );
+    $fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+        [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+    for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+    migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+    $db->db->exec( 'DROP TABLE wp_posts' );
+    $db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+    isxm_items_table( $db );
+    $conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn );
+    ISXM_Settings::flush_cache();
+    $jpeg = function ( $path ) { $im = imagecreatetruecolor( 400, 300 ); imagejpeg( $im, $path ); };
+    $dest = [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$fake_port", 'path_style' => true, 'base_key' => 'g/', 'version' => '' ];
+    foreach ( [ 1, 2, 3 ] as $id ) {
+        isxm_test_add_post( $id, [] ); update_post_meta( $id, '_wp_attached_file', "g$id.jpg" );
+        update_post_meta( $id, '_wp_attachment_metadata', [ 'width' => 400, 'height' => 300, 'file' => "g$id.jpg", 'sizes' => [ 'thumbnail' => [ 'file' => "g$id-150x150.jpg", 'width' => 150, 'height' => 150 ] ] ] );
+        $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($id)" );
+        ISXM_Offload::set_record( $id, $dest + [ 'files' => [ "g$id.jpg" ], 'missing' => [ "g$id-150x150.jpg" ] ] );
+        @unlink( ISXM_TEST_UPLOADS . "/g$id-150x150.jpg" );
+    }
+    $jpeg( ISXM_TEST_UPLOADS . '/g1.jpg' );                 // original still on the server
+    @unlink( ISXM_TEST_UPLOADS . '/g2.jpg' );               // original only on the bucket
+    $tmp = tempnam( sys_get_temp_dir(), 'g2' ); $jpeg( $tmp ); $g2 = file_get_contents( $tmp ); unlink( $tmp );
+    $GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( $g2 ) {
+        if ( strpos( $url, 'g2.jpg' ) === false ) return [ 'response' => [ 'code' => 404 ], 'body' => '' ];
+        if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], $g2 );
+        return [ 'response' => [ 'code' => 200 ], 'body' => $g2 ];
+    };
+    $puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = $row['uri']; } return $o; };
+    $r = ISXM_Offload::complete_missing_sizes( 1, false );
+    t( 'Built from the local original and uploaded; nothing left behind', $r === true && $puts() === [ '/media/g/g1-150x150.jpg' ] && ISXM_Offload::status_for( 1 )['status'] === 'offloaded' && ! is_file( ISXM_TEST_UPLOADS . '/g1-150x150.jpg' ), json_encode( [ is_wp_error( $r ) ? $r->get_error_message() : $r, $puts() ] ) );
+    $r = ISXM_Offload::complete_missing_sizes( 2, false );
+    t( 'Original only on the bucket: downloaded to a temp file, size built and uploaded', $r === true && in_array( '/media/g/g2-150x150.jpg', $puts(), true ) && ISXM_Offload::status_for( 2 )['status'] === 'offloaded', is_wp_error( $r ) ? $r->get_error_message() : '' );
+    @unlink( ISXM_TEST_UPLOADS . '/g3.jpg' );
+    $r = ISXM_Offload::complete_missing_sizes( 3, false );
+    t( 'Nothing to build from: the error names the folder that was checked', is_wp_error( $r ) && strpos( $r->get_error_message(), 'wp-content/uploads/' ) !== false && strpos( $r->get_error_message(), 'g3-150x150.jpg' ) !== false && strpos( $r->get_error_message(), sys_get_temp_dir() ) === false, is_wp_error( $r ) ? $r->get_error_message() : '' );
+    // Offload's second pass: no new uploads left → missing sizes → rewrite.
+    update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+    $off = new ReflectionMethod( 'ISXM_Tools', 'batch_offload' );
+    if ( PHP_VERSION_ID < 80100 ) $off->setAccessible( true );
+    $step = $off->invoke( new ISXM_Tools(), 'upload|0' );
+    t( 'Offload moves on to the missing-sizes pass when uploads are done', $step['cursor'] === 'partial|0' && ! $step['done'], json_encode( $step ) );
+    $step = $off->invoke( new ISXM_Tools(), 'partial|0' );
+    t( 'Missing-sizes pass then hands over to the rewrite', $step['cursor'] === 'rewrite|posts:0' && ! $step['done'] && $step['processed'] === 1, json_encode( $step ) );
+    delete_option( ISXM_Items::BACKFILLED_OPTION );
+    proc_terminate( $fake ); @unlink( $fake_log );
+}
+
 group( 'Upload server folders' );
 $fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_server_' . getmypid() . '.jsonl';
 $fake_port = 22000 + ( getmypid() % 1000 );

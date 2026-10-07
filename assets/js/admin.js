@@ -1076,15 +1076,13 @@
   // The retry card is meaningless with nothing to retry, so it ships hidden
   // and appears/disappears as the failure count changes — including right
   // after a run, without a page reload.
-  // Cards that only matter while their count is non-zero: retry_failed
-  // (stats.failed) and complete_partial (stats.partial).
+  // Cards that only matter while their count is non-zero.
   const syncRetryCard = (stats) => {
     if (!stats || typeof stats.failed === "undefined") {
       return;
     }
     [
       ["retry_failed", stats.failed],
-      ["complete_partial", stats.partial || 0],
     ].forEach(([tool, count]) => {
       const $card = cardFor(tool);
       if (!$card.length) {

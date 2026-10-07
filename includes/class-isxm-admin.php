@@ -439,7 +439,7 @@ class ISXM_Admin {
                             $this->tool_card(
                                 'offload',
                                 __( 'Offload remaining media', 'insightx-offload' ),
-                                __( 'Upload all media not yet in the bucket. The job runs on the server, so you can close this tab and resume later from the same point', 'insightx-offload' ),
+                                __( 'Upload all media not yet in the bucket, and any image sizes missing from items already there. The job runs on the server, so you can close this tab and resume later from the same point', 'insightx-offload' ),
                                 __( 'Start Offload', 'insightx-offload' ),
                                 '',
                                 false
@@ -473,15 +473,6 @@ class ISXM_Admin {
                                 __( 'Retry', 'insightx-offload' ),
                                 '',
                                 empty( $stats['failed'] )
-                            );
-                            // Same: only when some item is "Not all sizes uploaded".
-                            $this->tool_card(
-                                'complete_partial',
-                                __( 'Upload missing sizes', 'insightx-offload' ),
-                                __( 'Upload the image sizes missing from the bucket, using the copies still on the server', 'insightx-offload' ),
-                                __( 'Upload missing sizes', 'insightx-offload' ),
-                                '',
-                                empty( $stats['partial'] )
                             );
                             $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
                             $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );

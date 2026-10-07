@@ -546,8 +546,8 @@ msgid "Offload remaining media"
 msgstr "Offload media ที่เหลือ"
 
 #: includes/class-isxm-admin.php:396
-msgid "Upload all media not yet in the bucket. The job runs on the server, so you can close this tab and resume later from the same point"
-msgstr "อัปโหลด media ทั้งหมดที่ยังไม่อยู่ใน bucket งานทำงานบนเซิร์ฟเวอร์ สามารถปิดแท็บนี้แล้วกลับมาทำต่อจากจุดเดิมได้"
+msgid "Upload all media not yet in the bucket, and any image sizes missing from items already there. The job runs on the server, so you can close this tab and resume later from the same point"
+msgstr "อัปโหลด media ทั้งหมดที่ยังไม่อยู่ใน bucket รวมถึงขนาดรูปที่ยังขาดของไฟล์ที่อยู่ใน bucket แล้ว งานทำงานบนเซิร์ฟเวอร์ สามารถปิดแท็บนี้แล้วกลับมาทำต่อจากจุดเดิมได้"
 
 #: includes/class-isxm-admin.php:397
 msgid "Start Offload"
@@ -1507,3 +1507,31 @@ msgstr "เพิ่มโฟลเดอร์"
 #: includes/class-isxm-admin.php
 msgid "Remove"
 msgstr "นำออก"
+
+#: includes/class-isxm-offload.php
+msgid "Not found in %1$s: %2$s"
+msgstr "ไม่พบไฟล์ใน %1$s: %2$s"
+
+#: includes/class-isxm-offload.php
+msgid "Could not create size %1$s: %2$s"
+msgstr "สร้างขนาด %1$s ไม่สำเร็จ: %2$s"
+
+#: includes/class-isxm-offload.php
+msgid "not an image, or no image editor on this server"
+msgstr "ไม่ใช่ไฟล์รูป หรือเซิร์ฟเวอร์ไม่มีตัวแก้ไขรูป"
+
+#: includes/class-isxm-offload.php
+msgid "could not create a temporary file"
+msgstr "สร้างไฟล์ชั่วคราวไม่ได้"
+
+#: includes/class-isxm-offload.php
+msgid "the original could not be downloaded from the bucket (%s)"
+msgstr "ดาวน์โหลดไฟล์ต้นฉบับจาก bucket ไม่สำเร็จ (%s)"
+
+#: includes/class-isxm-offload.php
+msgid "it is not in the image data"
+msgstr "ไม่มีขนาดนี้ในข้อมูลของรูป"
+
+#: includes/class-isxm-offload.php
+msgid "could not be created: %s"
+msgstr "สร้างใหม่ไม่ได้: %s"

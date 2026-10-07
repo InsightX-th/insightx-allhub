@@ -1314,6 +1314,8 @@ class ISXM_Tools {
         return [
             'offload'      => __( 'Upload remaining files to the cloud', 'insightx-offload' ),
             'retry_failed' => __( 'Retry only the failed items', 'insightx-offload' ),
+            // Internal since 0.2.36 (Offload's second pass does it): kept so a
+            // run started from the old card can still finish or resume.
             'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
             'offload_folders' => __( 'Upload server folders', 'insightx-offload' ),
             'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
@@ -1514,7 +1516,9 @@ class ISXM_Tools {
 
         switch ( $tool ) {
             case 'offload':
-                return max( (int) $stats['total'] - (int) $stats['in_bucket'], 0 );
+                // Not on the bucket yet, plus items there with sizes missing
+                // (the run's second pass).
+                return max( (int) $stats['total'] - (int) $stats['in_bucket'], 0 ) + (int) $stats['partial'];
             case 'download':
             case 'remove':
                 return (int) $stats['in_bucket'];
@@ -2637,7 +2641,28 @@ class ISXM_Tools {
      * @return array
      */
     private function batch_offload( $cursor ) {
-        return $this->batch_pending_phased( $cursor, $this->offload_one_callback() );
+        list( $phase, $rest ) = self::split_cursor( $cursor, 'upload' );
+
+        // Second pass: items already on the bucket with sizes missing
+        // ("Not all sizes uploaded") — offload_one_callback() routes them
+        // to complete_missing_sizes(). Then the usual one-pass rewrite.
+        if ( $phase === 'partial' ) {
+            $result = $this->run_pending_batch( (int) $rest, $this->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ], true );
+            if ( ! empty( $result['done'] ) && ISXM_Offload::should_persist_urls() ) {
+                return self::batch_result( $result, [ 'cursor' => 'rewrite|posts:0', 'done' => false, 'phase' => 'rewriting' ] );
+            }
+            return self::batch_result( $result, [ 'cursor' => 'partial|' . $result['last_id'] ] );
+        }
+
+        $result = $this->batch_pending_phased( $cursor, $this->offload_one_callback() );
+        if ( $phase === 'upload' && ! is_wp_error( $result )
+            && ( ! empty( $result['done'] ) || strpos( (string) $result['cursor'], 'rewrite|' ) === 0 ) ) {
+            // New uploads drained: fill in missing sizes before the rewrite.
+            $result['cursor'] = 'partial|0';
+            $result['done']   = false;
+            $result['phase']  = '';
+        }
+        return $result;
     }
 
     /**

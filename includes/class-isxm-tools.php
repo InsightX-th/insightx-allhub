@@ -69,6 +69,7 @@ class ISXM_Tools {
 
         add_action( 'wp_ajax_isxs_save_settings', [ $this, 'ajax_save_settings' ] );
         add_action( 'wp_ajax_isxs_save_connection', [ $this, 'ajax_save_connection' ] );
+        add_action( 'wp_ajax_isxs_source_folders', [ $this, 'ajax_source_folders' ] );
         add_action( 'wp_ajax_isxs_stats', [ $this, 'ajax_stats' ] );
         add_action( 'wp_ajax_isxs_offload_single', [ $this, 'ajax_offload_single' ] );
         add_action( 'wp_ajax_isxs_sync_scan', [ $this, 'ajax_sync_scan' ] );
@@ -127,10 +128,29 @@ class ISXM_Tools {
         $settings['assets_cdn_domain'] = isset( $_POST['assets_cdn_domain'] ) ? self::sanitize_cdn_domain( $_POST['assets_cdn_domain'] ) : '';
 
         $settings['prefix']        = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
-        $settings['source_prefix'] = isset( $_POST['source_prefix'] ) ? self::sanitize_prefix( $_POST['source_prefix'] ) : '';
-        $settings['source_extra_prefixes'] = isset( $_POST['source_extra_prefixes'] )
-            ? self::sanitize_extra_prefixes( wp_unslash( (string) $_POST['source_extra_prefixes'] ), $settings['source_prefix'] )
-            : '';
+        $folders_warning = '';
+        if ( isset( $_POST['source_folders'] ) ) {
+            // The folder picker: one list, split back into the uploads root
+            // and the as-is folders. Only re-classified when the selection
+            // actually changed — every other autosave posts it too, and
+            // classifying costs a listing request per folder.
+            $folders = self::split_folders( wp_unslash( (string) $_POST['source_folders'] ) );
+            $stored  = self::split_folders( ISXM_Settings::source_folders() );
+            if ( self::same_folders( $folders, $stored ) ) {
+                $settings['source_prefix']         = $current['source_prefix'];
+                $settings['source_extra_prefixes'] = $current['source_extra_prefixes'];
+            } else {
+                $roles = self::assign_source_folders( $folders, $current['source_prefix'] );
+                $settings['source_prefix']         = $roles['prefix'];
+                $settings['source_extra_prefixes'] = $roles['extras'];
+                $folders_warning                   = $roles['warning'];
+            }
+        } else {
+            $settings['source_prefix'] = isset( $_POST['source_prefix'] ) ? self::sanitize_prefix( $_POST['source_prefix'] ) : '';
+            $settings['source_extra_prefixes'] = isset( $_POST['source_extra_prefixes'] )
+                ? self::sanitize_extra_prefixes( wp_unslash( (string) $_POST['source_extra_prefixes'] ), $settings['source_prefix'] )
+                : '';
+        }
 
         // Folder names go straight into an object key, so they get
         // sanitize_title() rather than sanitize_text_field() — that also
@@ -181,7 +201,9 @@ class ISXM_Tools {
         ISXM_Settings::save( $settings );
 
         wp_send_json_success( [
-            'message'              => __( 'Settings saved', 'insightx-offload' ),
+            'message'              => $folders_warning !== '' ? $folders_warning : __( 'Settings saved', 'insightx-offload' ),
+            'warning'              => $folders_warning !== '',
+            'source_prefix'        => ISXM_Settings::get( 'source_prefix' ),
             'public_base_url'      => ISXM_Settings::public_base_url(),
             'destination_changed'  => $destination_changed,
             // Refreshed on every response: an admin page left open past the
@@ -264,6 +286,71 @@ class ISXM_Tools {
             $out[ $prefix ] = true;
         }
         return implode( ', ', array_keys( $out ) );
+    }
+
+    /**
+     * Comma/newline-separated folders → sanitized, de-duplicated list.
+     *
+     * @return string[]
+     */
+    private static function split_folders( $value ) {
+        $out = [];
+        foreach ( preg_split( '/[,\r\n]+/', (string) $value ) as $part ) {
+            $prefix = self::sanitize_prefix( $part );
+            if ( $prefix !== '' ) $out[ $prefix ] = true;
+        }
+        return array_keys( $out );
+    }
+
+    private static function same_folders( array $a, array $b ) {
+        sort( $a ); sort( $b );
+        return $a === $b;
+    }
+
+    /**
+     * Decide which picked folder is the uploads root (Source Prefix) and
+     * which are copied as-is: the folder whose sampled keys resolve to the
+     * most attachments wins. One folder needs no sampling — it is the
+     * Source Prefix, exactly as typing it used to be.
+     *
+     * @param string[]      $folders  Sanitized folders, in the user's order.
+     * @param string        $previous Current Source Prefix (tie-breaker / fallback).
+     * @param callable|null $score    folder => int|WP_Error; defaults to sampling the source.
+     * @return array{prefix:string,extras:string,warning:string}
+     */
+    public static function assign_source_folders( array $folders, $previous, $score = null ) {
+        if ( count( $folders ) < 2 ) {
+            return [ 'prefix' => $folders[0] ?? '', 'extras' => '', 'warning' => '' ];
+        }
+        $score = $score ?: [ 'ISXM_Migrate', 'count_attachment_matches' ];
+        $best = ''; $best_score = 0; $failed = false;
+        foreach ( $folders as $folder ) {
+            $n = call_user_func( $score, $folder );
+            if ( is_wp_error( $n ) ) { $failed = true; continue; }
+            if ( $n > $best_score ) { $best = $folder; $best_score = $n; }
+        }
+        $warning = '';
+        if ( $best === '' ) {
+            $best    = in_array( $previous, $folders, true ) ? $previous : $folders[0];
+            $warning = $failed
+                ? sprintf( __( 'Could not read the source bucket to find the Media Library folder — using %s. Check the source connection.', 'insightx-offload' ), $best )
+                : sprintf( __( 'None of the selected folders holds Media Library files — using %s. Select the folder that contains your uploads directly (e.g. wp-content/uploads/).', 'insightx-offload' ), $best );
+        }
+        $extras = array_values( array_diff( $folders, [ $best ] ) );
+        return [ 'prefix' => $best, 'extras' => self::sanitize_extra_prefixes( implode( ',', $extras ), $best ), 'warning' => $warning ];
+    }
+
+    /**
+     * Folder picker: sub-folders of one level of the source bucket.
+     */
+    public function ajax_source_folders() {
+        $this->guard();
+        $prefix = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
+        $result = ISXM_Migrate::list_source_folders( $prefix );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+        }
+        wp_send_json_success( $result + [ 'prefix' => $prefix, 'media' => ISXM_Settings::get( 'source_prefix' ) ] );
     }
 
     /**

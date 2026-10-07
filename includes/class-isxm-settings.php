@@ -467,6 +467,18 @@ class ISXM_Settings {
     }
 
     /**
+     * The Migrate folder picker's value: the uploads root (Source Prefix)
+     * first, then the extra folders. Derived, not stored — the two
+     * settings stay the single source of truth the pipeline reads.
+     *
+     * @return string Comma-separated, e.g. "wp-content/uploads/, download/".
+     */
+    public static function source_folders() {
+        $prefix = (string) self::get( 'source_prefix' );
+        return implode( ', ', array_merge( $prefix !== '' ? [ $prefix ] : [], self::extra_prefixes() ) );
+    }
+
+    /**
      * Public base URL where media currently living on the migration
      * source is actually reachable — i.e. the URL that's already
      * hard-coded into the database and needs replacing during migrate.

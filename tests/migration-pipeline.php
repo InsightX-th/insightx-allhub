@@ -229,5 +229,37 @@ $content = $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=50' );
 $base = ISXM_Settings::public_base_url() . '/download/Specification/';
 t( 'Raw and percent-encoded links rewritten to the destination', strpos( $content, 'src.example.com' ) === false && strpos( $content, $base . 'a.pdf' ) !== false && strpos( $content, $base . 'Spec%20Sheet.pdf' ) !== false, $content );
 
+group( 'Source folder picker' );
+migration_fixture( 2 );
+$seen = [];
+$GLOBALS['isxm_t']['http_provider'] = function ( $url ) use ( &$seen ) {
+    parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q ); $seen[] = $q;
+    if ( isset( $q['delimiter'] ) ) {
+        return [ 'response' => [ 'code' => 200 ], 'body' => '<ListBucketResult><IsTruncated>false</IsTruncated>'
+            . '<CommonPrefixes><Prefix>wp-content/uploads/</Prefix></CommonPrefixes><CommonPrefixes><Prefix>wp-content/a&amp;b/</Prefix></CommonPrefixes></ListBucketResult>' ];
+    }
+    $prefix = $q['prefix'] ?? '';
+    if ( $prefix === 'wp-content/uploads/' ) return migration_listing( [ 'wp-content/uploads/', 'wp-content/uploads/m1.jpg', 'wp-content/uploads/m2-300x300.jpg', 'wp-content/uploads/stray.jpg' ] );
+    return migration_listing( [ $prefix . 'spec.pdf' ] );
+};
+$folders = ISXM_Migrate::list_source_folders( 'wp-content/' );
+t( 'Lists one level via delimiter=/ and decodes entities', $folders['folders'] === [ 'wp-content/uploads/', 'wp-content/a&b/' ] && ! $folders['truncated'] && end( $seen )['prefix'] === 'wp-content/' && end( $seen )['delimiter'] === '/', json_encode( $folders ) );
+t( 'Uploads folder: originals and sizes resolve to attachments, strays and markers do not', ISXM_Migrate::count_attachment_matches( 'wp-content/uploads/' ) === 2 );
+t( 'Non-media folder scores 0', ISXM_Migrate::count_attachment_matches( 'download/' ) === 0 );
+$roles = ISXM_Tools::assign_source_folders( [ 'download/', 'wp-content/uploads/' ], 'old/' );
+t( 'The folder with attachments becomes the Source Prefix, the rest copied as-is', $roles === [ 'prefix' => 'wp-content/uploads/', 'extras' => 'download/', 'warning' => '' ], json_encode( $roles ) );
+$calls = 0;
+$roles = ISXM_Tools::assign_source_folders( [ 'only/' ], 'old/', function () use ( &$calls ) { $calls++; return 0; } );
+t( 'A single folder is the Source Prefix without sampling', $roles['prefix'] === 'only/' && $roles['extras'] === '' && $calls === 0 );
+$roles = ISXM_Tools::assign_source_folders( [ 'a/', 'old/' ], 'old/', function () { return 0; } );
+t( 'No matches anywhere: keep the previous Source Prefix and warn', $roles['prefix'] === 'old/' && $roles['extras'] === 'a/' && $roles['warning'] !== '' );
+$roles = ISXM_Tools::assign_source_folders( [ 'a/', 'b/' ], 'old/', function () { return new WP_Error( 'x', 'down' ); } );
+t( 'Source unreachable: first folder, connection warning', $roles['prefix'] === 'a/' && strpos( $roles['warning'], 'source connection' ) !== false );
+$roles = ISXM_Tools::assign_source_folders( [ 'wp-content/uploads/', 'wp-content/uploads/2024/', 'download/' ], '', function ( $f ) { return $f === 'wp-content/uploads/' ? 5 : 1; } );
+t( 'A folder inside the chosen root is not copied twice', $roles['extras'] === 'download/', json_encode( $roles ) );
+$GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), [ 'source_prefix' => 'wp-content/uploads/', 'source_extra_prefixes' => "download/\nfiles/" ] );
+ISXM_Settings::flush_cache();
+t( 'Picker value derives from the two settings, root first', ISXM_Settings::source_folders() === 'wp-content/uploads/, download/, files/' );
+
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

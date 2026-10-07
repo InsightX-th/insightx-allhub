@@ -567,6 +567,43 @@ class ISXM_Client {
     }
 
     /**
+     * The immediate sub-folders of $prefix (ListObjectsV2 with
+     * delimiter=/, read from CommonPrefixes) — what the Migrate folder
+     * picker browses. Capped at $max_pages pages so a bucket with a flat
+     * million-folder level can't hang the request.
+     *
+     * @param string $prefix    '' for the bucket root, else "folder/".
+     * @param int    $max_pages Listing pages to follow (1000 entries each).
+     * @return array{folders:string[],truncated:bool}|WP_Error Full prefixes, e.g. "wp-content/uploads/".
+     */
+    public function list_folders( $prefix = '', $max_pages = 5 ) {
+        $folders = []; $token = '';
+        for ( $page = 0; $page < $max_pages; $page++ ) {
+            $query = [ 'list-type' => '2', 'delimiter' => '/', 'max-keys' => '1000' ];
+            if ( $prefix !== '' ) $query['prefix'] = $prefix;
+            if ( $token !== '' ) $query['continuation-token'] = $token;
+
+            $response = $this->request( 'GET', '', [ 'query' => $query, 'timeout' => 30 ] );
+            $ok       = $this->expect_status( $response, [ 200 ] );
+            if ( is_wp_error( $ok ) ) return $ok;
+
+            $body = wp_remote_retrieve_body( $response );
+            $xml  = self::parse_xml( $body );
+            if ( $xml === false || $xml->getName() !== 'ListBucketResult' ) {
+                return self::malformed_response_error();
+            }
+            foreach ( $xml->CommonPrefixes as $common ) {
+                $folder = (string) $common->Prefix;
+                if ( $folder !== '' ) $folders[] = $folder;
+            }
+            $token = self::extract_next_token( $body );
+            if ( is_wp_error( $token ) ) return $token;
+            if ( $token === '' ) break;
+        }
+        return [ 'folders' => $folders, 'truncated' => $token !== '' ];
+    }
+
+    /**
      * Pull the pagination token out of a ListObjectsV2 response body.
      *
      * '' means "genuinely the last page". If the response claims it's

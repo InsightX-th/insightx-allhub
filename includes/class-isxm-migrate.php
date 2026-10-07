@@ -410,6 +410,56 @@ class ISXM_Migrate {
     }
 
     /**
+     * Sub-folders of $prefix on the source bucket, for the folder picker.
+     *
+     * @return array{folders:string[],truncated:bool}|WP_Error
+     */
+    public static function list_source_folders( $prefix = '' ) {
+        return self::source_client()->list_folders( $prefix );
+    }
+
+    /**
+     * How many of the first $sample keys under $folder belong to a Media
+     * Library attachment — the folder picker uses it to tell which ticked
+     * folder is the uploads root (Source Prefix) and which are copied
+     * as-is. Matches both "2024/05/a.jpg" and "a.jpg" so the answer doesn't
+     * depend on the Year & Month toggle being right yet.
+     *
+     * @return int|WP_Error
+     */
+    public static function count_attachment_matches( $folder, $sample = 200 ) {
+        global $wpdb;
+        $page = self::source_client()->list_objects_keys_page( '', $sample, $folder );
+        if ( is_wp_error( $page ) ) return $page;
+
+        $by_key = [];
+        foreach ( $page['keys'] as $key ) {
+            $relative = substr( $key, strlen( $folder ) );
+            if ( $relative === '' || substr( $relative, -1 ) === '/' ) continue;
+            $by_key[ $key ] = array_unique( array_merge(
+                ISXM_Offload::lookup_paths( $relative ),
+                ISXM_Offload::lookup_paths( wp_basename( $relative ) )
+            ) );
+        }
+        if ( ! $by_key ) return 0;
+
+        $candidates = array_values( array_unique( array_merge( ...array_values( $by_key ) ) ) );
+        $marks      = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+        $found      = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value IN ({$marks})", // phpcs:ignore WordPress.DB.PreparedSQL -- placeholders built from a counted array
+            $candidates
+        ) );
+        $found   = array_flip( (array) $found );
+        $matches = 0;
+        foreach ( $by_key as $paths ) {
+            foreach ( $paths as $path ) {
+                if ( isset( $found[ $path ] ) ) { $matches++; break; }
+            }
+        }
+        return $matches;
+    }
+
+    /**
      * One listing page of an extra source folder (see
      * ISXM_Settings::extra_prefixes()).
      *

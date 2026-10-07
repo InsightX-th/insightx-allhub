@@ -1387,3 +1387,47 @@ msgstr "โฟลเดอร์เพิ่มเติม"
 #: includes/class-isxm-admin.php
 msgid "Folders outside the Media Library to copy as-is, separated by commas, e.g. download/ — every file in them keeps its key on the destination, and links to them in content are rewritten too"
 msgstr "โฟลเดอร์ที่อยู่นอก Media Library ที่อยากให้คัดลอกไปทั้งโฟลเดอร์ ใส่ได้หลายโฟลเดอร์โดยคั่นด้วยจุลภาค (,) เช่น download/ — ไฟล์ข้างในจะใช้ key เดิมบนปลายทาง และลิงก์ในเนื้อหาที่ชี้ไปที่ไฟล์เหล่านี้จะถูกเปลี่ยนให้ด้วย"
+
+#: includes/class-isxm-admin.php
+msgid "Folders to migrate"
+msgstr "โฟลเดอร์ที่จะ migrate"
+
+#: includes/class-isxm-admin.php
+msgid "Browse bucket"
+msgstr "เลือกจาก bucket"
+
+#: includes/class-isxm-admin.php
+msgid "Up one level"
+msgstr "ขึ้นไปหนึ่งระดับ"
+
+#: includes/class-isxm-admin.php
+msgid "Tick every folder on the source bucket to migrate. The one holding your uploads (e.g. wp-content/uploads/) is detected as the Media Library and moved into the destination layout; the others are copied as-is with their keys, and links to them in content are rewritten too"
+msgstr "ติ๊กทุกโฟลเดอร์บน source bucket ที่อยากย้าย โฟลเดอร์ที่เก็บไฟล์อัปโหลด (เช่น wp-content/uploads/) ระบบจะตรวจเจอเองว่าเป็น Media Library แล้วย้ายตามโครงสร้างปลายทาง ส่วนโฟลเดอร์อื่นจะถูกคัดลอกไปทั้งโฟลเดอร์ด้วย key เดิม และลิงก์ในเนื้อหาที่ชี้ไปที่ไฟล์เหล่านั้นจะถูกเปลี่ยนให้ด้วย"
+
+#: includes/class-isxm-admin.php
+msgid "Loading folders…"
+msgstr "กำลังโหลดโฟลเดอร์…"
+
+#: includes/class-isxm-admin.php
+msgid "No sub-folders here"
+msgstr "ไม่มีโฟลเดอร์ย่อยในนี้"
+
+#: includes/class-isxm-admin.php
+msgid "Showing the first folders only — type deeper paths by hand"
+msgstr "แสดงเฉพาะโฟลเดอร์ชุดแรก — ถ้าไม่เจอให้พิมพ์ path เองในช่องด้านบน"
+
+#: includes/class-isxm-admin.php
+msgid "Media Library"
+msgstr "Media Library"
+
+#: includes/class-isxm-admin.php
+msgid "Open"
+msgstr "เปิด"
+
+#: includes/class-isxm-tools.php
+msgid "Could not read the source bucket to find the Media Library folder — using %s. Check the source connection."
+msgstr "อ่าน source bucket ไม่ได้ เลยหาโฟลเดอร์ Media Library ไม่เจอ — ตอนนี้ใช้ %s ไปก่อน ลองเช็กการเชื่อมต่อ source"
+
+#: includes/class-isxm-tools.php
+msgid "None of the selected folders holds Media Library files — using %s. Select the folder that contains your uploads directly (e.g. wp-content/uploads/)."
+msgstr "ไม่มีโฟลเดอร์ที่เลือกไว้โฟลเดอร์ไหนมีไฟล์ของ Media Library — ตอนนี้ใช้ %s ไปก่อน ให้เลือกโฟลเดอร์ที่เก็บไฟล์อัปโหลดโดยตรง (เช่น wp-content/uploads/)"

@@ -270,7 +270,7 @@
   // 'change' (fires on blur/Enter, not per keystroke) auto-saves these —
   // 'input' above only drives the live preview.
   $(
-    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-prefix, #isxs-source-extra-prefixes, #isxs-source-public-url, [data-folder-field]",
+    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-source-public-url, [data-folder-field]",
   ).on("change", () => {
     saveSettingsDebounced();
   });
@@ -328,8 +328,7 @@
       cdn_domain: $.trim($("#isxs-cdn-domain").val()),
       assets_cdn_domain: $.trim($("#isxs-assets-cdn-domain").val()),
       source_provider: $("#isxs-source-provider").val(),
-      source_prefix: $.trim($("#isxs-source-prefix").val()),
-      source_extra_prefixes: $.trim($("#isxs-source-extra-prefixes").val()),
+      source_folders: $.trim($("#isxs-source-folders").val()),
       source_public_base_url: $.trim($("#isxs-source-public-url").val()),
     };
     // Connection-card toggles (path_style/send_public_acl) are scoped
@@ -380,7 +379,10 @@
           if (res.data.nonce) {
             cfg.nonce = res.data.nonce;
           }
-          showToast(res.data.message, false);
+          showToast(res.data.message, !!res.data.warning);
+          if (typeof res.data.source_prefix !== "undefined") {
+            cfg.sourceMedia = res.data.source_prefix;
+          }
           $secretFields.each((index, el) => {
             const $el = $(el);
             const willHaveSecret =
@@ -1647,6 +1649,81 @@
       jobAction("isxs_job_start", "offload", {});
     });
   }
+
+  // Source folder picker (Migrate → Source Path Structure): browses the
+  // source bucket one level at a time; ticking a folder adds it to the
+  // comma-separated input, which stays editable by hand. The server decides
+  // on save which ticked folder is the Media Library root.
+  const $folderInput = $("#isxs-source-folders");
+  const $folderPicker = $("#isxs-folder-picker");
+  const $folderBrowse = $(".isxs-folder-browse");
+  let folderPrefix = "";
+
+  const selectedFolders = () =>
+    $folderInput
+      .val()
+      .split(/[,\n]+/)
+      .map((f) => $.trim(f).replace(/^\/+/, ""))
+      .filter(Boolean)
+      .map((f) => (f.endsWith("/") ? f : f + "/"));
+
+  const setFolderSelected = (folder, on) => {
+    const list = selectedFolders().filter((f) => f !== folder);
+    if (on) list.push(folder);
+    $folderInput.val(list.join(", ")).trigger("change");
+  };
+
+  const loadFolders = (prefix) => {
+    folderPrefix = prefix;
+    const $list = $folderPicker.find(".isxs-folder-list").empty();
+    const $status = $folderPicker.find(".isxs-folder-status").text(cfg.i18n.folderLoading);
+    $folderPicker.find(".isxs-folder-path").text("/" + prefix);
+    $folderPicker.find(".isxs-folder-up").prop("disabled", prefix === "");
+    $.post(cfg.ajaxUrl, { action: "isxs_source_folders", nonce: cfg.nonce, prefix: prefix })
+      .done((res) => {
+        if (folderPrefix !== prefix) return; // a newer level was opened meanwhile
+        if (!res || !res.success) {
+          $status.text((res && res.data && res.data.message) || cfg.i18n.error);
+          return;
+        }
+        const chosen = selectedFolders();
+        res.data.folders.forEach((folder) => {
+          const $li = $('<li class="isxs-folder-item">');
+          const $label = $("<label>");
+          $("<input type='checkbox'>")
+            .prop("checked", chosen.includes(folder))
+            .on("change", (e) => setFolderSelected(folder, e.currentTarget.checked))
+            .appendTo($label);
+          $("<span class='isxs-folder-name'>").text(folder.slice(prefix.length)).appendTo($label);
+          if (folder === cfg.sourceMedia) {
+            $("<span class='isxs-folder-badge'>").text(cfg.i18n.folderMedia).appendTo($label);
+          }
+          $li.append($label);
+          $("<button type='button' class='isxs-folder-open'>")
+            .attr("aria-label", cfg.i18n.folderOpen + " " + folder)
+            .text("›")
+            .on("click", () => loadFolders(folder))
+            .appendTo($li);
+          $list.append($li);
+        });
+        $status.text(
+          !res.data.folders.length ? cfg.i18n.folderEmpty : res.data.truncated ? cfg.i18n.folderMore : "",
+        );
+      })
+      .fail(() => {
+        if (folderPrefix === prefix) $status.text(cfg.i18n.error);
+      });
+  };
+
+  $folderBrowse.on("click", () => {
+    const open = !$folderPicker.prop("hidden");
+    $folderPicker.prop("hidden", open);
+    $folderBrowse.attr("aria-expanded", open ? "false" : "true");
+    if (!open) loadFolders(folderPrefix);
+  });
+  $folderPicker.find(".isxs-folder-up").on("click", () => {
+    loadFolders(folderPrefix.replace(/[^/]+\/$/, ""));
+  });
 
   // Custom provider picker on the Storage card — a button + listbox
   // (native <select> can't render the provider logos). Picking an option

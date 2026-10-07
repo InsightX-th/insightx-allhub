@@ -57,6 +57,7 @@ class ISXM_Admin {
         wp_localize_script( 'isxs-admin', 'isxsAdmin', [
             'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
             'nonce'       => wp_create_nonce( ISXM_Tools::NONCE_ACTION ),
+            'sourceMedia' => ISXM_Settings::get( 'source_prefix' ),
             'stats'       => $stats,
             'configured'  => ISXM_Settings::is_configured(),
             'hasSecret'   => $settings['secret_key'] !== '',
@@ -106,6 +107,11 @@ class ISXM_Admin {
                 'indexing'      => __( 'Building attachment index…', 'insightx-offload' ),
                 'finalizing'    => __( 'Finalizing migration…', 'insightx-offload' ),
                 'copyingExtras' => __( 'Copying extra folders… %s files', 'insightx-offload' ),
+                'folderLoading' => __( 'Loading folders…', 'insightx-offload' ),
+                'folderEmpty'   => __( 'No sub-folders here', 'insightx-offload' ),
+                'folderMore'    => __( 'Showing the first folders only — type deeper paths by hand', 'insightx-offload' ),
+                'folderMedia'   => __( 'Media Library', 'insightx-offload' ),
+                'folderOpen'    => __( 'Open', 'insightx-offload' ),
                 /* translators: 1: rows done, 2: rows in total */
                 'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-offload' ),
                 /* translators: 1: files checked, 2: files in total */
@@ -486,14 +492,21 @@ class ISXM_Admin {
                             <div class="isxs-card-head"><h2><?php esc_html_e( 'Source Path Structure', 'insightx-offload' ); ?></h2></div>
                             <div class="isxs-card-body">
                                 <p class="isxs-hint"><?php esc_html_e( 'Must match the real key structure in the source bucket. Files are fetched using this path; if it is wrong, you will see an error with the attempted key in the list below after clicking Migrate', 'insightx-offload' ); ?></p>
-                                <div class="isxs-field">
-                                    <label for="isxs-source-prefix">Source Prefix</label>
-                                    <input type="text" id="isxs-source-prefix" value="<?php echo esc_attr( $s['source_prefix'] ); ?>" placeholder="wp-content/uploads/">
-                                </div>
-                                <div class="isxs-field">
-                                    <label for="isxs-source-extra-prefixes"><?php esc_html_e( 'Extra folders', 'insightx-offload' ); ?></label>
-                                    <input type="text" id="isxs-source-extra-prefixes" value="<?php echo esc_attr( $s['source_extra_prefixes'] ); ?>" placeholder="download/">
-                                    <p class="isxs-hint"><?php esc_html_e( 'Folders outside the Media Library to copy as-is, separated by commas, e.g. download/ — every file in them keeps its key on the destination, and links to them in content are rewritten too', 'insightx-offload' ); ?></p>
+                                <div class="isxs-field isxs-folder-field">
+                                    <label for="isxs-source-folders"><?php esc_html_e( 'Folders to migrate', 'insightx-offload' ); ?></label>
+                                    <div class="isxs-folder-row">
+                                        <input type="text" id="isxs-source-folders" value="<?php echo esc_attr( ISXM_Settings::source_folders() ); ?>" placeholder="wp-content/uploads/">
+                                        <button type="button" class="isxs-btn isxs-btn-ghost isxs-folder-browse" aria-expanded="false"><?php esc_html_e( 'Browse bucket', 'insightx-offload' ); ?> ▾</button>
+                                    </div>
+                                    <div class="isxs-folder-picker" id="isxs-folder-picker" hidden>
+                                        <div class="isxs-folder-picker-head">
+                                            <button type="button" class="isxs-folder-up" aria-label="<?php esc_attr_e( 'Up one level', 'insightx-offload' ); ?>">↑</button>
+                                            <span class="isxs-folder-path"></span>
+                                        </div>
+                                        <ul class="isxs-folder-list"></ul>
+                                        <p class="isxs-folder-status"></p>
+                                    </div>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Tick every folder on the source bucket to migrate. The one holding your uploads (e.g. wp-content/uploads/) is detected as the Media Library and moved into the destination layout; the others are copied as-is with their keys, and links to them in content are rewritten too', 'insightx-offload' ); ?></p>
                                 </div>
                                 <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-offload' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-offload' ) ); ?>
                             </div>

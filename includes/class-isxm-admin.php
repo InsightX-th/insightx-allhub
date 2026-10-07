@@ -203,6 +203,7 @@ class ISXM_Admin {
                         </div>
                     </div>
 
+                    <div class="isxs-status-group">
                     <div class="isxs-status-wrap">
                         <button type="button" class="isxs-status-widget" aria-expanded="false">
                             <span class="isxs-status-text"><strong id="isxs-status-percent">0%</strong> Offloaded</span>
@@ -234,6 +235,35 @@ class ISXM_Admin {
                             </div>
                             <div class="isxs-status-foot"><?php printf( esc_html__( 'Total %1$s items · %2$s on the bucket', 'insightx-offload' ), '<span id="isxs-status-total">0</span>', '<span id="isxs-status-onbucket">0</span>' ); ?></div>
                         </div>
+                    </div>
+
+                    <div class="isxs-status-wrap">
+                        <button type="button" class="isxs-status-widget isxs-migrate-widget" aria-expanded="false">
+                            <span class="isxs-status-text"><strong id="isxs-migrate-percent">0%</strong> <?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></span>
+                            <span class="isxs-status-bar"><span class="isxs-status-bar-fill" id="isxs-migrate-fill"></span></span>
+                            <span class="isxs-status-chev" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="isxs-status-panel" id="isxs-migrate-panel" hidden>
+                            <div class="isxs-status-panel-head">
+                                <strong><?php esc_html_e( 'Migrate Status', 'insightx-offload' ); ?></strong>
+                            </div>
+                            <table class="isxs-status-table">
+                                <thead>
+                                    <tr><th><?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></th><th><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="isxs-status-num" id="isxs-migrate-done">0</td>
+                                        <td class="isxs-status-num" id="isxs-migrate-remaining">—</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="isxs-status-action">
+                                <button type="button" class="isxs-btn isxs-btn-primary isxs-migrate-open-btn"><?php esc_html_e( 'Open Migrate', 'insightx-offload' ); ?></button>
+                            </div>
+                            <div class="isxs-status-foot" id="isxs-migrate-state" data-empty="<?php esc_attr_e( 'No migration yet', 'insightx-offload' ); ?>"><?php esc_html_e( 'No migration yet', 'insightx-offload' ); ?></div>
+                        </div>
+                    </div>
                     </div>
                 </div>
 

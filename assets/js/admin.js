@@ -863,6 +863,44 @@
     $badge.attr("data-state", state).attr("title", lastRun ? when : "");
   };
 
+  // Header "Migrated" widget — same numbers as the Migrate card, compact.
+  const renderMigrateWidget = (job) => {
+    const $state = $("#isxs-migrate-state");
+    if (!job) {
+      $("#isxs-migrate-percent").text("0%");
+      $("#isxs-migrate-fill").css("width", "0%");
+      $("#isxs-migrate-done").text("0");
+      $("#isxs-migrate-remaining").text("—");
+      $state.text($state.data("empty"));
+      return;
+    }
+    const running = job.state === "running";
+    // Same rule as the card: total 0 means "not counted yet".
+    if (job.total > 0) {
+      $("#isxs-migrate-percent").text(job.percent + "%");
+      $("#isxs-migrate-fill").css("width", job.percent + "%");
+      $("#isxs-migrate-remaining").text(
+        Math.max(job.total - job.processed, 0).toLocaleString(),
+      );
+    } else {
+      $("#isxs-migrate-percent").text("");
+      $("#isxs-migrate-fill").css("width", running ? "5%" : "0%");
+      $("#isxs-migrate-remaining").text("—");
+    }
+    $("#isxs-migrate-done").text(job.processed.toLocaleString());
+    $state.text(
+      job.state === "done"
+        ? cfg.i18n.done
+        : job.stalled
+          ? cfg.i18n.stalled
+          : job.state === "paused"
+            ? cfg.i18n.stopped
+            : job.state === "error"
+              ? cfg.i18n.error
+              : cfg.i18n.working,
+    );
+  };
+
   const applyJobPayload = (res) => {
     if (!res || !res.success || !res.data) {
       return false;
@@ -888,6 +926,7 @@
     // Jobs first: applyStats() below decides whether the retry card is
     // visible, and that decision reads the running state from here.
     jobs = data.jobs || {};
+    renderMigrateWidget(jobs.migrate);
 
     // Keep the header's quick-offload button honest while a run is going.
     const offJob = jobs.offload;
@@ -1536,21 +1575,35 @@
    * ---------------------------------------------------------------- */
 
   const $statusWidget = $(".isxs-status-widget");
-  const $statusPanel = $("#isxs-status-panel");
+
+  const closeStatusPanels = () => {
+    $(".isxs-status-panel").attr("hidden", true);
+    $statusWidget.attr("aria-expanded", "false");
+  };
 
   if ($statusWidget.length) {
+    // Two widgets (Offloaded, Migrated): each opens its own panel, and
+    // only one panel is open at a time.
     $statusWidget.on("click", (e) => {
       e.stopPropagation();
-      const open = $statusPanel.is(":visible");
-      $statusPanel.attr("hidden", open);
-      $statusWidget.attr("aria-expanded", open ? "false" : "true");
+      const $widget = $(e.currentTarget);
+      const $panel = $widget.closest(".isxs-status-wrap").find(".isxs-status-panel");
+      const open = $panel.is(":visible");
+      closeStatusPanels();
+      if (!open) {
+        $panel.removeAttr("hidden");
+        $widget.attr("aria-expanded", "true");
+      }
     });
-    // Click anywhere else closes the panel.
+    // Click anywhere else closes the panels.
     $(document).on("click", (e) => {
       if (!$(e.target).closest(".isxs-status-wrap").length) {
-        $statusPanel.attr("hidden", true);
-        $statusWidget.attr("aria-expanded", "false");
+        closeStatusPanels();
       }
+    });
+    $(".isxs-migrate-open-btn").on("click", () => {
+      closeStatusPanels();
+      switchTab("migrate");
     });
     // Refresh re-reads the stats directly (independent of the poll loop)
     // while the panel stays open — with a spinning icon so the click

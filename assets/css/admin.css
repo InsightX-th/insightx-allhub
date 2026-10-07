@@ -105,6 +105,13 @@
 
 /* ---------- Offload Status widget (top-right) ---------- */
 
+.isxs-status-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .isxs-status-wrap {
   position: relative;
 }

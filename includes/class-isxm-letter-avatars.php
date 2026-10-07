@@ -28,7 +28,7 @@ class ISXM_Letter_Avatars {
         add_filter( 'get_avatar_data', [ $this, 'filter_avatar_data' ], PHP_INT_MAX, 2 );
         // Served whether or not the toggle is on, so a URL already sitting
         // in a page cache keeps rendering after it is switched off.
-        if ( isset( $_GET[ self::QUERY_VAR ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- public, read-only image
+        if ( self::is_image_request( $_GET, is_admin() ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- public, read-only image
             add_action( 'init', [ __CLASS__, 'serve' ], 0 );
         }
     }
@@ -46,6 +46,16 @@ class ISXM_Letter_Avatars {
         $args['url']          = self::url( self::initial( $name ), self::hue( $seed ) );
         $args['found_avatar'] = true;
         return $args;
+    }
+
+    /**
+     * Whether this request asks for an avatar image. Front end only, and
+     * the colour must be present: the Media Library's own filter submits
+     * an (empty) isxs_avatar too, and 0.2.38 answered that admin page with
+     * a "?" circle instead of the list.
+     */
+    public static function is_image_request( array $query, $admin ) {
+        return ! $admin && isset( $query[ self::QUERY_VAR ], $query['h'] ) && $query[ self::QUERY_VAR ] !== '';
     }
 
     /**

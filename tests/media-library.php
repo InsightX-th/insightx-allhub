@@ -167,6 +167,8 @@ t( 'Endpoint input: one letter (with its marks) or "?"', ISXM_Letter_Avatars::cl
     && ISXM_Letter_Avatars::clean_initial( '<script>' ) === '?' && ISXM_Letter_Avatars::clean_initial( 'AB' ) === '?' && ISXM_Letter_Avatars::clean_initial( str_repeat( 'ก', 20 ) ) === '?' && ISXM_Letter_Avatars::clean_initial( '' ) === '?' );
 t( 'Endpoint input: hue 0–359 only', ISXM_Letter_Avatars::clean_hue( '200' ) === 200 && ISXM_Letter_Avatars::clean_hue( '999' ) === 0 && ISXM_Letter_Avatars::clean_hue( '-5' ) === 0 && ISXM_Letter_Avatars::clean_hue( 'x' ) === 0 );
 t( 'What the endpoint draws for a hostile query is harmless', stripos( ISXM_Letter_Avatars::svg( ISXM_Letter_Avatars::clean_initial( '"/><script>alert(1)</script>' ), ISXM_Letter_Avatars::clean_hue( '1);x' ) ), 'script' ) === false );
+t( 'The Media Library filter (empty isxs_avatar, admin) is never answered with an image', ! ISXM_Letter_Avatars::is_image_request( [ 'isxs_avatar' => '', 'isxs_status' => '', 'm' => '0' ], true ) && ! ISXM_Letter_Avatars::is_image_request( [ 'isxs_avatar' => 'only' ], true ) );
+t( 'Avatar URLs are served on the front end only, with letter and colour', ISXM_Letter_Avatars::is_image_request( [ 'isxs_avatar' => 'S', 'h' => '12' ], false ) && ! ISXM_Letter_Avatars::is_image_request( [ 'isxs_avatar' => 'S' ], false ) && ! ISXM_Letter_Avatars::is_image_request( [ 'isxs_avatar' => 'S', 'h' => '12' ], true ) );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

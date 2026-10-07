@@ -179,7 +179,8 @@ class ISXM_Background {
      * Restart a run whose driver disappeared (loopback request killed by
      * the host, PHP fatal, server restart). Does nothing while a runner is
      * demonstrably alive — `is_stalled()` only becomes true after
-     * ISXM_Job::STALL_SECONDS without a single batch write.
+     * ISXM_Job::STALL_SECONDS without a single batch write. Without
+     * loopback it drives the run itself, since nothing else would.
      */
     public function handle_healthcheck() {
         // Also the safety net for the ledger backfill on a site whose admin
@@ -199,7 +200,23 @@ class ISXM_Background {
             return;
         }
 
-        if ( ! $job->is_stalled() || self::is_locked() ) {
+        if ( self::is_locked() ) {
+            return;
+        }
+
+        // No loopback: nothing re-dispatches between batches, so with the
+        // tab closed the run would sit idle forever. Let the cron request
+        // drive one budgeted slice itself — same runner and lock as the UI
+        // tick, so an open tab driving it at the same time is harmless.
+        // ponytail: ~RUNNER_BUDGET of work per cron minute; a real cron
+        // running `wp isxm job run` is the upgrade path if that is too slow.
+        if ( ! self::loopback_available() ) {
+            ignore_user_abort( true );
+            self::run();
+            return;
+        }
+
+        if ( ! $job->is_stalled() ) {
             return;
         }
 
@@ -302,7 +319,15 @@ class ISXM_Background {
             isxm_log_error( 'Loopback request unavailable (' . $reason . ') — bulk tools will run in browser-driven mode.' );
         }
 
-        set_transient( self::LOOPBACK_TRANSIENT, $ok ? 'yes' : 'no', DAY_IN_SECONDS );
+        // A transport failure (timeout, refused connection) usually means the
+        // site was too busy to answer its own ping — e.g. every PHP worker
+        // tied up by the running job. Caching that for a day would silence
+        // dispatch() and the healthcheck for a day, so retry it on the next
+        // healthcheck tick instead. A real HTTP answer that isn't the pong
+        // (401/403 from auth or a firewall) is a property of the host, and
+        // re-probing it every minute would only burn a 10s request.
+        $ttl = ( ! $ok && is_wp_error( $response ) ) ? self::CRON_INTERVAL : DAY_IN_SECONDS;
+        set_transient( self::LOOPBACK_TRANSIENT, $ok ? 'yes' : 'no', $ttl );
         return $ok;
     }
 

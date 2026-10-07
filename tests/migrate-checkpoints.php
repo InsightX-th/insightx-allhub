@@ -165,6 +165,10 @@ t( 'Owner can release own lease', ! ISXM_Background::runner_lock_held() );
 set_transient( ISXM_Background::LOOPBACK_TRANSIENT, 'yes' );
 $GLOBALS['isxm_t']['http_provider'] = function () { return new WP_Error( 'transport', 'injected dispatch failure' ); };
 t( 'Dispatch failure is returned and enables browser fallback', ! ISXM_Background::dispatch() && get_transient( ISXM_Background::LOOPBACK_TRANSIENT ) === 'no' );
+$GLOBALS['isxm_t']['http_provider'] = function () { return new WP_Error( 'http_request_failed', 'cURL error 28: Operation timed out' ); };
+t( 'Ping timeout (busy site) is cached for one healthcheck tick, not a day', ! ISXM_Background::loopback_available( true ) && $GLOBALS['isxm_t']['transient_ttl'][ ISXM_Background::LOOPBACK_TRANSIENT ] === ISXM_Background::CRON_INTERVAL );
+$GLOBALS['isxm_t']['http_provider'] = function () { return [ 'response' => [ 'code' => 403 ], 'body' => '' ]; };
+t( 'Ping refused by the host is still cached for a day', ! ISXM_Background::loopback_available( true ) && $GLOBALS['isxm_t']['transient_ttl'][ ISXM_Background::LOOPBACK_TRANSIENT ] === DAY_IN_SECONDS );
 
 group( 'Background integration with durable migration' );
 $job = migration_fixture( 3 );
@@ -180,6 +184,20 @@ ISXM_Background::run();
 $finished = ISXM_Job::get( 'migrate' );
 t( 'Production runner reloads checkpoint and does not double-count', $finished->state === ISXM_Job::STATE_DONE && $finished->processed === 3, $finished->message );
 t( 'Production runner releases its lease', ! ISXM_Background::runner_lock_held() );
+
+group( 'Healthcheck drives the run when loopback is unavailable' );
+$job = migration_fixture( 3 );
+$connections = get_option( 'isxs_connections' );
+$connections['minio'] = $connections['custom']; $connections['minio']['bucket'] = 'source';
+update_option( 'isxs_connections', $connections );
+$settings = get_option( 'isxs_settings' ); $settings['source_provider'] = 'minio';
+update_option( 'isxs_settings', $settings ); ISXM_Settings::flush_cache();
+set_transient( ISXM_Background::LOOPBACK_TRANSIENT, 'no' );
+t( 'Fresh run is not stalled (old healthcheck would have ignored it)', ! ISXM_Job::get( 'migrate' )->is_stalled() );
+( new ISXM_Background() )->handle_healthcheck();
+$after = ISXM_Job::get( 'migrate' );
+t( 'Healthcheck processes the run itself with no tab open', $after->processed > 0, $after->state . ' ' . $after->message );
+t( 'Healthcheck runner releases its lease', ! ISXM_Background::runner_lock_held() );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

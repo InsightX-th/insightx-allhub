@@ -143,20 +143,30 @@ if ( ! function_exists( 'get_user_by' ) ) { function get_user_by( $f, $v ) { glo
 $GLOBALS['isxm_users'] =& $isxm_users;
 $somchai = $mk( 7, 'somchai jaidee', 'somchai', 'Somchai@Example.com' );
 $mk( 8, '', 'กมล', 'kamol@example.com' );
-$svg = function ( $args ) { return base64_decode( substr( $args['url'], strlen( 'data:image/svg+xml;base64,' ) ) ); };
 $av = new ISXM_Letter_Avatars();
+// WordPress' esc_url() keeps only allowed protocols — data: is not one of them.
+$esc_url = function ( $url ) { return preg_match( '#^(https?:)?//#i', $url ) ? $url : ''; };
+$letter = function ( $url ) { parse_str( (string) parse_url( $url, PHP_URL_QUERY ), $q ); return [ $q['isxs_avatar'] ?? null, isset( $q['h'] ) ? (int) $q['h'] : null ]; };
 isxm_test_configure( [], [ 'letter_avatars' => false ] );
 t( 'Off: avatar data untouched', $av->filter_avatar_data( [ 'url' => 'https://gravatar.example/x' ], 7 )['url'] === 'https://gravatar.example/x' );
 isxm_test_configure( [], [ 'letter_avatars' => true ] );
 $a = $av->filter_avatar_data( [ 'url' => 'https://cdn.example/stored-avatar.jpg', 'size' => 96 ], 7 );
-t( 'On: stored / Gravatar picture replaced by an SVG letter circle', strpos( $a['url'], 'data:image/svg+xml;base64,' ) === 0 && $a['found_avatar'] && strpos( $svg( $a ), '<circle' ) !== false && strpos( $svg( $a ), '>S</text>' ) !== false );
-t( 'Same person, same colour, whichever way they are passed', $svg( $av->filter_avatar_data( [], $somchai ) ) === $svg( $a ) && $svg( $av->filter_avatar_data( [], 'somchai@example.com' ) ) === $svg( $a ) );
-t( 'Thai name, falls back to user_login when display name is empty', strpos( $svg( $av->filter_avatar_data( [], 8 ) ), '>ก</text>' ) !== false );
+t( 'On: stored / Gravatar picture replaced by this site\'s letter URL', strpos( $a['url'], 'https://example.com/?isxs_avatar=S&h=' ) === 0 && $a['found_avatar'] );
+t( 'The URL survives esc_url() (the 0.2.37 data: URI did not — broken image)', $esc_url( $a['url'] ) === $a['url'] && $esc_url( 'data:image/svg+xml;base64,AAAA' ) === '' );
+parse_str( (string) parse_url( $a['url'], PHP_URL_QUERY ), $aq );
+t( 'Only the letter and colour in the URL — no email or user id', array_keys( $aq ) === [ 'isxs_avatar', 'h' ] && stripos( $a['url'], 'somchai' ) === false );
+t( 'Same person, same URL, whichever way they are passed', $av->filter_avatar_data( [], $somchai )['url'] === $a['url'] && $av->filter_avatar_data( [], 'somchai@example.com' )['url'] === $a['url'] );
+t( 'Thai name, falls back to user_login when display name is empty', $letter( $av->filter_avatar_data( [], 8 )['url'] )[0] === 'ก' );
 t( 'Thai: leading vowel skipped (เกศินี → ก), vowel marks dropped (นิดา → น)', ISXM_Letter_Avatars::initial( 'เกศินี' ) === 'ก' && ISXM_Letter_Avatars::initial( 'นิดา' ) === 'น' && ISXM_Letter_Avatars::initial( '  @john ' ) === 'J' && ISXM_Letter_Avatars::initial( '' ) === '?' );
 $c = new WP_Comment(); $c->comment_author = '<b>Guest</b>'; $c->comment_author_email = 'guest@example.com';
-$g = $svg( $av->filter_avatar_data( [], $c ) );
-t( 'Guest commenter: letter from the comment author, markup cannot leak into the SVG', strpos( $g, '>B</text>' ) !== false || strpos( $g, '>G</text>' ) !== false );
-t( 'Unknown email: letter from the address', strpos( $svg( $av->filter_avatar_data( [], 'zoe@example.com' ) ), '>Z</text>' ) !== false );
+t( 'Guest commenter: letter from the comment author', in_array( $letter( $av->filter_avatar_data( [], $c )['url'] )[0], [ 'B', 'G' ], true ) );
+t( 'Unknown email: letter from the address', $letter( $av->filter_avatar_data( [], 'zoe@example.com' )['url'] )[0] === 'Z' );
+$svg = ISXM_Letter_Avatars::svg( 'ก', 120 );
+t( 'SVG: a circle with the letter, no script', strpos( $svg, '<circle' ) !== false && strpos( $svg, 'hsl(120,' ) !== false && strpos( $svg, '>ก</text>' ) !== false && stripos( $svg, '<script' ) === false );
+t( 'Endpoint input: one letter (with its marks) or "?"', ISXM_Letter_Avatars::clean_initial( 'ก' ) === 'ก' && ISXM_Letter_Avatars::clean_initial( 'S' ) === 'S'
+    && ISXM_Letter_Avatars::clean_initial( '<script>' ) === '?' && ISXM_Letter_Avatars::clean_initial( 'AB' ) === '?' && ISXM_Letter_Avatars::clean_initial( str_repeat( 'ก', 20 ) ) === '?' && ISXM_Letter_Avatars::clean_initial( '' ) === '?' );
+t( 'Endpoint input: hue 0–359 only', ISXM_Letter_Avatars::clean_hue( '200' ) === 200 && ISXM_Letter_Avatars::clean_hue( '999' ) === 0 && ISXM_Letter_Avatars::clean_hue( '-5' ) === 0 && ISXM_Letter_Avatars::clean_hue( 'x' ) === 0 );
+t( 'What the endpoint draws for a hostile query is harmless', stripos( ISXM_Letter_Avatars::svg( ISXM_Letter_Avatars::clean_initial( '"/><script>alert(1)</script>' ), ISXM_Letter_Avatars::clean_hue( '1);x' ) ), 'script' ) === false );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

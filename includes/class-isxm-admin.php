@@ -277,6 +277,7 @@ class ISXM_Admin {
 
                 <nav class="isxs-nav" role="tablist">
                     <button type="button" class="isxs-nav-item is-active" data-tab="media" role="tab"><?php esc_html_e( 'Media', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="images" role="tab"><?php esc_html_e( 'Images', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="assets" role="tab"><?php esc_html_e( 'Assets', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="tools" role="tab"><?php esc_html_e( 'Tools', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="migrate" role="tab"><?php esc_html_e( 'Migrate', 'insightx-offload' ); ?></button>
@@ -329,8 +330,6 @@ class ISXM_Admin {
                                 <div class="isxs-card-body">
                                     <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy media files to storage automatically after upload', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'letter_avatars', $s['letter_avatars'], __( 'Letter avatars', 'insightx-offload' ), __( 'Show every profile picture as a coloured circle with the person\'s first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'use_prefix', $s['use_prefix'], 'Add Prefix to Bucket Path', __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
                                     <div class="isxs-field isxs-indent" id="isxs-prefix-field">
@@ -397,6 +396,27 @@ class ISXM_Admin {
                         </div>
 
                         <?php $this->url_preview_card(); ?>
+                    </section>
+
+                    <!-- ============ IMAGES ============ -->
+                    <section class="isxs-tab" data-tab-panel="images">
+                        <div class="isxs-card isxs-card-half">
+                            <div class="isxs-card-head">
+                                <div class="isxs-card-head-title">
+                                    <span class="isxs-icon-box" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                                    </span>
+                                    <div>
+                                        <h2><?php esc_html_e( 'Images', 'insightx-offload' ); ?></h2>
+                                        <p class="isxs-card-sub"><?php esc_html_e( 'Image sizes and profile pictures', 'insightx-offload' ); ?></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="isxs-card-body">
+                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-offload' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'letter_avatars', $s['letter_avatars'], __( 'Letter avatars', 'insightx-offload' ), __( 'Show every profile picture as a coloured circle with the person\'s first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off', 'insightx-offload' ) ); ?>
+                            </div>
+                        </div>
                     </section>
 
                     <!-- ============ ASSETS ============ -->

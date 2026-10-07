@@ -1543,3 +1543,11 @@ msgstr "รูปโปรไฟล์แบบตัวอักษร"
 #: includes/class-isxm-admin.php
 msgid "Show every profile picture as a coloured circle with the person's first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off"
 msgstr "แสดงรูปโปรไฟล์ของทุกคนเป็นวงกลมสีพร้อมตัวอักษรแรกของชื่อ ไม่เก็บไฟล์และไม่โหลดจาก Gravatar รูปโปรไฟล์ที่เก็บไว้เดิมยังอยู่ และจะกลับมาแสดงเมื่อปิดตัวเลือกนี้"
+
+#: includes/class-isxm-admin.php
+msgid "Images"
+msgstr "รูปภาพ"
+
+#: includes/class-isxm-admin.php
+msgid "Image sizes and profile pictures"
+msgstr "ขนาดรูปและรูปโปรไฟล์"

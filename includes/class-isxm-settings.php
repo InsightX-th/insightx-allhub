@@ -88,6 +88,7 @@ class ISXM_Settings {
             'source_public_base_url' => '',        // URL the existing media is actually served from now (as found in the DB) — empty = infer from source_endpoint/bucket
             'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, comma-separated (e.g. download/)
             'source_media'           => true,
+            'offload_media_library'  => true,      // Offload card: the uploads chip (whole Media Library) is selected
             'offload_server_folders' => '',        // Server folders outside the Media Library uploaded as-is (relative to ABSPATH), comma-separated      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
         ];
     }
@@ -467,6 +468,24 @@ class ISXM_Settings {
             if ( $line !== '' ) $out[] = $line . '/';
         }
         return array_values( array_unique( $out ) );
+    }
+
+    /**
+     * The uploads directory relative to the WordPress root, e.g.
+     * "wp-content/uploads/" — the Offload card's Media Library chip.
+     */
+    public static function uploads_relative() {
+        $uploads = wp_normalize_path( trailingslashit( wp_get_upload_dir()['basedir'] ) );
+        $root    = wp_normalize_path( ABSPATH );
+        return strpos( $uploads, $root ) === 0 ? substr( $uploads, strlen( $root ) ) : 'wp-content/uploads/';
+    }
+
+    /**
+     * The Offload card's folder field: the uploads chip (when the Media
+     * Library is selected) followed by the server folders.
+     */
+    public static function offload_folders() {
+        return implode( ', ', array_merge( self::get( 'offload_media_library' ) ? [ self::uploads_relative() ] : [], self::server_folders() ) );
     }
 
     /**

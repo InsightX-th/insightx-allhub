@@ -181,7 +181,20 @@ class ISXM_Tools {
         // Server folders for the "Upload server folders" tool. Not posted →
         // keep what is stored (save() would otherwise reset it to default).
         delete_transient( self::SERVER_STATS ); // folders may change below
-        if ( isset( $_POST['offload_server_folders'] ) ) {
+        $settings['offload_media_library'] = (bool) $current['offload_media_library'];
+        if ( isset( $_POST['offload_folders'] ) ) {
+            // The Offload card's one field: the uploads chip switches the
+            // Media Library on, everything else is a server folder.
+            $split = self::split_offload_folders( wp_unslash( (string) $_POST['offload_folders'] ) );
+            $settings['offload_media_library']  = $split['media'];
+            $settings['offload_server_folders'] = $split['folders'];
+            if ( $split['inside_uploads'] ) {
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'Folders inside %1$s were removed — the Media Library chip already covers them: %2$s', 'insightx-offload' ), ISXM_Settings::uploads_relative(), implode( ', ', $split['inside_uploads'] ) ) );
+            }
+            if ( $split['rejected'] ) {
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-offload' ), implode( ', ', $split['rejected'] ) ) );
+            }
+        } elseif ( isset( $_POST['offload_server_folders'] ) ) {
             $server = self::sanitize_server_folders( wp_unslash( (string) $_POST['offload_server_folders'] ) );
             $settings['offload_server_folders'] = $server['value'];
             if ( $server['rejected'] ) {
@@ -366,6 +379,9 @@ class ISXM_Tools {
      */
     public static function server_folder_path( $folder ) {
         if ( $folder === '' || preg_match( '#(^|/)\.#', $folder ) ) return '';
+        // The uploads tree is the Media Library's (Offload's uploads chip),
+        // never uploaded again as raw files.
+        if ( strpos( $folder, ISXM_Settings::uploads_relative() ) === 0 ) return '';
         foreach ( self::BLOCKED_SERVER_FOLDERS as $blocked ) {
             if ( strpos( $folder, $blocked ) === 0 ) return '';
         }
@@ -374,6 +390,26 @@ class ISXM_Tools {
         if ( ! $root || ! $path || ! is_dir( $path ) ) return '';
         $root = trailingslashit( $root ); $path = trailingslashit( $path );
         return ( strpos( $path, $root ) === 0 && $path !== $root ) ? $path : '';
+    }
+
+    /**
+     * The Offload card's field → Media Library on/off + server folders.
+     * Folders inside uploads are dropped (the uploads chip covers them).
+     *
+     * @return array{media:bool,folders:string,inside_uploads:string[],rejected:string[]}
+     */
+    public static function split_offload_folders( $value ) {
+        $uploads = ISXM_Settings::uploads_relative();
+        $media = false; $inside = []; $rest = [];
+        foreach ( preg_split( '/[,\r\n]+/', (string) $value ) as $part ) {
+            $folder = self::sanitize_prefix( $part );
+            if ( $folder === '' ) continue;
+            if ( $folder === $uploads ) { $media = true; continue; }
+            if ( strpos( $folder, $uploads ) === 0 ) { $inside[] = $folder; continue; }
+            $rest[] = trim( $part ); // as typed, so a refusal names what the user wrote
+        }
+        $server = self::sanitize_server_folders( implode( ',', $rest ) );
+        return [ 'media' => $media, 'folders' => $server['value'], 'inside_uploads' => $inside, 'rejected' => $server['rejected'] ];
     }
 
     /**
@@ -409,10 +445,11 @@ class ISXM_Tools {
             new RecursiveDirectoryIterator( $base, FilesystemIterator::SKIP_DOTS ),
             function ( $item ) use ( $root ) {
                 if ( strpos( $item->getFilename(), '.' ) === 0 ) return false;
-                // Picking "wp-content/" must not walk into plugins/ or themes/.
+                // Picking "wp-content/" must not walk into plugins/ or themes/,
+                // nor into uploads (the Media Library goes up as attachments).
                 if ( $item->isDir() ) {
                     $relative = substr( $item->getPathname(), strlen( $root ) ) . '/';
-                    foreach ( self::BLOCKED_SERVER_FOLDERS as $blocked ) {
+                    foreach ( array_merge( self::BLOCKED_SERVER_FOLDERS, [ ISXM_Settings::uploads_relative() ] ) as $blocked ) {
                         if ( strpos( $relative, $blocked ) === 0 ) return false;
                     }
                 }
@@ -443,7 +480,7 @@ class ISXM_Tools {
      *
      * @return array|WP_Error
      */
-    private function batch_offload_folders( $cursor ) {
+    private function batch_offload_folders( $cursor, $then_rewrite = true ) {
         $cursor = (string) $cursor;
         if ( strpos( $cursor, 'rewrite|' ) === 0 ) {
             return $this->rewrite_server_links( substr( $cursor, 8 ) );
@@ -488,7 +525,8 @@ class ISXM_Tools {
         }
 
         $uploaded_all = $index >= count( $folders );
-        if ( $uploaded_all && ISXM_Offload::should_persist_urls() ) {
+        // Inside the Offload run the caller sequences the rewrite itself.
+        if ( $uploaded_all && $then_rewrite && ISXM_Offload::should_persist_urls() ) {
             return [ 'processed' => $processed, 'cursor' => 'rewrite|posts:0', 'done' => false, 'errors' => $errors, 'phase' => 'rewriting' ];
         }
         return [
@@ -624,8 +662,17 @@ class ISXM_Tools {
      */
     public function ajax_server_folders() {
         $this->guard();
-        $prefix = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
+        $prefix  = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
+        $uploads = ISXM_Settings::uploads_relative();
+        if ( $prefix === $uploads ) {
+            // The uploads chip is the whole Media Library: nothing to pick inside.
+            wp_send_json_success( [ 'folders' => [], 'truncated' => false, 'prefix' => $prefix, 'media' => $uploads ] );
+        }
         $base   = $prefix === '' ? trailingslashit( (string) realpath( ABSPATH ) ) : self::server_folder_path( $prefix );
+        // Browsing down to the uploads folder passes through wp-content/.
+        if ( $base === '' && $prefix !== '' && strpos( $uploads, $prefix ) === 0 && is_dir( ABSPATH . $prefix ) ) {
+            $base = trailingslashit( (string) realpath( ABSPATH . $prefix ) );
+        }
         if ( $base === '' || $base === '/' ) {
             wp_send_json_error( [ 'message' => __( 'This folder cannot be browsed', 'insightx-offload' ) ] );
         }
@@ -633,9 +680,9 @@ class ISXM_Tools {
         foreach ( (array) scandir( $base ) as $name ) {
             if ( $name === '' || $name[0] === '.' || ! is_dir( $base . $name ) ) continue;
             $folder = $prefix . $name . '/';
-            if ( self::server_folder_path( $folder ) !== '' ) $folders[] = $folder;
+            if ( $folder === $uploads || self::server_folder_path( $folder ) !== '' ) $folders[] = $folder;
         }
-        wp_send_json_success( [ 'folders' => $folders, 'truncated' => false, 'prefix' => $prefix, 'media' => '' ] );
+        wp_send_json_success( [ 'folders' => $folders, 'truncated' => false, 'prefix' => $prefix, 'media' => $uploads ] );
     }
 
     /**
@@ -1529,6 +1576,9 @@ class ISXM_Tools {
                 return new WP_Error( 'isxs_same_bucket', __( 'Source and destination point at the same bucket and prefix — choose a different source provider (or change the prefix) first', 'insightx-offload' ) );
             }
         }
+        if ( $tool === 'offload' && ! ISXM_Settings::get( 'offload_media_library' ) && ! ISXM_Settings::server_folders() ) {
+            return new WP_Error( 'isxs_offload_nothing', __( 'Choose at least one folder to offload first', 'insightx-offload' ) );
+        }
         if ( $tool === 'clean_local' && ! ISXM_Settings::get( 'persist_urls' ) && ! ISXM_Settings::get( 'deliver_enabled' ) ) {
             // Same rule as Remove Local Media: with neither on, pages still
             // point at the server copies.
@@ -1618,9 +1668,10 @@ class ISXM_Tools {
 
         switch ( $tool ) {
             case 'offload':
-                // Not on the bucket yet, plus items there with sizes missing
-                // (the run's second pass).
-                return max( (int) $stats['total'] - (int) $stats['in_bucket'], 0 ) + (int) $stats['partial'];
+                // Media Library: not on the bucket yet, plus items there with
+                // sizes missing (the second pass). Server folders: files to send.
+                return ( ISXM_Settings::get( 'offload_media_library' ) ? max( (int) $stats['total'] - (int) $stats['in_bucket'], 0 ) + (int) $stats['partial'] : 0 )
+                    + self::tool_total( 'offload_folders' );
             case 'download':
             case 'remove':
             case 'clean_local':
@@ -2745,27 +2796,81 @@ class ISXM_Tools {
      *                           or rewrite|<table>:<id>).
      * @return array
      */
+    /**
+     * The Offload card's run, in order — each step only when selected:
+     *   upload|  Media Library items not on the bucket yet
+     *   partial| Media Library items with sizes missing
+     *   folders| server folders outside uploads, uploaded under their path
+     *   rewrite| one pass moving Media Library URLs to the bucket
+     *   frewrite| one pass moving server-folder links to the bucket
+     * Cursors from older versions (upload|, partial|, rewrite|) resume as is.
+     */
     private function batch_offload( $cursor ) {
         list( $phase, $rest ) = self::split_cursor( $cursor, 'upload' );
+        $media   = (bool) ISXM_Settings::get( 'offload_media_library' );
+        $folders = (bool) ISXM_Settings::server_folders();
+        $persist = ISXM_Offload::should_persist_urls();
 
-        // Second pass: items already on the bucket with sizes missing
-        // ("Not all sizes uploaded") — offload_one_callback() routes them
-        // to complete_missing_sizes(). Then the usual one-pass rewrite.
-        if ( $phase === 'partial' ) {
-            $result = $this->run_pending_batch( (int) $rest, $this->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ], true );
-            if ( ! empty( $result['done'] ) && ISXM_Offload::should_persist_urls() ) {
-                return self::batch_result( $result, [ 'cursor' => 'rewrite|posts:0', 'done' => false, 'phase' => 'rewriting' ] );
+        // Where the run goes once a step is finished.
+        $after_media_uploads = function () use ( $folders, $media, $persist ) {
+            if ( $folders ) return 'folders|0|';
+            if ( $media && $persist ) return 'rewrite|posts:0';
+            return '';
+        };
+        $after_folder_uploads = function () use ( $media, $folders, $persist ) {
+            if ( $media && $persist ) return 'rewrite|posts:0';
+            if ( $folders && $persist ) return 'frewrite|posts:0';
+            return '';
+        };
+        $step = function ( array $result, $next ) {
+            if ( $next === '' ) {
+                $result['done'] = true;
+                return $result;
             }
-            return self::batch_result( $result, [ 'cursor' => 'partial|' . $result['last_id'] ] );
+            $result['cursor'] = $next;
+            $result['done']   = false;
+            $result['phase']  = strpos( $next, 'rewrite|' ) !== false ? 'rewriting' : '';
+            return $result;
+        };
+
+        if ( $phase === 'upload' && ! $media ) {
+            $phase = 'folders'; $rest = '0|';
+        }
+
+        if ( $phase === 'folders' ) {
+            $result = $this->batch_offload_folders( $rest, false );
+            if ( is_wp_error( $result ) ) return $result;
+            if ( empty( $result['done'] ) ) {
+                $result['cursor'] = 'folders|' . $result['cursor'];
+                return $result;
+            }
+            return $step( $result, $after_folder_uploads() );
+        }
+
+        if ( $phase === 'frewrite' ) {
+            $result = $this->rewrite_server_links( $rest );
+            if ( is_wp_error( $result ) || ! empty( $result['done'] ) ) return $result;
+            $result['cursor'] = 'f' . $result['cursor']; // "rewrite|…" → "frewrite|…"
+            return $result;
+        }
+
+        if ( $phase === 'partial' ) {
+            $result = self::batch_result( $this->run_pending_batch( (int) $rest, $this->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ], true ) );
+            if ( empty( $result['done'] ) ) {
+                $result['cursor'] = 'partial|' . $result['cursor'];
+                return $result;
+            }
+            return $step( $result, $after_media_uploads() );
         }
 
         $result = $this->batch_pending_phased( $cursor, $this->offload_one_callback() );
-        if ( $phase === 'upload' && ! is_wp_error( $result )
-            && ( ! empty( $result['done'] ) || strpos( (string) $result['cursor'], 'rewrite|' ) === 0 ) ) {
-            // New uploads drained: fill in missing sizes before the rewrite.
-            $result['cursor'] = 'partial|0';
-            $result['done']   = false;
-            $result['phase']  = '';
+        if ( is_wp_error( $result ) ) return $result;
+        if ( $phase === 'upload' && ( ! empty( $result['done'] ) || strpos( (string) $result['cursor'], 'rewrite|' ) === 0 ) ) {
+            // New uploads drained: fill in missing sizes next.
+            return $step( $result, 'partial|0' );
+        }
+        if ( $phase === 'rewrite' && ! empty( $result['done'] ) && $folders && $persist ) {
+            return $step( $result, 'frewrite|posts:0' );
         }
         return $result;
     }

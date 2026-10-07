@@ -58,6 +58,7 @@ class ISXM_Admin {
             'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
             'nonce'       => wp_create_nonce( ISXM_Tools::NONCE_ACTION ),
             'sourceMedia' => ISXM_Settings::get( 'source_prefix' ),
+            'uploadsPath' => ISXM_Settings::uploads_relative(),
             'stats'       => $stats,
             'configured'  => ISXM_Settings::is_configured(),
             'hasSecret'   => $settings['secret_key'] !== '',
@@ -233,12 +234,7 @@ class ISXM_Admin {
                                 </thead>
                                 <tbody id="isxs-status-rows">
                                     <tr>
-                                        <?php
-                                        // The source as a path ("wp-content/uploads/"), Media Library on hover.
-                                        $uploads_dir = wp_normalize_path( trailingslashit( wp_get_upload_dir()['basedir'] ) );
-                                        $site_root   = wp_normalize_path( ABSPATH );
-                                        ?>
-                                        <td title="Media Library"><?php echo esc_html( strpos( $uploads_dir, $site_root ) === 0 ? substr( $uploads_dir, strlen( $site_root ) ) : 'Media Library' ); ?></td>
+                                        <td title="Media Library"><?php echo esc_html( ISXM_Settings::uploads_relative() ); ?></td>
                                         <td class="isxs-status-num" id="isxs-status-offloaded">0</td>
                                         <td class="isxs-status-num" id="isxs-status-remaining">0</td>
                                     </tr>
@@ -246,7 +242,6 @@ class ISXM_Admin {
                             </table>
                             <div class="isxs-status-action">
                                 <button type="button" class="isxs-btn isxs-btn-primary isxs-status-offload-btn"><?php printf( esc_html__( 'Offload Remaining %s items', 'insightx-offload' ), '<span id="isxs-status-remaining-num">0</span>' ); ?></button>
-                                <button type="button" class="isxs-btn isxs-btn-ghost isxs-status-folders-btn" hidden><?php printf( esc_html__( 'Upload remaining folder files (%s)', 'insightx-offload' ), '<span id="isxs-status-folders-num">0</span>' ); ?></button>
                             </div>
                             <div class="isxs-status-foot"><?php printf( esc_html__( 'Total %1$s items · %2$s on the bucket', 'insightx-offload' ), '<span id="isxs-status-total">0</span>', '<span id="isxs-status-onbucket">0</span>' ); ?></div>
                         </div>
@@ -464,32 +459,25 @@ class ISXM_Admin {
                         <div class="isxs-tools-grid">
                             <?php
                             $this->sync_card();
-                            $this->tool_card(
-                                'offload',
-                                __( 'Offload remaining media', 'insightx-offload' ),
-                                __( 'Upload all media not yet in the bucket, and any image sizes missing from items already there. The job runs on the server, so you can close this tab and resume later from the same point', 'insightx-offload' ),
-                                __( 'Start Offload', 'insightx-offload' ),
-                                '',
-                                false
-                            );
-
+                            // One Offload card: the uploads chip is the whole Media
+                            // Library, any other folder goes up under its own path.
                             ob_start();
                             ?>
                             <div class="isxs-field isxs-folder-field">
-                                <label for="isxs-server-folders-type"><?php esc_html_e( 'Server folders', 'insightx-offload' ); ?></label>
-                                <input type="hidden" id="isxs-server-folders" value="<?php echo esc_attr( $s['offload_server_folders'] ); ?>">
-                                <?php $this->folder_picker_markup( 'isxs-server-folders-type' ); ?>
+                                <label for="isxs-offload-folders-type"><?php esc_html_e( 'Folders to offload', 'insightx-offload' ); ?></label>
+                                <input type="hidden" id="isxs-offload-folders" value="<?php echo esc_attr( ISXM_Settings::offload_folders() ); ?>">
+                                <?php $this->folder_picker_markup( 'isxs-offload-folders-type' ); ?>
                             </div>
                             <?php
-                            $server_fields = ob_get_clean();
+                            $offload_fields = ob_get_clean();
                             $this->tool_card(
-                                'offload_folders',
-                                __( 'Upload server folders', 'insightx-offload' ),
-                                __( 'Upload folders on this server that are not part of the Media Library (e.g. download/). Files keep their path on the bucket, links to them are updated, and the server copies are kept', 'insightx-offload' ),
-                                __( 'Upload Folders', 'insightx-offload' ),
+                                'offload',
+                                __( 'Offload media', 'insightx-offload' ),
+                                sprintf( __( 'Choose the folders to offload. %s is the whole Media Library (new files and missing image sizes); other folders go up under their own path and keep their server copies. Runs on the server, so you can close this tab', 'insightx-offload' ), ISXM_Settings::uploads_relative() ),
+                                __( 'Start Offload', 'insightx-offload' ),
                                 '',
                                 false,
-                                $server_fields
+                                $offload_fields
                             );
 
                             // Only worth showing when something actually failed —
@@ -502,9 +490,26 @@ class ISXM_Admin {
                                 '',
                                 empty( $stats['failed'] )
                             );
-                            $this->tool_card( 'clean_local', __( 'Delete server copies already in the bucket', 'insightx-offload' ), __( 'Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins\' folders are not touched', 'insightx-offload' ), __( 'Delete Server Copies', 'insightx-offload' ), 'danger' );
+                            // One Delete card; the dropdown picks which copy goes —
+                            // the server's (clean_local) or the bucket's (remove).
+                            $delete_modes = [
+                                'clean_local' => [ __( 'Delete server copies already in the bucket', 'insightx-offload' ), __( 'Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins\' folders are not touched', 'insightx-offload' ), __( 'Delete Server Copies', 'insightx-offload' ) ],
+                                'remove'      => [ __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ) ],
+                            ];
+                            ob_start();
+                            ?>
+                            <div class="isxs-field">
+                                <label for="isxs-delete-mode"><?php esc_html_e( 'What to delete', 'insightx-offload' ); ?></label>
+                                <select id="isxs-delete-mode" class="isxs-select">
+                                    <?php foreach ( $delete_modes as $mode => $texts ) : ?>
+                                        <option value="<?php echo esc_attr( $mode ); ?>" data-desc="<?php echo esc_attr( $texts[1] ); ?>" data-button="<?php echo esc_attr( $texts[2] ); ?>"><?php echo esc_html( $texts[0] ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php
+                            $delete_fields = ob_get_clean();
+                            $this->tool_card( 'clean_local', __( 'Delete files', 'insightx-offload' ), $delete_modes['clean_local'][1], $delete_modes['clean_local'][2], 'danger', false, $delete_fields );
                             $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
-                            $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );
                             if ( class_exists( 'WC_Product' ) ) {
                                 $this->tool_card( 'wc_downloads', __( 'Check and update WooCommerce downloadable products', 'insightx-offload' ), __( 'Make downloadable product files private in the bucket and update their URLs', 'insightx-offload' ), __( 'Check and Update', 'insightx-offload' ) );
                             }

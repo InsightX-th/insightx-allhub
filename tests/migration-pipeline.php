@@ -436,6 +436,77 @@ t( 'Refused while pages could still point at the server copies', is_wp_error( $p
 delete_option( ISXM_Items::BACKFILLED_OPTION );
 foreach ( [ 'c1-150x150.jpg', 'c1-extra.jpg', 'woocommerce_uploads/d.zip' ] as $f ) @unlink( ISXM_TEST_UPLOADS . '/' . $f );
 
+group( 'One Offload card: Media Library chip + server folders' );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_combined_' . getmypid() . '.jsonl';
+$fake_port = 24000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_items_table( $db ); update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+delete_option( ISXM_Tools::SERVER_MANIFEST ); delete_transient( ISXM_Tools::SERVER_STATS );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn );
+ISXM_Settings::flush_cache();
+$combo = ABSPATH . 'download/Combined/';
+wp_mkdir_p( $combo ); file_put_contents( $combo . 'one.pdf', '1' ); file_put_contents( $combo . 'two.pdf', '2' );
+wp_mkdir_p( ISXM_TEST_UPLOADS . '/2021' ); file_put_contents( ISXM_TEST_UPLOADS . '/2021/stray.jpg', 's' );
+$set = function ( array $over ) { $GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), $over ); ISXM_Settings::flush_cache(); delete_transient( ISXM_Tools::SERVER_STATS ); };
+
+$split = ISXM_Tools::split_offload_folders( 'wp-content/uploads/, download/Combined/, wp-content/uploads/2021/, ../etc/, wp-admin/' );
+t( 'Field split: uploads chip turns the Media Library on, other folders stay, uploads subfolders and unsafe ones are dropped', $split['media'] === true && $split['folders'] === 'download/Combined/' && $split['inside_uploads'] === [ 'wp-content/uploads/2021/' ] && $split['rejected'] === [ '../etc/', 'wp-admin/' ], json_encode( $split ) );
+t( 'Without the uploads chip the Media Library is off', ISXM_Tools::split_offload_folders( 'download/Combined/' )['media'] === false );
+t( 'Uploads and anything inside it is never a raw server folder', ISXM_Tools::server_folder_path( 'wp-content/uploads/' ) === '' && ISXM_Tools::server_folder_path( 'wp-content/uploads/2021/' ) === '' );
+t( 'Picking wp-content/ walks past uploads (no raw copy of the Media Library)', ! preg_grep( '#^wp-content/uploads/#', ISXM_Tools::server_folder_files( 'wp-content/' ) ) );
+$set( [ 'offload_media_library' => true, 'offload_server_folders' => 'download/Combined/' ] );
+t( 'Field value: uploads chip first, then the server folders', ISXM_Settings::offload_folders() === 'wp-content/uploads/, download/Combined/' && ISXM_Settings::uploads_relative() === 'wp-content/uploads/' );
+
+$off = new ReflectionMethod( 'ISXM_Tools', 'batch_offload' );
+if ( PHP_VERSION_ID < 80100 ) $off->setAccessible( true );
+$run = function ( $cursor ) use ( $off ) {
+    $trail = [];
+    for ( $i = 0; $i < 30; $i++ ) {
+        $r = $off->invoke( new ISXM_Tools(), $cursor );
+        if ( is_wp_error( $r ) ) return [ $trail, $r ];
+        $trail[] = explode( '|', (string) $r['cursor'] )[0];
+        if ( ! empty( $r['done'] ) ) return [ $trail, $r ];
+        $cursor = $r['cursor'];
+    }
+    return [ $trail, null ];
+};
+$puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = rawurldecode( $row['uri'] ); } return $o; };
+$db->db->exec( 'INSERT INTO wp_posts VALUES(90,' . $db->db->quote( '<a href="https://www.example.com/download/Combined/one.pdf">1</a>' ) . ",'','page','publish')" );
+list( $trail, $r ) = $run( 0 );
+$steps = array_values( array_filter( array_unique( $trail ), function ( $p ) { return ! is_numeric( $p ) && $p !== ''; } ) );
+t( 'Both selected: Media Library → missing sizes → folders → media rewrite → folder rewrite → done', $r && $r['done'] && $steps === [ 'partial', 'folders', 'rewrite', 'frewrite' ], json_encode( $trail ) );
+t( 'Folder files went up under their own path', in_array( '/media/download/Combined/one.pdf', $puts(), true ) && in_array( '/media/download/Combined/two.pdf', $puts(), true ), json_encode( $puts() ) );
+t( 'Links to the folder files are rewritten in the final pass', strpos( $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=90' ), ISXM_Settings::public_base_url() . '/download/Combined/one.pdf' ) !== false );
+t( 'No raw copy of the Media Library folder was uploaded', ! preg_grep( '#/media/wp-content/uploads/#', $puts() ) );
+
+@unlink( $fake_log ); delete_option( ISXM_Tools::SERVER_MANIFEST );
+$set( [ 'offload_media_library' => false ] );
+list( $trail, $r ) = $run( 0 );
+t( 'Media Library off: only the folders are uploaded, then their links — no attachment steps', $r && $r['done'] && ! in_array( 'partial', $trail, true ) && ! in_array( 'rewrite', $trail, true ) && in_array( 'frewrite', $trail, true )
+    && in_array( '/media/download/Combined/one.pdf', $puts(), true ), json_encode( [ $trail, $puts() ] ) );
+t( 'Total counts only the folder files', ISXM_Tools::tool_total( 'offload' ) === 0 );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+t( '…and every one of them once the manifest is empty', ISXM_Tools::tool_total( 'offload' ) === 2 );
+
+$set( [ 'offload_media_library' => true, 'offload_server_folders' => '' ] );
+list( $trail, $r ) = $run( 0 );
+t( 'No folders: the Offload run is the same as before (no folder steps)', $r && $r['done'] && ! in_array( 'folders', $trail, true ) && ! in_array( 'frewrite', $trail, true ) && in_array( 'partial', $trail, true ), json_encode( $trail ) );
+list( $trail, $r ) = $run( 'rewrite|posts:0' );
+t( 'A cursor from an older version (rewrite|…) still resumes and finishes', $r && $r['done'] );
+
+$set( [ 'offload_media_library' => false, 'offload_server_folders' => '' ] );
+$pre = ISXM_Tools::precheck_tool( 'offload' );
+t( 'Nothing selected: Offload refuses to start', is_wp_error( $pre ) && $pre->get_error_code() === 'isxs_offload_nothing' );
+$set( [ 'offload_media_library' => true ] );
+delete_option( ISXM_Items::BACKFILLED_OPTION );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];

@@ -1579,3 +1579,31 @@ msgstr "กรุณาเปิด “เขียน URL ถาวรลงฐ
 #: includes/class-isxm-tools.php
 msgid "Kept on the server, not found in the bucket: %s"
 msgstr "เก็บไว้บนเซิร์ฟเวอร์ เพราะไม่พบใน bucket: %s"
+
+#: includes/class-isxm-admin.php
+msgid "Offload media"
+msgstr "Offload media"
+
+#: includes/class-isxm-admin.php
+msgid "Folders to offload"
+msgstr "โฟลเดอร์ที่จะ offload"
+
+#: includes/class-isxm-admin.php
+msgid "Choose the folders to offload. %s is the whole Media Library (new files and missing image sizes); other folders go up under their own path and keep their server copies. Runs on the server, so you can close this tab"
+msgstr "เลือกโฟลเดอร์ที่จะ offload — %s คือ Media Library ทั้งหมด (ไฟล์ใหม่และขนาดรูปที่ขาด) ส่วนโฟลเดอร์อื่นจะอัปโหลดด้วย path เดิม และเก็บไฟล์บนเซิร์ฟเวอร์ไว้ งานทำงานบนเซิร์ฟเวอร์ ปิดแท็บนี้ได้"
+
+#: includes/class-isxm-tools.php
+msgid "Choose at least one folder to offload first"
+msgstr "กรุณาเลือกโฟลเดอร์ที่จะ offload อย่างน้อย 1 โฟลเดอร์"
+
+#: includes/class-isxm-tools.php
+msgid "Folders inside %1$s were removed — the Media Library chip already covers them: %2$s"
+msgstr "นำโฟลเดอร์ที่อยู่ใน %1$s ออกแล้ว เพราะชิป Media Library ครอบคลุมอยู่แล้ว: %2$s"
+
+#: includes/class-isxm-admin.php
+msgid "Delete files"
+msgstr "ลบไฟล์"
+
+#: includes/class-isxm-admin.php
+msgid "What to delete"
+msgstr "ต้องการลบแบบไหน"

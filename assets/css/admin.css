@@ -229,6 +229,22 @@
   display: none;
 }
 
+.isxs-field select {
+  width: 100%;
+  max-width: 100%;
+  min-height: 0; /* WP admin forces 30px+ on selects */
+  border: 1px solid var(--isxs-line);
+  border-radius: 8px;
+  padding: 9px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  background-color: var(--isxs-bg);
+  color: var(--isxs-ink);
+}
+.isxs-tool-body .isxs-field {
+  margin-top: 10px;
+}
+
 .isxs-status-group {
   display: flex;
   align-items: center;

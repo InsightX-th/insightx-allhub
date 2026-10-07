@@ -270,7 +270,7 @@
   // 'change' (fires on blur/Enter, not per keystroke) auto-saves these —
   // 'input' above only drives the live preview.
   $(
-    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-server-folders, #isxs-source-public-url, [data-folder-field]",
+    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-offload-folders, #isxs-source-public-url, [data-folder-field]",
   ).on("change", () => {
     saveSettingsDebounced();
   });
@@ -329,7 +329,7 @@
       assets_cdn_domain: $.trim($("#isxs-assets-cdn-domain").val()),
       source_provider: $("#isxs-source-provider").val(),
       source_folders: $.trim($("#isxs-source-folders").val()),
-      offload_server_folders: $.trim($("#isxs-server-folders").val()),
+      offload_folders: $.trim($("#isxs-offload-folders").val()),
       source_public_base_url: $.trim($("#isxs-source-public-url").val()),
     };
     // Connection-card toggles (path_style/send_public_acl) are scoped
@@ -542,6 +542,8 @@
     });
     $("#isxs-status-total").text(total.toLocaleString());
     $("#isxs-status-onbucket").text(onBucket.toLocaleString());
+    // One Offload run covers every source, so its button counts them all.
+    $("#isxs-status-remaining-num").text(Math.max(total - onBucket, 0).toLocaleString());
   };
 
   const applyStats = (stats) => {
@@ -571,7 +573,6 @@
     renderStatusFoot();
     const statusRemaining = Math.max(total - onBucket, 0);
     $("#isxs-status-remaining").text(statusRemaining.toLocaleString());
-    $("#isxs-status-remaining-num").text(statusRemaining.toLocaleString());
 
     const failed = stats.failed || 0;
     $("#isxs-stat-failed").text(failed.toLocaleString());
@@ -951,9 +952,34 @@
         .append($("<td class='isxs-status-num'>").text(r.remaining.toLocaleString()))
         .appendTo($body);
     });
-    $("#isxs-status-folders-num").text(left.toLocaleString());
-    $(".isxs-status-folders-btn").prop("hidden", left === 0);
+
   };
+
+  // The Delete card drives one of two tools, picked in its dropdown:
+  // clean_local (server copies) or remove (bucket copies).
+  const $deleteMode = $("#isxs-delete-mode");
+  const setDeleteMode = (tool) => {
+    const $card = $deleteMode.closest(".isxs-tool");
+    const $opt = $deleteMode.find('option[value="' + tool + '"]');
+    if (!$card.length || !$opt.length) return;
+    $deleteMode.val(tool);
+    $card.attr("data-tool", tool).data("tool", tool);
+    $card.find(".isxs-tool-body > p").first().text($opt.data("desc"));
+    $card.find(".isxs-tool-run").text($opt.data("button"));
+  };
+  // A run of either tool owns the card until it finishes or is cancelled.
+  const syncDeleteCard = () => {
+    if (!$deleteMode.length) return;
+    const busy = ["remove", "clean_local"].find(
+      (t) => jobs[t] && ["running", "paused", "error"].includes(jobs[t].state),
+    );
+    if (busy && $deleteMode.val() !== busy) setDeleteMode(busy);
+    $deleteMode.prop("disabled", !!busy);
+  };
+  $deleteMode.on("change", () => {
+    setDeleteMode($deleteMode.val());
+    renderToolCard($deleteMode.closest(".isxs-tool"), jobs[$deleteMode.val()]);
+  });
 
   const applyJobPayload = (res) => {
     if (!res || !res.success || !res.data) {
@@ -986,15 +1012,20 @@
     // Keep the header's quick-offload button honest while a run is going.
     const offJob = jobs.offload;
     const offRunning = !!(offJob && offJob.state === "running");
-    $(".isxs-status-offload-btn")
+    // .html(), not .text(): the label carries the remaining-count <span>,
+    // which .text() used to wipe for good after the first run.
+    const $offBtn = $(".isxs-status-offload-btn");
+    if (!$offBtn.data("label")) $offBtn.data("label", $offBtn.html());
+    $offBtn
       .prop("disabled", offRunning)
-      .text(offRunning ? cfg.i18n.working : "Offload Remaining");
+      .html(offRunning ? $("<span>").text(cfg.i18n.working).html() : $offBtn.data("label"));
 
     if (data.stats) {
       cfg.stats = data.stats;
       applyStats(data.stats);
     }
 
+    syncDeleteCard();
     $toolCards.each((index, el) => {
       const $card = $(el);
       renderToolCard($card, jobs[$card.data("tool")]);
@@ -1693,10 +1724,6 @@
     });
     // Quick offload straight from the dropdown — same server-side job the
     // Tools tab's card starts.
-    $(".isxs-status-folders-btn").on("click", (e) => {
-      $(e.currentTarget).prop("disabled", true);
-      jobAction("isxs_job_start", "offload_folders", {});
-    });
     $(".isxs-status-offload-btn").on("click", (e) => {
       $(e.currentTarget).prop("disabled", true);
       jobAction("isxs_job_start", "offload", {});
@@ -1821,7 +1848,7 @@
 
   [
     ["#isxs-source-folders", "isxs_source_folders", () => cfg.sourceMedia],
-    ["#isxs-server-folders", "isxs_server_folders", null],
+    ["#isxs-offload-folders", "isxs_server_folders", () => cfg.uploadsPath],
   ].forEach(([input, action, badge]) => {
     const $field = $(input).closest(".isxs-folder-field");
     if ($field.length) folderPicker($field, $(input), action, badge);

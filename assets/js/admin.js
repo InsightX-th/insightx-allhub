@@ -329,7 +329,7 @@
       assets_cdn_domain: $.trim($("#isxs-assets-cdn-domain").val()),
       source_provider: $("#isxs-source-provider").val(),
       source_prefix: $.trim($("#isxs-source-prefix").val()),
-      source_extra_prefixes: $("#isxs-source-extra-prefixes").val() || "",
+      source_extra_prefixes: $.trim($("#isxs-source-extra-prefixes").val()),
       source_public_base_url: $.trim($("#isxs-source-public-url").val()),
     };
     // Connection-card toggles (path_style/send_public_acl) are scoped

@@ -186,8 +186,8 @@ ISXM_DB_Rewriter::replace_urls_window( [], [ 'table' => 0, 'after' => 4 ], 0, fu
 t( 'Unrelated content does not purge caches', count( $GLOBALS['isxm_t']['purged_posts'] ?? [] ) === $before );
 
 group( 'Extra source folders are copied key-for-key and their links rewritten' );
-t( 'Sanitize: one folder per line, blanks dropped, inside-Source-Prefix dropped, duplicates merged',
-    ISXM_Tools::sanitize_extra_prefixes( "download/\n\n /x/y \nwp-content/uploads/2024/\ndownload", 'wp-content/uploads/' ) === "download/\nx/y/" );
+t( 'Sanitize: comma (or newline) separated, blanks dropped, inside-Source-Prefix dropped, duplicates merged',
+    ISXM_Tools::sanitize_extra_prefixes( "download/, , /x/y ,wp-content/uploads/2024/\ndownload", 'wp-content/uploads/' ) === 'download/, x/y/' );
 $fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_pipe_' . getmypid() . '.jsonl';
 $fake_port = 19000 + ( getmypid() % 1000 );
 @unlink( $fake_log );

@@ -247,22 +247,23 @@ class ISXM_Tools {
     }
 
     /**
-     * One sanitized folder per line for `source_extra_prefixes`. A folder
-     * inside the main Source Prefix is dropped: the Media Library pass
-     * already lists it, and copying it again would duplicate every file.
+     * Comma-separated sanitized folders for `source_extra_prefixes` (line
+     * breaks accepted too). A folder inside the main Source Prefix is
+     * dropped: the Media Library pass already lists it, and copying it
+     * again would duplicate every file.
      *
-     * @param string $value         Raw textarea value (already unslashed).
+     * @param string $value         Raw input value (already unslashed).
      * @param string $source_prefix Sanitized Source Prefix being saved with it.
      * @return string
      */
     public static function sanitize_extra_prefixes( $value, $source_prefix ) {
         $out = [];
-        foreach ( preg_split( '/\R/', (string) $value ) as $line ) {
+        foreach ( preg_split( '/[,\r\n]+/', (string) $value ) as $line ) {
             $prefix = self::sanitize_prefix( $line );
             if ( $prefix === '' || ( $source_prefix !== '' && strpos( $prefix, $source_prefix ) === 0 ) ) continue;
             $out[ $prefix ] = true;
         }
-        return implode( "\n", array_keys( $out ) );
+        return implode( ', ', array_keys( $out ) );
     }
 
     /**

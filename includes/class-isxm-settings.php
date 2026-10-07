@@ -85,7 +85,7 @@ class ISXM_Settings {
             'source_prefix'          => 'wp-content/uploads/',
             'source_use_year_month'  => true,
             'source_public_base_url' => '',        // URL the existing media is actually served from now (as found in the DB) — empty = infer from source_endpoint/bucket
-            'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, one per line (e.g. download/)
+            'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, comma-separated (e.g. download/)
         ];
     }
 
@@ -458,7 +458,8 @@ class ISXM_Settings {
      */
     public static function extra_prefixes() {
         $out = [];
-        foreach ( preg_split( '/\R/', (string) self::get( 'source_extra_prefixes' ) ) as $line ) {
+        // Comma-separated (the input); line breaks still accepted from 0.2.29.
+        foreach ( preg_split( '/[,\r\n]+/', (string) self::get( 'source_extra_prefixes' ) ) as $line ) {
             $line = trim( trim( $line ), '/' );
             if ( $line !== '' ) $out[] = $line . '/';
         }

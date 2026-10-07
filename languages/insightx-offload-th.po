@@ -1359,3 +1359,31 @@ msgstr "รูปโปรไฟล์ผู้ใช้"
 #: includes/class-isxm-media-library.php
 msgid "Without user profile pictures"
 msgstr "ไม่รวมรูปโปรไฟล์ผู้ใช้"
+
+#: includes/class-isxm-admin.php
+msgid "Migrated"
+msgstr "Migrated"
+
+#: includes/class-isxm-admin.php
+msgid "Migrate Status"
+msgstr "สถานะ Migrate"
+
+#: includes/class-isxm-admin.php
+msgid "Open Migrate"
+msgstr "ไปที่หน้า Migrate"
+
+#: includes/class-isxm-admin.php
+msgid "No migration yet"
+msgstr "ยังไม่เคย migrate"
+
+#: includes/class-isxm-admin.php
+msgid "Copying extra folders… %s files"
+msgstr "กำลังคัดลอกโฟลเดอร์เพิ่มเติม… %s ไฟล์"
+
+#: includes/class-isxm-admin.php
+msgid "Extra folders"
+msgstr "โฟลเดอร์เพิ่มเติม"
+
+#: includes/class-isxm-admin.php
+msgid "Folders outside the Media Library to copy as-is, separated by commas, e.g. download/ — every file in them keeps its key on the destination, and links to them in content are rewritten too"
+msgstr "โฟลเดอร์ที่อยู่นอก Media Library ที่อยากให้คัดลอกไปทั้งโฟลเดอร์ ใส่ได้หลายโฟลเดอร์โดยคั่นด้วยจุลภาค (,) เช่น download/ — ไฟล์ข้างในจะใช้ key เดิมบนปลายทาง และลิงก์ในเนื้อหาที่ชี้ไปที่ไฟล์เหล่านี้จะถูกเปลี่ยนให้ด้วย"

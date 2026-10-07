@@ -1555,3 +1555,27 @@ msgstr "ขนาดรูปและรูปโปรไฟล์"
 #: includes/class-isxm-admin.php
 msgid "Upload remaining folder files (%s)"
 msgstr "อัปโหลดไฟล์ในโฟลเดอร์ที่เหลือ (%s)"
+
+#: includes/class-isxm-tools.php
+msgid "Delete server copies already in the bucket"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์ที่อยู่ใน bucket แล้ว"
+
+#: includes/class-isxm-admin.php
+msgid "Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins' folders are not touched"
+msgstr "คืนพื้นที่บนเซิร์ฟเวอร์ โดยลบไฟล์ media ที่ตรวจแล้วว่าอยู่ใน bucket ไฟล์ที่ไม่มีใน bucket และโฟลเดอร์ของปลั๊กอินอื่นจะไม่ถูกแตะ"
+
+#: includes/class-isxm-admin.php
+msgid "Delete Server Copies"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Delete the server copies of media already in the bucket?\n\nOnly files confirmed in the bucket are deleted; pages keep loading them from the bucket. Keep a backup first"
+msgstr "ลบไฟล์บนเซิร์ฟเวอร์ของ media ที่อยู่ใน bucket แล้ว?\n\nระบบลบเฉพาะไฟล์ที่ตรวจแล้วว่ามีใน bucket หน้าเว็บจะโหลดรูปจาก bucket ตามเดิม ควรสำรองข้อมูลไว้ก่อน"
+
+#: includes/class-isxm-tools.php
+msgid "Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies"
+msgstr "กรุณาเปิด “เขียน URL ถาวรลงฐานข้อมูล” หรือ “Deliver Offloaded Media” ก่อน ไม่เช่นนั้นหน้าเว็บจะยังชี้ไปที่ไฟล์บนเซิร์ฟเวอร์"
+
+#: includes/class-isxm-tools.php
+msgid "Kept on the server, not found in the bucket: %s"
+msgstr "เก็บไว้บนเซิร์ฟเวอร์ เพราะไม่พบใน bucket: %s"

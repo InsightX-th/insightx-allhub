@@ -540,7 +540,8 @@ class ISXM_Tools {
 
     /**
      * Old → new map for one database value: this site's links (http or
-     * https, raw or percent-encoded, plain or JSON-escaped) to files that
+     * https, with or without www., raw or percent-encoded, plain or
+     * JSON-escaped) to files that
      * are on the bucket (in the manifest). Relative links are left alone —
      * a bare path would also match text that is not a link.
      *
@@ -550,10 +551,12 @@ class ISXM_Tools {
         $manifest = self::server_manifest();
         $folders  = ISXM_Settings::server_folders();
         if ( ! $folders || ! $manifest ) return [];
-        $host  = preg_replace( '#^https?://#', '', untrailingslashit( home_url( '/' ) ) );
+        // With or without "www.", whichever the Site Address uses: links in
+        // content are often typed the other way round.
+        $host  = preg_replace( '#^(https?://)?(www\.)?#i', '', untrailingslashit( home_url( '/' ) ) );
         $plain = str_replace( '\/', '/', (string) $content );
         $alts  = implode( '|', array_map( function ( $f ) { return preg_quote( $f, '#' ); }, $folders ) );
-        if ( ! preg_match_all( '#https?://' . preg_quote( $host, '#' ) . '/((?:' . $alts . ')[^"\'\s<>()\\\\?\#]*)#u', $plain, $m, PREG_SET_ORDER ) ) {
+        if ( ! preg_match_all( '#https?://(?:www\.)?' . preg_quote( $host, '#' ) . '/((?:' . $alts . ')[^"\'\s<>()\\\\?\#]*)#u', $plain, $m, PREG_SET_ORDER ) ) {
             return [];
         }
         $base = ISXM_Settings::public_base_url() . '/';
@@ -1411,6 +1414,7 @@ class ISXM_Tools {
             'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
             'offload_folders' => __( 'Upload server folders', 'insightx-offload' ),
             'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
+            'clean_local'  => __( 'Delete server copies already in the bucket', 'insightx-offload' ),
             'remove'       => __( 'Remove files from the bucket', 'insightx-offload' ),
             'migrate'      => __( 'Move files from the source bucket', 'insightx-offload' ),
             'wc_downloads' => __( 'Check WooCommerce product files', 'insightx-offload' ),
@@ -1525,6 +1529,11 @@ class ISXM_Tools {
                 return new WP_Error( 'isxs_same_bucket', __( 'Source and destination point at the same bucket and prefix — choose a different source provider (or change the prefix) first', 'insightx-offload' ) );
             }
         }
+        if ( $tool === 'clean_local' && ! ISXM_Settings::get( 'persist_urls' ) && ! ISXM_Settings::get( 'deliver_enabled' ) ) {
+            // Same rule as Remove Local Media: with neither on, pages still
+            // point at the server copies.
+            return new WP_Error( 'isxs_clean_local_unsafe', __( 'Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies', 'insightx-offload' ) );
+        }
         if ( $tool === 'offload_folders' && ! ISXM_Settings::server_folders() ) {
             return new WP_Error( 'isxs_no_server_folders', __( 'Choose at least one server folder first', 'insightx-offload' ) );
         }
@@ -1614,6 +1623,7 @@ class ISXM_Tools {
                 return max( (int) $stats['total'] - (int) $stats['in_bucket'], 0 ) + (int) $stats['partial'];
             case 'download':
             case 'remove':
+            case 'clean_local':
                 return (int) $stats['in_bucket'];
             case 'retry_failed':
                 return (int) $stats['failed'];
@@ -1664,6 +1674,8 @@ class ISXM_Tools {
                     return $instance->batch_pending_phased( $cursor, $instance->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ] );
                 case 'download':
                     return $instance->batch_download( $cursor );
+                case 'clean_local':
+                    return $instance->batch_clean_local( $cursor );
                 case 'remove':
                     return $instance->batch_remove( $cursor );
                 case 'migrate':
@@ -2858,6 +2870,53 @@ class ISXM_Tools {
      * @param int|string $cursor Attachment ID to resume after.
      * @return array
      */
+    /**
+     * One batch of "Delete server copies already in the bucket": for each
+     * attachment on the current destination, delete the local copies of
+     * its recorded files that are confirmed to exist in the bucket. Files
+     * the bucket lacks are kept and reported; anything that is not one of
+     * the record's files (other plugins' folders, orphans) is never touched.
+     */
+    private function batch_clean_local( $cursor ) {
+        $result = $this->run_offloaded_batch( (int) $cursor, [ __CLASS__, 'clean_local_one' ] );
+        return self::batch_result( $result );
+    }
+
+    /**
+     * @return true|WP_Error
+     */
+    public static function clean_local_one( $id ) {
+        if ( ISXM_Offload::is_protected_download( $id ) ) return true;
+        $record = ISXM_Offload::get_record( $id );
+        $local  = ISXM_Offload::local_path( $id );
+        if ( ! is_array( $record ) || $local === '' ) return true;
+        $dir   = trailingslashit( dirname( $local ) );
+        $names = [];
+        foreach ( (array) ( $record['files'] ?? [] ) as $name ) {
+            $name = ISXM_Offload::safe_filename( $name );
+            if ( $name !== '' && is_file( $dir . $name ) ) $names[] = $name;
+        }
+        if ( ! $names ) return true;
+
+        // One listing of the record's folder; per-file checks only when the
+        // folder is too broad to list.
+        $listed = ISXM_Sync::list_record_folder( $record );
+        $verified = []; $missing = [];
+        foreach ( $names as $name ) {
+            if ( $listed !== null ) {
+                $there = isset( $listed[ $record['base_key'] . $name ] );
+            } else {
+                $probe = $record; $probe['files'] = [ $name ];
+                $there = ISXM_Sync::primary_exists_on_destination( $probe );
+            }
+            if ( $there ) { $verified[] = $dir . $name; } else { $missing[] = $name; }
+        }
+        ISXM_Offload::delete_local_files( $verified );
+        return $missing
+            ? new WP_Error( 'isxs_not_in_bucket', sprintf( __( 'Kept on the server, not found in the bucket: %s', 'insightx-offload' ), implode( ', ', $missing ) ) )
+            : true;
+    }
+
     private function batch_download( $cursor ) {
         $offload = new ISXM_Offload();
 

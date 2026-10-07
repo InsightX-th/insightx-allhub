@@ -76,6 +76,7 @@ class ISXM_Admin {
                 'save'          => __( 'Save Settings', 'insightx-offload' ),
                 'connSave'      => __( 'Save', 'insightx-offload' ),
                 'testing'       => __( 'Testing…', 'insightx-offload' ),
+                'confirmCleanLocal' => __( "Delete the server copies of media already in the bucket?\n\nOnly files confirmed in the bucket are deleted; pages keep loading them from the bucket. Keep a backup first", 'insightx-offload' ),
                 'confirmRemove' => __( "Remove all files from the bucket?\n\nFiles missing from the server will be downloaded back before removal, but always keep a backup first", 'insightx-offload' ),
                 'working'       => __( 'Working…', 'insightx-offload' ),
                 'done'          => __( 'Done ✓', 'insightx-offload' ),
@@ -501,6 +502,7 @@ class ISXM_Admin {
                                 '',
                                 empty( $stats['failed'] )
                             );
+                            $this->tool_card( 'clean_local', __( 'Delete server copies already in the bucket', 'insightx-offload' ), __( 'Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins\' folders are not touched', 'insightx-offload' ), __( 'Delete Server Copies', 'insightx-offload' ), 'danger' );
                             $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
                             $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );
                             if ( class_exists( 'WC_Product' ) ) {
@@ -878,6 +880,9 @@ class ISXM_Admin {
             case 'complete_partial':
                 // Picture frame with a plus: fill in what's missing.
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 9v8"/><path d="M8 13h8"/></svg>';
+            case 'clean_local':
+                // Server stack with a minus: copies removed from the server.
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M9 16.5h6"/></svg>';
             case 'download':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
             case 'remove':

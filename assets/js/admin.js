@@ -1124,6 +1124,9 @@
     const job = jobs[tool];
     const resume = !!(job && (job.state === "paused" || job.state === "error"));
 
+    if (tool === "clean_local" && !resume && !window.confirm(cfg.i18n.confirmCleanLocal)) {
+      return;
+    }
     if (tool === "remove" && !resume && !window.confirm(cfg.i18n.confirmRemove)) {
       return;
     }

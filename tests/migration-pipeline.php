@@ -398,7 +398,43 @@ t( 'Changed and new files count as left', ISXM_Tools::server_folder_stats()[0]['
 @unlink( $fake_log );
 $r = $drain( 0 );
 t( '…and only they go up again', $r && $r['done'] && $puts() === [ '/media/download/Specification/a.pdf', '/media/download/Specification/new.pdf' ], json_encode( $puts() ) );
+$bucket_a = ISXM_Settings::public_base_url() . '/download/Specification/Spec%20Sheet.pdf';
+$sc = '[button text="Spec" link="https://www.example.com/download/Specification/Spec%20Sheet.pdf" target="_blank"]';
+t( 'www. link matched although the Site Address has none (shortcode attribute, %20)', ( ISXM_Tools::server_url_map( $sc )['https://www.example.com/download/Specification/Spec%20Sheet.pdf'] ?? '' ) === $bucket_a );
+$GLOBALS['isxm_t']['home'] = 'https://www.example.com';
+t( '…and the other way round', ( ISXM_Tools::server_url_map( 'see https://example.com/download/Specification/Spec%20Sheet.pdf' )['https://example.com/download/Specification/Spec%20Sheet.pdf'] ?? '' ) === $bucket_a );
+$GLOBALS['isxm_t']['home'] = 'https://example.com';
+t( 'Another domain is never touched', ISXM_Tools::server_url_map( '<a href="https://other.com/download/Specification/a.pdf">x</a> https://wwwexample.com/download/Specification/a.pdf' ) === [] );
 proc_terminate( $fake ); @unlink( $fake_log );
+
+group( 'Delete server copies already in the bucket' );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_items_table( $db ); update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+$rec = [ 'bucket' => 'media', 'endpoint' => 'https://s3.example.test', 'path_style' => true, 'base_key' => 'c/', 'version' => '' ];
+foreach ( [ 1 => 'c1.jpg', 2 => 'woocommerce_uploads/d.zip' ] as $id => $file ) {
+    isxm_test_add_post( $id, [] ); update_post_meta( $id, '_wp_attached_file', $file );
+    $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($id)" );
+}
+ISXM_Offload::set_record( 1, $rec + [ 'files' => [ 'c1.jpg', 'c1-150x150.jpg' ] ] );
+ISXM_Offload::set_record( 2, $rec + [ 'files' => [ 'd.zip' ] ] );
+wp_mkdir_p( ISXM_TEST_UPLOADS . '/woocommerce_uploads' );
+foreach ( [ 'c1.jpg', 'c1-150x150.jpg', 'c1-extra.jpg', 'woocommerce_uploads/d.zip' ] as $f ) file_put_contents( ISXM_TEST_UPLOADS . '/' . $f, 'x' );
+$GLOBALS['isxm_t']['http_provider'] = function ( $url ) { return migration_listing( [ 'c/c1.jpg', 'c/d.zip' ] ); };
+$clean = new ReflectionMethod( 'ISXM_Tools', 'batch_clean_local' );
+if ( PHP_VERSION_ID < 80100 ) $clean->setAccessible( true );
+$r = $clean->invoke( new ISXM_Tools(), 0 );
+t( 'Only the copy confirmed in the bucket is deleted', ! is_file( ISXM_TEST_UPLOADS . '/c1.jpg' ) && is_file( ISXM_TEST_UPLOADS . '/c1-150x150.jpg' ), json_encode( $r ) );
+t( 'A recorded size the bucket lacks is kept and reported', count( $r['errors'] ) === 1 && strpos( $r['errors'][0], 'c1-150x150.jpg' ) !== false, json_encode( $r['errors'] ) );
+t( 'Files that are not the record\'s, and protected downloads, are never touched', is_file( ISXM_TEST_UPLOADS . '/c1-extra.jpg' ) && is_file( ISXM_TEST_UPLOADS . '/woocommerce_uploads/d.zip' ) );
+$r2 = $clean->invoke( new ISXM_Tools(), 0 );
+t( 'Running again changes nothing', is_file( ISXM_TEST_UPLOADS . '/c1-150x150.jpg' ) && is_file( ISXM_TEST_UPLOADS . '/c1-extra.jpg' ) && count( $r2['errors'] ) === 1 );
+$GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), [ 'persist_urls' => false, 'deliver_enabled' => false ] ); ISXM_Settings::flush_cache();
+$pre = ISXM_Tools::precheck_tool( 'clean_local' );
+t( 'Refused while pages could still point at the server copies', is_wp_error( $pre ) && $pre->get_error_code() === 'isxs_clean_local_unsafe' );
+delete_option( ISXM_Items::BACKFILLED_OPTION );
+foreach ( [ 'c1-150x150.jpg', 'c1-extra.jpg', 'woocommerce_uploads/d.zip' ] as $f ) @unlink( ISXM_TEST_UPLOADS . '/' . $f );
 
 group( 'Source folder picker' );
 migration_fixture( 2 );

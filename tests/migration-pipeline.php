@@ -361,6 +361,7 @@ migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
 $conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn );
 ISXM_Settings::flush_cache();
 $spec = ABSPATH . 'download/Specification/';
+@unlink( $spec . 'new.pdf' ); // left by a previous run of this suite
 foreach ( [ 'a.pdf', 'sub/b.pdf', 'Spec Sheet.pdf', '.hidden', '.git/config' ] as $f ) { wp_mkdir_p( dirname( $spec . $f ) ); file_put_contents( $spec . $f, 'x' ); }
 foreach ( [ 'wp-admin', 'wp-content/plugins/p', 'wp-content/themes/t', 'wp-content/keep' ] as $d ) { wp_mkdir_p( ABSPATH . $d ); file_put_contents( ABSPATH . $d . '/f.txt', 'x' ); }
 $s = ISXM_Tools::sanitize_server_folders( "download/Specification/, ../etc/, wp-admin/, wp-content/plugins/, missing/, , download/Specification" );
@@ -371,17 +372,32 @@ $GLOBALS['isxm_t']['options']['isxs_settings']['offload_server_folders'] = 'down
 $db->db->exec( 'INSERT INTO wp_posts VALUES(70,' . $db->db->quote( '<a href="https://example.com/download/Specification/a.pdf">A</a> <a href="http://example.com/download/Specification/Spec%20Sheet.pdf">B</a> <a href="/download/Specification/a.pdf">rel</a>' ) . ",'')" );
 $batch = new ReflectionMethod( 'ISXM_Tools', 'batch_offload_folders' );
 if ( PHP_VERSION_ID < 80100 ) $batch->setAccessible( true );
-$r = $batch->invoke( new ISXM_Tools(), '0|download/Specification/Spec Sheet.pdf' );
+delete_option( ISXM_Tools::SERVER_MANIFEST ); delete_transient( ISXM_Tools::SERVER_STATS );
 $puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = rawurldecode( $row['uri'] ); } return $o; };
-t( 'Resume from the cursor: only the files after it are uploaded', $r['done'] && $r['processed'] === 2 && $puts() === [ '/media/download/Specification/a.pdf', '/media/download/Specification/sub/b.pdf' ], json_encode( [ $r, $puts() ] ) );
+$drain = function ( $cursor ) use ( $batch ) { for ( $i = 0; $i < 20; $i++ ) { $r = $batch->invoke( new ISXM_Tools(), $cursor ); if ( is_wp_error( $r ) || $r['done'] ) return $r; $cursor = $r['cursor']; } return null; };
+t( 'Total counts the files still to upload', ISXM_Tools::tool_total( 'offload_folders' ) === 3 );
+$r = $batch->invoke( new ISXM_Tools(), '0|download/Specification/Spec Sheet.pdf' );
+t( 'Resume from the cursor: only the files after it are uploaded', $r['processed'] === 2 && $puts() === [ '/media/download/Specification/a.pdf', '/media/download/Specification/sub/b.pdf' ], json_encode( [ $r, $puts() ] ) );
+t( 'Uploads done → links are rewritten in a separate final pass, not per batch', $r['cursor'] === 'rewrite|posts:0' && ! $r['done'] && $r['phase'] === 'rewriting' && strpos( $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=70' ), 'example.com/download' ) !== false );
+$stats = ISXM_Tools::server_folder_stats();
+t( 'Status panel: 2 on the bucket, 1 left', $stats === [ [ 'path' => 'download/Specification/', 'offloaded' => 2, 'remaining' => 1 ] ], json_encode( $stats ) );
 @unlink( $fake_log );
-$r = $batch->invoke( new ISXM_Tools(), 0 );
-t( 'Full run: every file under its own path, nothing hidden', $r['done'] && $r['errors'] === [] && $puts() === [ '/media/download/Specification/Spec Sheet.pdf', '/media/download/Specification/a.pdf', '/media/download/Specification/sub/b.pdf' ], json_encode( $puts() ) );
+$r = $drain( 0 );
+t( 'Next run uploads only what is left, then finishes the rewrite pass', $r && $r['done'] && $puts() === [ '/media/download/Specification/Spec Sheet.pdf' ], json_encode( $puts() ) );
 t( 'Server copies are kept', is_file( $spec . 'a.pdf' ) && is_file( $spec . 'Spec Sheet.pdf' ) );
 $content = $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=70' );
 $base = ISXM_Settings::public_base_url() . '/download/Specification/';
 t( 'Site links (http and https, raw and encoded) now point at the bucket; relative link untouched', strpos( $content, 'href="' . $base . 'a.pdf"' ) !== false && strpos( $content, 'href="' . $base . 'Spec%20Sheet.pdf"' ) !== false && strpos( $content, 'href="/download/Specification/a.pdf"' ) !== false && strpos( $content, 'example.com/download' ) === false, $content );
-t( 'Total counts the files to upload', ISXM_Tools::tool_total( 'offload_folders' ) === 3 );
+@unlink( $fake_log );
+$r = $drain( 0 );
+t( 'Nothing changed: a new run uploads nothing and the total is 0', $r && $r['done'] && $puts() === [] && ISXM_Tools::tool_total( 'offload_folders' ) === 0 && ISXM_Tools::server_folder_stats()[0]['remaining'] === 0 );
+touch( $spec . 'a.pdf', time() + 120 ); clearstatcache();
+file_put_contents( $spec . 'new.pdf', 'n' );
+delete_transient( ISXM_Tools::SERVER_STATS );
+t( 'Changed and new files count as left', ISXM_Tools::server_folder_stats()[0]['remaining'] === 2 && ISXM_Tools::tool_total( 'offload_folders' ) === 2 );
+@unlink( $fake_log );
+$r = $drain( 0 );
+t( '…and only they go up again', $r && $r['done'] && $puts() === [ '/media/download/Specification/a.pdf', '/media/download/Specification/new.pdf' ], json_encode( $puts() ) );
 proc_terminate( $fake ); @unlink( $fake_log );
 
 group( 'Source folder picker' );
@@ -420,8 +436,6 @@ t( 'Picker value derives from the two settings, root first', ISXM_Settings::sour
 $GLOBALS['isxm_t']['options']['isxs_settings']['source_media'] = false; ISXM_Settings::flush_cache();
 t( 'Without a Media Library the unused root is not shown', ISXM_Settings::source_folders() === 'download/, files/' );
 $GLOBALS['isxm_t']['options']['isxs_settings']['cdn_domain'] = 'cdn.example.test'; ISXM_Settings::flush_cache();
-t( 'Source Public URL on the destination host: a warning, not a refusal', ISXM_Tools::source_url_warning( 'https://cdn.example.test', 'cdn.example.test' ) !== ''
-    && ISXM_Tools::source_url_warning( 'https://old-bucket.s3.amazonaws.com', 'cdn.example.test' ) === '' && ISXM_Tools::source_url_warning( '', 'cdn.example.test' ) === '' );
 
 group( 'Migrate only the picked folders (no Media Library)' );
 $fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_extras_only_' . getmypid() . '.jsonl';

@@ -180,6 +180,7 @@ class ISXM_Tools {
 
         // Server folders for the "Upload server folders" tool. Not posted →
         // keep what is stored (save() would otherwise reset it to default).
+        delete_transient( self::SERVER_STATS ); // folders may change below
         if ( isset( $_POST['offload_server_folders'] ) ) {
             $server = self::sanitize_server_folders( wp_unslash( (string) $_POST['offload_server_folders'] ) );
             $settings['offload_server_folders'] = $server['value'];
@@ -190,14 +191,11 @@ class ISXM_Tools {
             $settings['offload_server_folders'] = $current['offload_server_folders'];
         }
 
-        // A warning, not a refusal: the same host is legitimate when one CDN
-        // domain stays in front of the media across the provider switch, and
-        // refusing here used to block every other setting on the page too
-        // (they are all autosaved in one request).
-        $url_warning = self::source_url_warning( $settings['source_public_base_url'], $settings['cdn_domain'] );
-        if ( $url_warning !== '' ) {
-            $folders_warning = trim( $folders_warning . ' ' . $url_warning );
-        }
+        // A Source Public URL on the destination host is accepted silently:
+        // it is legitimate when one CDN domain stays in front of the media
+        // across the provider switch, and both the old refusal (blocked
+        // every autosaved setting) and the later warning (a red toast on
+        // every save) got in the way more than they helped.
 
         // Detect a destination switch before saving overwrites $current —
         // the frontend uses this to reset all 4 tools' UI/resume state,
@@ -320,25 +318,6 @@ class ISXM_Tools {
     }
 
     /**
-     * Warning when the Source Public URL shares a host with the destination.
-     * Legitimate when one CDN domain fronts the media before and after the
-     * switch; a mistake when it was meant to be the old bucket's address —
-     * old→new pairs on the destination host match nothing in the database.
-     *
-     * @return string '' when the hosts differ.
-     */
-    public static function source_url_warning( $source_url, $cdn_domain ) {
-        if ( $source_url === '' ) return '';
-        $source_host = strtolower( (string) wp_parse_url( $source_url, PHP_URL_HOST ) );
-        $dest_hosts  = array_filter( [
-            strtolower( (string) wp_parse_url( 'https://' . preg_replace( '#^https?://#', '', (string) $cdn_domain ), PHP_URL_HOST ) ),
-            strtolower( (string) wp_parse_url( ISXM_Settings::public_base_url(), PHP_URL_HOST ) ),
-        ] );
-        if ( $source_host === '' || ! in_array( $source_host, $dest_hosts, true ) ) return '';
-        return __( 'Saved. Note: the Source Public URL uses the same address as the destination — fine if the same CDN domain serves your media before and after the move; otherwise set it to where the old files are served from now, or links will not be rewritten.', 'insightx-offload' );
-    }
-
-    /**
      * Decide which picked folder is the uploads root (Source Prefix) and
      * which are copied as-is: every folder is sampled, and the one whose
      * keys resolve to the most attachments is the Media Library. The Media
@@ -448,27 +427,42 @@ class ISXM_Tools {
     }
 
     /**
-     * One batch of "Upload server folders": files go up under their path
-     * relative to the WordPress root, and links to them in content move to
-     * the bucket. Local files are kept — nothing in WordPress manages them.
+     * One batch of "Upload server folders": new or changed files go up under
+     * their path relative to the WordPress root, then — once every folder
+     * is done and persist_urls is on — one pass over the database moves
+     * links to them to the bucket. Local files are kept: nothing in
+     * WordPress manages them.
      *
-     * Cursor: "<folder index>|<last relative path done>".
+     * Cursors: "<folder index>|<last relative path done>" while uploading,
+     * "rewrite|<table>:<after id>" for the final pass.
+     *
+     * 0.2.34 rewrote URLs after every upload batch with four old→new pairs
+     * per file as leading-wildcard LIKEs; on a large postmeta table that
+     * outlived the request, so no batch was ever recorded and the run
+     * restarted the same files forever.
      *
      * @return array|WP_Error
      */
     private function batch_offload_folders( $cursor ) {
+        $cursor = (string) $cursor;
+        if ( strpos( $cursor, 'rewrite|' ) === 0 ) {
+            return $this->rewrite_server_links( substr( $cursor, 8 ) );
+        }
+
         $folders = ISXM_Settings::server_folders();
-        $parts   = explode( '|', (string) $cursor, 2 );
+        $parts   = explode( '|', $cursor, 2 );
         $index   = (int) $parts[0];
         $after   = $parts[1] ?? '';
         $started = microtime( true );
         $budget  = self::time_budget();
         $client  = new ISXM_Client();
         $acl     = (bool) ISXM_Settings::get( 'send_public_acl' );
-        $processed = 0; $errors = []; $pairs = [];
+        $processed = 0; $errors = [];
+        $manifest  = self::server_manifest();
 
         while ( $index < count( $folders ) && microtime( true ) - $started < $budget ) {
-            $pending = array_values( array_filter( self::server_folder_files( $folders[ $index ] ), function ( $f ) use ( $after ) {
+            // New or changed files only, after the cursor.
+            $pending = array_values( array_filter( self::server_pending_files( $folders[ $index ], $manifest ), function ( $f ) use ( $after ) {
                 return $after === '' || strcmp( $f, $after ) > 0;
             } ) );
             foreach ( $pending as $relative ) {
@@ -478,7 +472,7 @@ class ISXM_Tools {
                 if ( is_wp_error( $result ) ) {
                     $errors[] = $relative . ': ' . $result->get_error_message();
                 } else {
-                    $pairs = array_merge( $pairs, self::server_file_url_pairs( $relative ) );
+                    $manifest[ $relative ] = (int) @filemtime( ABSPATH . $relative );
                 }
                 $processed++;
                 $after = $relative;
@@ -486,41 +480,139 @@ class ISXM_Tools {
             $index++; $after = '';
         }
 
-        // ponytail: one full-table rewrite per batch; fine for hundreds or a
-        // few thousand files. Queue pairs and rewrite once at the end (as
-        // Migrate does) if a site ever offloads far more than that.
-        if ( $pairs && ISXM_Offload::should_persist_urls() ) {
-            ISXM_DB_Rewriter::replace_urls_bulk( $pairs );
+        // Saved before anything else can go wrong: a later failure must not
+        // send these files up again.
+        if ( $processed ) {
+            update_option( self::SERVER_MANIFEST, $manifest, false );
+            delete_transient( self::SERVER_STATS );
         }
 
+        $uploaded_all = $index >= count( $folders );
+        if ( $uploaded_all && ISXM_Offload::should_persist_urls() ) {
+            return [ 'processed' => $processed, 'cursor' => 'rewrite|posts:0', 'done' => false, 'errors' => $errors, 'phase' => 'rewriting' ];
+        }
         return [
             'processed' => $processed,
             'cursor'    => $index . '|' . $after,
-            'done'      => $index >= count( $folders ),
+            'done'      => $uploaded_all,
             'errors'    => $errors,
         ];
     }
 
     /**
-     * Old → new URL pairs for one server file: the site's http and https
-     * URL, raw and percent-encoded, to the bucket (or CDN) URL. Relative
-     * links ("/download/x.pdf") are left alone — matching a bare path would
-     * also hit text that is not a link.
+     * The final pass of "Upload server folders": posts → postmeta →
+     * options, a window of rows at a time by id, reading only rows that
+     * mention one of the folders, within this request's budget.
      *
-     * @return array<int,array{old:string,new:string}>
+     * @param string $rest "<table>:<after id>".
+     * @return array|WP_Error
      */
-    public static function server_file_url_pairs( $relative ) {
-        $encoded = implode( '/', array_map( 'rawurlencode', explode( '/', $relative ) ) );
-        $new     = ISXM_Settings::public_base_url() . '/' . $encoded;
-        $home    = preg_replace( '#^https?://#', '', untrailingslashit( home_url( '/' ) ) );
-        $pairs   = [];
-        foreach ( [ 'https://', 'http://' ] as $scheme ) {
-            foreach ( array_unique( [ $relative, $encoded ] ) as $path ) {
-                $old = $scheme . $home . '/' . $path;
-                if ( $old !== $new ) $pairs[] = [ 'old' => $old, 'new' => $new ];
+    private function rewrite_server_links( $rest ) {
+        global $wpdb;
+        $started = microtime( true );
+        $budget  = self::time_budget();
+        $tables  = self::rewrite_tables();
+        $keys    = array_keys( $tables );
+        $parts   = explode( ':', $rest, 2 );
+        $idx     = isset( $tables[ $parts[0] ] ) ? array_search( $parts[0], $keys, true ) : 0;
+        $after   = (int) ( $parts[1] ?? 0 );
+        $probes  = [];
+        foreach ( ISXM_Settings::server_folders() as $folder ) {
+            $probes[] = '%' . $wpdb->esc_like( '/' . $folder ) . '%';
+            $probes[] = '%' . $wpdb->esc_like( str_replace( '/', '\/', '/' . $folder ) ) . '%'; // JSON-escaped twin
+        }
+        if ( ! $probes ) {
+            return [ 'processed' => 0, 'cursor' => '', 'done' => true, 'errors' => [] ];
+        }
+        while ( microtime( true ) - $started < $budget ) {
+            $cfg    = $tables[ $keys[ $idx ] ];
+            $window = ISXM_DB_Rewriter::rewrite_window( $cfg['table'], $cfg['id_col'], $cfg['value_col'], [ __CLASS__, 'server_url_map' ],
+                $after, self::REWRITE_WINDOW, $cfg['ref_col'], $cfg['kind'], $started + $budget, $probes );
+            if ( is_wp_error( $window ) ) return $window;
+            if ( ! $window['done'] ) { $after = $window['last_id']; break; }
+            $idx++; $after = 0;
+            if ( $idx >= count( $keys ) ) {
+                return [ 'processed' => 0, 'cursor' => '', 'done' => true, 'errors' => [] ];
             }
         }
-        return $pairs;
+        return [ 'processed' => 0, 'cursor' => 'rewrite|' . $keys[ $idx ] . ':' . $after, 'done' => false, 'errors' => [], 'phase' => 'rewriting' ];
+    }
+
+    /**
+     * Old → new map for one database value: this site's links (http or
+     * https, raw or percent-encoded, plain or JSON-escaped) to files that
+     * are on the bucket (in the manifest). Relative links are left alone —
+     * a bare path would also match text that is not a link.
+     *
+     * @return array<string,string>
+     */
+    public static function server_url_map( $content ) {
+        $manifest = self::server_manifest();
+        $folders  = ISXM_Settings::server_folders();
+        if ( ! $folders || ! $manifest ) return [];
+        $host  = preg_replace( '#^https?://#', '', untrailingslashit( home_url( '/' ) ) );
+        $plain = str_replace( '\/', '/', (string) $content );
+        $alts  = implode( '|', array_map( function ( $f ) { return preg_quote( $f, '#' ); }, $folders ) );
+        if ( ! preg_match_all( '#https?://' . preg_quote( $host, '#' ) . '/((?:' . $alts . ')[^"\'\s<>()\\\\?\#]*)#u', $plain, $m, PREG_SET_ORDER ) ) {
+            return [];
+        }
+        $base = ISXM_Settings::public_base_url() . '/';
+        $map  = [];
+        foreach ( $m as $hit ) {
+            $relative = rawurldecode( $hit[1] );
+            if ( ! isset( $manifest[ $relative ] ) ) continue;
+            $new = $base . implode( '/', array_map( 'rawurlencode', explode( '/', $relative ) ) );
+            if ( $hit[0] === $new ) continue;
+            $map[ $hit[0] ] = $new;
+            $map[ str_replace( '/', '\/', $hit[0] ) ] = str_replace( '/', '\/', $new );
+        }
+        uksort( $map, function ( $a, $b ) { return strlen( $b ) - strlen( $a ); } );
+        return $map;
+    }
+
+    /** Server files already on the bucket: relative path => mtime when uploaded. */
+    const SERVER_MANIFEST = 'isxs_server_manifest';
+    /** Cached per-folder counts for the header Offload Status panel. */
+    const SERVER_STATS = 'isxs_server_folder_stats';
+
+    /** @return array<string,int> */
+    public static function server_manifest() {
+        $manifest = get_option( self::SERVER_MANIFEST, [] );
+        return is_array( $manifest ) ? $manifest : [];
+    }
+
+    /**
+     * Files of a server folder not on the bucket yet, or changed since
+     * they were uploaded (their mtime moved).
+     *
+     * @return string[]
+     */
+    public static function server_pending_files( $folder, ?array $manifest = null ) {
+        $manifest = $manifest ?? self::server_manifest();
+        return array_values( array_filter( self::server_folder_files( $folder ), function ( $f ) use ( $manifest ) {
+            return ! isset( $manifest[ $f ] ) || (int) $manifest[ $f ] !== (int) @filemtime( ABSPATH . $f );
+        } ) );
+    }
+
+    /**
+     * Per-folder counts for the Offload Status panel. Cached for five
+     * minutes (it walks the disk); every upload batch and settings save
+     * drops the cache.
+     *
+     * @return array<int,array{path:string,offloaded:int,remaining:int}>
+     */
+    public static function server_folder_stats() {
+        $cached = get_transient( self::SERVER_STATS );
+        if ( is_array( $cached ) ) return $cached;
+        $manifest = self::server_manifest();
+        $stats    = [];
+        foreach ( ISXM_Settings::server_folders() as $folder ) {
+            $all       = count( self::server_folder_files( $folder ) );
+            $remaining = count( self::server_pending_files( $folder, $manifest ) );
+            $stats[]   = [ 'path' => $folder, 'offloaded' => $all - $remaining, 'remaining' => $remaining ];
+        }
+        set_transient( self::SERVER_STATS, $stats, 5 * MINUTE_IN_SECONDS );
+        return $stats;
     }
 
     /**
@@ -1510,7 +1602,8 @@ class ISXM_Tools {
     public static function tool_total( $tool ) {
         if ( $tool === 'offload_folders' ) {
             // Files on disk, not attachments: no reason to run the stats queries.
-            return array_sum( array_map( function ( $f ) { return count( self::server_folder_files( $f ) ); }, ISXM_Settings::server_folders() ) );
+            $manifest = self::server_manifest();
+            return array_sum( array_map( function ( $f ) use ( $manifest ) { return count( self::server_pending_files( $f, $manifest ) ); }, ISXM_Settings::server_folders() ) );
         }
         $stats = self::get_stats( true );
 

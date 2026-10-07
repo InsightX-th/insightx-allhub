@@ -242,18 +242,19 @@ class ISXM_DB_Rewriter {
      * @return array{processed:int,last_id:int,done:bool}|WP_Error Error only
      *               for a failed write; the cursor in the caller stays put.
      */
-    public static function rewrite_window( $table, $id_col, $value_col, callable $map_builder, $after_id = 0, $limit = 100, $ref_col = null, $kind = null, $deadline = 0 ) {
+    public static function rewrite_window( $table, $id_col, $value_col, callable $map_builder, $after_id = 0, $limit = 100, $ref_col = null, $kind = null, $deadline = 0, ?array $probes = null ) {
         global $wpdb;
 
+        // Rows worth reading: by default anything mentioning the uploads
+        // URL; callers rewriting other paths pass their own LIKE patterns.
+        $probes = $probes ?: [ self::uploads_url_probe(), self::uploads_url_probe_escaped() ];
+        $where  = implode( ' OR ', array_fill( 0, count( $probes ), "{$value_col} LIKE %s" ) );
         $rows = $wpdb->get_results( $wpdb->prepare(
             "SELECT {$id_col} AS id, {$value_col} AS val" . ( $ref_col ? ", {$ref_col} AS ref" : '' ) . "
-             FROM {$table} WHERE ( {$value_col} LIKE %s OR {$value_col} LIKE %s ) AND {$id_col} > %d
+             FROM {$table} WHERE ( {$where} ) AND {$id_col} > %d
              ORDER BY {$id_col} ASC LIMIT %d",
-            self::uploads_url_probe(),
-            self::uploads_url_probe_escaped(),
-            (int) $after_id,
-            (int) $limit
-        ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- $id_col/$value_col/$ref_col are this class's own hard-coded column names
+            array_merge( array_values( $probes ), [ (int) $after_id, (int) $limit ] )
+        ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- $id_col/$value_col/$ref_col are this class's own hard-coded column names; $where is placeholders only
         if ( $wpdb->last_error ) {
             return new WP_Error( 'isxs_rewrite_read', 'Could not read the next URL rewrite window; checkpoint retained.' );
         }

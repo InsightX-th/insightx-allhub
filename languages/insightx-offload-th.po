@@ -1551,3 +1551,7 @@ msgstr "รูปภาพ"
 #: includes/class-isxm-admin.php
 msgid "Image sizes and profile pictures"
 msgstr "ขนาดรูปและรูปโปรไฟล์"
+
+#: includes/class-isxm-admin.php
+msgid "Upload remaining folder files (%s)"
+msgstr "อัปโหลดไฟล์ในโฟลเดอร์ที่เหลือ (%s)"

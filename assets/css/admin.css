@@ -398,6 +398,13 @@
 .isxs-status-action .isxs-btn {
   width: 100%;
 }
+.isxs-status-action .isxs-btn + .isxs-btn {
+  margin-top: 8px;
+}
+/* .isxs-btn sets display, which would beat [hidden]. */
+.isxs-status-action .isxs-btn[hidden] {
+  display: none;
+}
 
 .isxs-status-foot {
   margin-top: 10px;

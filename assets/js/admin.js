@@ -917,6 +917,25 @@
     );
   };
 
+  // Offload Status panel: one row per "Upload server folders" folder, under
+  // the uploads row, plus a button while any of their files are left.
+  const renderServerFolderRows = (rows) => {
+    if (!Array.isArray(rows)) return;
+    const $body = $("#isxs-status-rows");
+    $body.find(".isxs-status-folder-row").remove();
+    let left = 0;
+    rows.forEach((r) => {
+      left += r.remaining;
+      $("<tr class='isxs-status-folder-row'>")
+        .append($("<td>").text(r.path))
+        .append($("<td class='isxs-status-num'>").text(r.offloaded.toLocaleString()))
+        .append($("<td class='isxs-status-num'>").text(r.remaining.toLocaleString()))
+        .appendTo($body);
+    });
+    $("#isxs-status-folders-num").text(left.toLocaleString());
+    $(".isxs-status-folders-btn").prop("hidden", left === 0);
+  };
+
   const applyJobPayload = (res) => {
     if (!res || !res.success || !res.data) {
       return false;
@@ -943,6 +962,7 @@
     // visible, and that decision reads the running state from here.
     jobs = data.jobs || {};
     renderMigrateWidget(jobs.migrate, data.migrate_last);
+    renderServerFolderRows(data.server_folders);
 
     // Keep the header's quick-offload button honest while a run is going.
     const offJob = jobs.offload;
@@ -1651,6 +1671,10 @@
     });
     // Quick offload straight from the dropdown — same server-side job the
     // Tools tab's card starts.
+    $(".isxs-status-folders-btn").on("click", (e) => {
+      $(e.currentTarget).prop("disabled", true);
+      jobAction("isxs_job_start", "offload_folders", {});
+    });
     $(".isxs-status-offload-btn").on("click", (e) => {
       $(e.currentTarget).prop("disabled", true);
       jobAction("isxs_job_start", "offload", {});

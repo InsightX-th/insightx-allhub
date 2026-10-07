@@ -230,9 +230,14 @@ class ISXM_Admin {
                                 <thead>
                                     <tr><th><?php esc_html_e( 'Source', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Offloaded', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="isxs-status-rows">
                                     <tr>
-                                        <td>Media Library</td>
+                                        <?php
+                                        // The source as a path ("wp-content/uploads/"), Media Library on hover.
+                                        $uploads_dir = wp_normalize_path( trailingslashit( wp_get_upload_dir()['basedir'] ) );
+                                        $site_root   = wp_normalize_path( ABSPATH );
+                                        ?>
+                                        <td title="Media Library"><?php echo esc_html( strpos( $uploads_dir, $site_root ) === 0 ? substr( $uploads_dir, strlen( $site_root ) ) : 'Media Library' ); ?></td>
                                         <td class="isxs-status-num" id="isxs-status-offloaded">0</td>
                                         <td class="isxs-status-num" id="isxs-status-remaining">0</td>
                                     </tr>
@@ -240,6 +245,7 @@ class ISXM_Admin {
                             </table>
                             <div class="isxs-status-action">
                                 <button type="button" class="isxs-btn isxs-btn-primary isxs-status-offload-btn"><?php printf( esc_html__( 'Offload Remaining %s items', 'insightx-offload' ), '<span id="isxs-status-remaining-num">0</span>' ); ?></button>
+                                <button type="button" class="isxs-btn isxs-btn-ghost isxs-status-folders-btn" hidden><?php printf( esc_html__( 'Upload remaining folder files (%s)', 'insightx-offload' ), '<span id="isxs-status-folders-num">0</span>' ); ?></button>
                             </div>
                             <div class="isxs-status-foot"><?php printf( esc_html__( 'Total %1$s items · %2$s on the bucket', 'insightx-offload' ), '<span id="isxs-status-total">0</span>', '<span id="isxs-status-onbucket">0</span>' ); ?></div>
                         </div>

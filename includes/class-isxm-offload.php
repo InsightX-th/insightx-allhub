@@ -671,6 +671,66 @@ class ISXM_Offload {
         return true;
     }
 
+    /**
+     * Upload just the sizes a partial record lists as `missing`, into the
+     * record's own folder. The original is already on the bucket and may
+     * well be gone locally ("Remove Local Media"), so re-running the whole
+     * offload would only fail on it — while the never-uploaded sizes sit
+     * untouched in uploads/.
+     *
+     * @param int  $attachment_id Attachment post ID.
+     * @param bool $defer_persist Queue local deletions for the caller's batch rewrite.
+     * @return true|WP_Error True when at least one missing size went up.
+     */
+    public static function complete_missing_sizes( $attachment_id, $defer_persist = true ) {
+        $state  = self::status_for( $attachment_id );
+        $record = $state['info'];
+        if ( $state['status'] !== 'partial' ) {
+            return new WP_Error( 'isxs_not_partial', __( 'This item has no missing sizes on the current bucket', 'insightx-offload' ) );
+        }
+
+        $settings  = ISXM_Settings::all();
+        $local_dir = trailingslashit( dirname( self::local_path( $attachment_id ) ) );
+        $client    = self::client_for_info( $record );
+        $uploaded  = []; $absent = []; $failed = [];
+        foreach ( $record['missing'] as $name ) {
+            $path = $local_dir . $name;
+            if ( ! is_file( $path ) ) { $absent[] = $name; continue; }
+            $type   = wp_check_filetype( $name );
+            $result = $client->put_object( $record['base_key'] . $name, $path, $type['type'] ?: 'application/octet-stream', ! empty( $settings['send_public_acl'] ) );
+            if ( is_wp_error( $result ) ) {
+                $failed[] = $name . ' (' . $result->get_error_message() . ')';
+                continue;
+            }
+            $uploaded[] = $name;
+        }
+
+        if ( ! $uploaded ) {
+            return new WP_Error( 'isxs_missing_sizes_unavailable', $failed
+                ? sprintf( __( 'Could not upload the missing sizes: %s', 'insightx-offload' ), implode( ', ', $failed ) )
+                : sprintf( __( 'The missing sizes are not on the server either: %s', 'insightx-offload' ), implode( ', ', $absent ) ) );
+        }
+
+        $record['files']   = array_values( array_unique( array_merge( $record['files'] ?? [], $uploaded ) ) );
+        $record['missing'] = array_values( array_diff( $record['missing'], $uploaded ) );
+        if ( ! $record['missing'] ) unset( $record['missing'] );
+        if ( ! self::set_record( $attachment_id, $record ) ) {
+            return new WP_Error( 'isxs_record_write', __( 'Could not save the upload record to the database; local files were kept', 'insightx-offload' ) );
+        }
+        delete_post_meta( $attachment_id, self::ERROR_META_KEY );
+
+        // Same rule as run_offload(): only delete what stays resolvable.
+        if ( $settings['remove_local'] && ( $settings['persist_urls'] || $settings['deliver_enabled'] ) ) {
+            $paths = array_map( function ( $name ) use ( $local_dir ) { return $local_dir . $name; }, $uploaded );
+            if ( $defer_persist ) {
+                self::queue_local_deletion( $paths );
+            } else {
+                self::delete_local_files( $paths );
+            }
+        }
+        return true;
+    }
+
     /* ---------------------------------------------------------------------
      * Deferred local-file deletion ("Remove Local Media" during bulk runs)
      * ------------------------------------------------------------------ */

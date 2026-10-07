@@ -229,6 +229,60 @@ $content = $db->get_var( 'SELECT post_content FROM wp_posts WHERE ID=50' );
 $base = ISXM_Settings::public_base_url() . '/download/Specification/';
 t( 'Raw and percent-encoded links rewritten to the destination', strpos( $content, 'src.example.com' ) === false && strpos( $content, $base . 'a.pdf' ) !== false && strpos( $content, $base . 'Spec%20Sheet.pdf' ) !== false, $content );
 
+group( 'Upload missing sizes of a partial item' );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_partial_' . getmypid() . '.jsonl';
+$fake_port = 20000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+migration_fixture( 0 ); $db = $GLOBALS['wpdb'];
+// The ledger/legacy queries filter on post_type/post_status.
+$db->db->exec( 'DROP TABLE wp_posts' );
+$db->db->exec( "CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, post_content TEXT, guid TEXT, post_type TEXT DEFAULT 'attachment', post_status TEXT DEFAULT 'inherit')" );
+isxm_items_table( $db );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn );
+ISXM_Settings::flush_cache();
+$dest = [ 'bucket' => 'media', 'endpoint' => "http://127.0.0.1:$fake_port", 'path_style' => true, 'base_key' => 'p/', 'version' => '' ];
+foreach ( [ 1, 2, 3, 4, 5 ] as $id ) {
+    isxm_test_add_post( $id, [] ); update_post_meta( $id, '_wp_attached_file', "p$id.jpg" );
+    $db->db->exec( "INSERT INTO wp_posts(ID) VALUES ($id)" );
+}
+ISXM_Offload::set_record( 1, $dest + [ 'files' => [ 'p1.jpg' ], 'missing' => [ 'p1-150x150.jpg', 'p1-300x300.jpg' ] ] );
+ISXM_Offload::set_record( 2, $dest + [ 'files' => [ 'p2.jpg' ], 'missing' => [ 'p2-150x150.jpg' ] ] );
+ISXM_Offload::set_record( 3, $dest + [ 'files' => [ 'p3.jpg' ], 'missing' => [ 'p3-150x150.jpg' ] ] );
+ISXM_Offload::set_record( 4, [ 'bucket' => 'old', 'endpoint' => 'https://old.example' ] + $dest + [ 'files' => [ 'p4.jpg' ], 'missing' => [ 'p4-150x150.jpg' ] ] );
+ISXM_Offload::set_record( 5, $dest + [ 'files' => [ 'p5.jpg' ] ] );
+@unlink( ISXM_TEST_UPLOADS . '/p1.jpg' ); // original already removed by "Remove Local Media"
+file_put_contents( ISXM_TEST_UPLOADS . '/p1-150x150.jpg', 'small' );
+$r = ISXM_Offload::complete_missing_sizes( 1, false );
+$puts = [];
+foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $puts[] = $row['uri']; }
+$rec = ISXM_Offload::get_record( 1 );
+t( 'Only the missing size found locally is uploaded, into the record folder', $r === true && $puts === [ '/media/p/p1-150x150.jpg' ], json_encode( [ $r, $puts ] ) );
+t( 'Record: uploaded size moves to files, the absent one stays missing', $rec['files'] === [ 'p1.jpg', 'p1-150x150.jpg' ] && $rec['missing'] === [ 'p1-300x300.jpg' ] && ISXM_Offload::status_for( 1 )['status'] === 'partial' );
+t( 'Uploaded local copy removed (Remove Local Media + persist)', ! is_file( ISXM_TEST_UPLOADS . '/p1-150x150.jpg' ) );
+file_put_contents( ISXM_TEST_UPLOADS . '/p1-300x300.jpg', 'medium' );
+ISXM_Offload::complete_missing_sizes( 1, false );
+t( 'Last missing size uploaded: item is complete', ! isset( ISXM_Offload::get_record( 1 )['missing'] ) && ISXM_Offload::status_for( 1 )['status'] === 'offloaded' );
+$r = ISXM_Offload::complete_missing_sizes( 2 );
+t( 'Nothing on the server: error names the size, record unchanged', is_wp_error( $r ) && strpos( $r->get_error_message(), 'p2-150x150.jpg' ) !== false && ISXM_Offload::get_record( 2 )['missing'] === [ 'p2-150x150.jpg' ] );
+file_put_contents( ISXM_TEST_UPLOADS . '/p3-150x150.jpg', 'small' );
+$cb = new ReflectionMethod( 'ISXM_Tools', 'offload_one_callback' );
+if ( PHP_VERSION_ID < 80100 ) $cb->setAccessible( true ); // no-op (deprecated) on 8.1+
+$pairs = call_user_func( $cb->invoke( new ISXM_Tools() ), 3 );
+t( 'Offload Now on a partial item fills it in instead of failing on the removed original', ! is_wp_error( $pairs ) && ISXM_Offload::status_for( 3 )['status'] === 'offloaded', is_wp_error( $pairs ) ? $pairs->get_error_message() : '' );
+ISXM_Offload::clear_pending_deletions();
+update_option( ISXM_Items::BACKFILLED_OPTION, '1' );
+t( 'Ledger: partial ids on the current bucket only', ISXM_Tools::get_partial_ids( 10 )['ids'] === [ 2 ], json_encode( ISXM_Tools::get_partial_ids( 10 ) ) );
+delete_option( ISXM_Items::BACKFILLED_OPTION );
+// The meta stub is in-memory; mirror the records into the SQL table the legacy query reads.
+foreach ( [ 1, 2, 3, 4, 5 ] as $id ) {
+    $db->db->exec( 'INSERT INTO wp_postmeta(post_id,meta_key,meta_value) VALUES (' . $id . ',' . $db->db->quote( ISXM_Offload::META_KEY ) . ',' . $db->db->quote( serialize( ISXM_Offload::get_record( $id ) ) ) . ')' );
+}
+t( 'Legacy postmeta: same answer', ISXM_Tools::get_partial_ids( 10 )['ids'] === [ 2 ], json_encode( ISXM_Tools::get_partial_ids( 10 ) ) );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];
@@ -247,19 +301,65 @@ t( 'Lists one level via delimiter=/ and decodes entities', $folders['folders'] =
 t( 'Uploads folder: originals and sizes resolve to attachments, strays and markers do not', ISXM_Migrate::count_attachment_matches( 'wp-content/uploads/' ) === 2 );
 t( 'Non-media folder scores 0', ISXM_Migrate::count_attachment_matches( 'download/' ) === 0 );
 $roles = ISXM_Tools::assign_source_folders( [ 'download/', 'wp-content/uploads/' ], 'old/' );
-t( 'The folder with attachments becomes the Source Prefix, the rest copied as-is', $roles === [ 'prefix' => 'wp-content/uploads/', 'extras' => 'download/', 'warning' => '' ], json_encode( $roles ) );
+t( 'The folder with attachments becomes the Source Prefix, the rest copied as-is', $roles['prefix'] === 'wp-content/uploads/' && $roles['media'] && $roles['extras'] === 'download/' && $roles['warning'] === '' && $roles['notice'] === '', json_encode( $roles ) );
 $calls = 0;
-$roles = ISXM_Tools::assign_source_folders( [ 'only/' ], 'old/', function () use ( &$calls ) { $calls++; return 0; } );
-t( 'A single folder is the Source Prefix without sampling', $roles['prefix'] === 'only/' && $roles['extras'] === '' && $calls === 0 );
+$roles = ISXM_Tools::assign_source_folders( [ 'download/Specification/' ], 'wp-content/uploads/', function () use ( &$calls ) { $calls++; return 0; } );
+t( 'A single non-media folder is sampled and copied as-is: no Media Library in this run', $calls === 1 && ! $roles['media'] && $roles['extras'] === 'download/Specification/' && $roles['prefix'] === 'wp-content/uploads/' && $roles['notice'] !== '' && $roles['warning'] === '', json_encode( $roles ) );
+$roles = ISXM_Tools::assign_source_folders( [ 'wp-content/uploads/' ], '', function () { return 7; } );
+t( 'A single uploads folder is the Media Library', $roles['media'] && $roles['prefix'] === 'wp-content/uploads/' && $roles['extras'] === '' );
 $roles = ISXM_Tools::assign_source_folders( [ 'a/', 'old/' ], 'old/', function () { return 0; } );
-t( 'No matches anywhere: keep the previous Source Prefix and warn', $roles['prefix'] === 'old/' && $roles['extras'] === 'a/' && $roles['warning'] !== '' );
+t( 'No matches anywhere: every folder copied as-is, previous prefix kept but unused', ! $roles['media'] && $roles['prefix'] === 'old/' && $roles['extras'] === 'a/, old/' );
 $roles = ISXM_Tools::assign_source_folders( [ 'a/', 'b/' ], 'old/', function () { return new WP_Error( 'x', 'down' ); } );
-t( 'Source unreachable: first folder, connection warning', $roles['prefix'] === 'a/' && strpos( $roles['warning'], 'source connection' ) !== false );
+t( 'Source unreachable: previous setting kept, connection warning', ! $roles['media'] && $roles['extras'] === 'a/, b/' && strpos( $roles['warning'], 'source connection' ) !== false );
 $roles = ISXM_Tools::assign_source_folders( [ 'wp-content/uploads/', 'wp-content/uploads/2024/', 'download/' ], '', function ( $f ) { return $f === 'wp-content/uploads/' ? 5 : 1; } );
 t( 'A folder inside the chosen root is not copied twice', $roles['extras'] === 'download/', json_encode( $roles ) );
 $GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), [ 'source_prefix' => 'wp-content/uploads/', 'source_extra_prefixes' => "download/\nfiles/" ] );
 ISXM_Settings::flush_cache();
 t( 'Picker value derives from the two settings, root first', ISXM_Settings::source_folders() === 'wp-content/uploads/, download/, files/' );
+$GLOBALS['isxm_t']['options']['isxs_settings']['source_media'] = false; ISXM_Settings::flush_cache();
+t( 'Without a Media Library the unused root is not shown', ISXM_Settings::source_folders() === 'download/, files/' );
+$GLOBALS['isxm_t']['options']['isxs_settings']['cdn_domain'] = 'cdn.example.test'; ISXM_Settings::flush_cache();
+t( 'Source Public URL on the destination host: a warning, not a refusal', ISXM_Tools::source_url_warning( 'https://cdn.example.test', 'cdn.example.test' ) !== ''
+    && ISXM_Tools::source_url_warning( 'https://old-bucket.s3.amazonaws.com', 'cdn.example.test' ) === '' && ISXM_Tools::source_url_warning( '', 'cdn.example.test' ) === '' );
+
+group( 'Migrate only the picked folders (no Media Library)' );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_extras_only_' . getmypid() . '.jsonl';
+$fake_port = 21000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+$job = migration_fixture( 2 ); $db = $GLOBALS['wpdb'];
+$job->total = 0; $job->save(); // a real migrate starts at 0 (tool_total('migrate'))
+$conn = get_option( 'isxs_connections' );
+$conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port";
+$conn['minio'] = $conn['custom']; $conn['minio']['bucket'] = 'source';
+update_option( 'isxs_connections', $conn );
+$GLOBALS['isxm_t']['options']['isxs_settings'] = array_merge( get_option( 'isxs_settings' ), [
+    'source_provider' => 'minio', 'source_media' => false, 'source_extra_prefixes' => 'download/Specification/', 'source_public_base_url' => 'https://src.example.com' ] );
+ISXM_Settings::flush_cache();
+$listed = [];
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$listed ) {
+    parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q );
+    if ( isset( $q['list-type'] ) ) {
+        $listed[] = $q['prefix'] ?? '';
+        return migration_listing( ( $q['prefix'] ?? '' ) === 'download/Specification/' ? [ 'download/Specification/x.pdf', 'download/Specification/y.pdf' ] : [ 'm1.jpg', 'm2.jpg' ] );
+    }
+    if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], 'pdf' );
+    return [ 'response' => [ 'code' => 200 ], 'body' => 'pdf' ];
+};
+$count = ( new ReflectionMethod( 'ISXM_Tools', 'batch_migrate' ) );
+if ( PHP_VERSION_ID < 80100 ) $count->setAccessible( true );
+$counted = $count->invoke( new ISXM_Tools(), 'count|' );
+t( 'Counting phase skips the whole-bucket count', $counted['cursor'] === 'run|' && $counted['total_delta'] === 0 && $listed === [] );
+pipeline_drain();
+$puts = [];
+foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $puts[] = $row['uri']; }
+proc_terminate( $fake ); @unlink( $fake_log );
+$done = ISXM_Job::get( 'migrate' );
+t( 'Media Library untouched: only the picked folder is listed', $listed === [ 'download/Specification/' ], json_encode( $listed ) );
+t( 'Picked files copied under their own keys', $puts === [ '/media/download/Specification/x.pdf', '/media/download/Specification/y.pdf' ], json_encode( $puts ) );
+t( 'Progress counts the copied files', $done->processed === 2 && $done->total === 2 && $done->total_complete && $done->migration['stage'] === 'complete', json_encode( [ $done->processed, $done->total, $done->total_complete, $done->migration['stage'] ] ) );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

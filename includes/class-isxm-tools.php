@@ -128,7 +128,7 @@ class ISXM_Tools {
         $settings['assets_cdn_domain'] = isset( $_POST['assets_cdn_domain'] ) ? self::sanitize_cdn_domain( $_POST['assets_cdn_domain'] ) : '';
 
         $settings['prefix']        = isset( $_POST['prefix'] ) ? self::sanitize_prefix( $_POST['prefix'] ) : '';
-        $folders_warning = '';
+        $folders_warning = ''; $folders_notice = '';
         if ( isset( $_POST['source_folders'] ) ) {
             // The folder picker: one list, split back into the uploads root
             // and the as-is folders. Only re-classified when the selection
@@ -139,13 +139,17 @@ class ISXM_Tools {
             if ( self::same_folders( $folders, $stored ) ) {
                 $settings['source_prefix']         = $current['source_prefix'];
                 $settings['source_extra_prefixes'] = $current['source_extra_prefixes'];
+                $settings['source_media']          = (bool) $current['source_media'];
             } else {
                 $roles = self::assign_source_folders( $folders, $current['source_prefix'] );
                 $settings['source_prefix']         = $roles['prefix'];
                 $settings['source_extra_prefixes'] = $roles['extras'];
+                $settings['source_media']          = $roles['media'];
                 $folders_warning                   = $roles['warning'];
+                $folders_notice                    = $roles['notice'];
             }
         } else {
+            $settings['source_media']  = true;
             $settings['source_prefix'] = isset( $_POST['source_prefix'] ) ? self::sanitize_prefix( $_POST['source_prefix'] ) : '';
             $settings['source_extra_prefixes'] = isset( $_POST['source_extra_prefixes'] )
                 ? self::sanitize_extra_prefixes( wp_unslash( (string) $_POST['source_extra_prefixes'] ), $settings['source_prefix'] )
@@ -173,19 +177,13 @@ class ISXM_Tools {
             $settings['source_public_base_url'] = '';
         }
 
-        // The Source Public URL is where existing media is served from NOW
-        // (the old bucket/CDN). Pointing it at the destination makes the
-        // migration record old→new URL pairs that match nothing in the
-        // database, so the final rewrite silently leaves the old URLs in place.
-        if ( $settings['source_public_base_url'] !== '' ) {
-            $source_host = strtolower( (string) wp_parse_url( $settings['source_public_base_url'], PHP_URL_HOST ) );
-            $dest_hosts  = array_filter( [
-                strtolower( (string) wp_parse_url( 'https://' . preg_replace( '#^https?://#', '', $settings['cdn_domain'] ), PHP_URL_HOST ) ),
-                strtolower( (string) wp_parse_url( ISXM_Settings::public_base_url(), PHP_URL_HOST ) ),
-            ] );
-            if ( $source_host !== '' && in_array( $source_host, $dest_hosts, true ) ) {
-                wp_send_json_error( [ 'message' => __( 'Source Public URL must be where your existing media is served from now (for example the old S3 bucket or its CDN) — not the destination address', 'insightx-offload' ) ] );
-            }
+        // A warning, not a refusal: the same host is legitimate when one CDN
+        // domain stays in front of the media across the provider switch, and
+        // refusing here used to block every other setting on the page too
+        // (they are all autosaved in one request).
+        $url_warning = self::source_url_warning( $settings['source_public_base_url'], $settings['cdn_domain'] );
+        if ( $url_warning !== '' ) {
+            $folders_warning = trim( $folders_warning . ' ' . $url_warning );
         }
 
         // Detect a destination switch before saving overwrites $current —
@@ -201,9 +199,10 @@ class ISXM_Tools {
         ISXM_Settings::save( $settings );
 
         wp_send_json_success( [
-            'message'              => $folders_warning !== '' ? $folders_warning : __( 'Settings saved', 'insightx-offload' ),
+            'message'              => $folders_warning !== '' ? $folders_warning : ( $folders_notice !== '' ? $folders_notice : __( 'Settings saved', 'insightx-offload' ) ),
             'warning'              => $folders_warning !== '',
-            'source_prefix'        => ISXM_Settings::get( 'source_prefix' ),
+            // The picker's "Media Library" badge: none when no ticked folder is the uploads root.
+            'source_prefix'        => ISXM_Settings::get( 'source_media' ) ? ISXM_Settings::get( 'source_prefix' ) : '',
             'public_base_url'      => ISXM_Settings::public_base_url(),
             'destination_changed'  => $destination_changed,
             // Refreshed on every response: an admin page left open past the
@@ -308,20 +307,37 @@ class ISXM_Tools {
     }
 
     /**
+     * Warning when the Source Public URL shares a host with the destination.
+     * Legitimate when one CDN domain fronts the media before and after the
+     * switch; a mistake when it was meant to be the old bucket's address —
+     * old→new pairs on the destination host match nothing in the database.
+     *
+     * @return string '' when the hosts differ.
+     */
+    public static function source_url_warning( $source_url, $cdn_domain ) {
+        if ( $source_url === '' ) return '';
+        $source_host = strtolower( (string) wp_parse_url( $source_url, PHP_URL_HOST ) );
+        $dest_hosts  = array_filter( [
+            strtolower( (string) wp_parse_url( 'https://' . preg_replace( '#^https?://#', '', (string) $cdn_domain ), PHP_URL_HOST ) ),
+            strtolower( (string) wp_parse_url( ISXM_Settings::public_base_url(), PHP_URL_HOST ) ),
+        ] );
+        if ( $source_host === '' || ! in_array( $source_host, $dest_hosts, true ) ) return '';
+        return __( 'Saved. Note: the Source Public URL uses the same address as the destination — fine if the same CDN domain serves your media before and after the move; otherwise set it to where the old files are served from now, or links will not be rewritten.', 'insightx-offload' );
+    }
+
+    /**
      * Decide which picked folder is the uploads root (Source Prefix) and
-     * which are copied as-is: the folder whose sampled keys resolve to the
-     * most attachments wins. One folder needs no sampling — it is the
-     * Source Prefix, exactly as typing it used to be.
+     * which are copied as-is: every folder is sampled, and the one whose
+     * keys resolve to the most attachments is the Media Library. The Media
+     * Library is optional — when no picked folder holds attachments, the run
+     * only copies the picked folders, key for key.
      *
      * @param string[]      $folders  Sanitized folders, in the user's order.
-     * @param string        $previous Current Source Prefix (tie-breaker / fallback).
+     * @param string        $previous Current Source Prefix (kept when unused, fallback when unreadable).
      * @param callable|null $score    folder => int|WP_Error; defaults to sampling the source.
-     * @return array{prefix:string,extras:string,warning:string}
+     * @return array{prefix:string,extras:string,media:bool,warning:string,notice:string}
      */
     public static function assign_source_folders( array $folders, $previous, $score = null ) {
-        if ( count( $folders ) < 2 ) {
-            return [ 'prefix' => $folders[0] ?? '', 'extras' => '', 'warning' => '' ];
-        }
         $score = $score ?: [ 'ISXM_Migrate', 'count_attachment_matches' ];
         $best = ''; $best_score = 0; $failed = false;
         foreach ( $folders as $folder ) {
@@ -329,15 +345,20 @@ class ISXM_Tools {
             if ( is_wp_error( $n ) ) { $failed = true; continue; }
             if ( $n > $best_score ) { $best = $folder; $best_score = $n; }
         }
-        $warning = '';
-        if ( $best === '' ) {
-            $best    = in_array( $previous, $folders, true ) ? $previous : $folders[0];
-            $warning = $failed
-                ? sprintf( __( 'Could not read the source bucket to find the Media Library folder — using %s. Check the source connection.', 'insightx-offload' ), $best )
-                : sprintf( __( 'None of the selected folders holds Media Library files — using %s. Select the folder that contains your uploads directly (e.g. wp-content/uploads/).', 'insightx-offload' ), $best );
+        $out = [ 'prefix' => (string) $previous, 'media' => false, 'warning' => '', 'notice' => '' ];
+        if ( $best !== '' ) {
+            $out['prefix'] = $best; $out['media'] = true;
+        } elseif ( $failed ) {
+            // Can't tell — keep the previous root if it is still ticked.
+            $out['media']   = in_array( $previous, $folders, true );
+            $out['warning'] = __( 'Could not read the source bucket to find the Media Library folder — the previous setting is kept. Check the source connection.', 'insightx-offload' );
+        } elseif ( $folders ) {
+            $out['notice'] = __( 'No Media Library folder selected — Migrate will copy only the selected folders, keeping their paths.', 'insightx-offload' );
         }
-        $extras = array_values( array_diff( $folders, [ $best ] ) );
-        return [ 'prefix' => $best, 'extras' => self::sanitize_extra_prefixes( implode( ',', $extras ), $best ), 'warning' => $warning ];
+        $root   = $out['media'] ? $out['prefix'] : '';
+        $extras = array_values( array_diff( $folders, [ $root ] ) );
+        $out['extras'] = self::sanitize_extra_prefixes( implode( ',', $extras ), $root );
+        return $out;
     }
 
     /**
@@ -350,7 +371,7 @@ class ISXM_Tools {
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'message' => $result->get_error_message() ] );
         }
-        wp_send_json_success( $result + [ 'prefix' => $prefix, 'media' => ISXM_Settings::get( 'source_prefix' ) ] );
+        wp_send_json_success( $result + [ 'prefix' => $prefix, 'media' => ISXM_Settings::get( 'source_media' ) ? ISXM_Settings::get( 'source_prefix' ) : '' ] );
     }
 
     /**
@@ -1111,6 +1132,7 @@ class ISXM_Tools {
         return [
             'offload'      => __( 'Upload remaining files to the cloud', 'insightx-offload' ),
             'retry_failed' => __( 'Retry only the failed items', 'insightx-offload' ),
+            'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
             'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
             'remove'       => __( 'Remove files from the bucket', 'insightx-offload' ),
             'migrate'      => __( 'Move files from the source bucket', 'insightx-offload' ),
@@ -1308,6 +1330,8 @@ class ISXM_Tools {
                 return (int) $stats['in_bucket'];
             case 'retry_failed':
                 return (int) $stats['failed'];
+            case 'complete_partial':
+                return (int) $stats['partial'];
             case 'wc_downloads':
                 return isset( $stats['wc_total'] ) ? (int) $stats['wc_total'] : 0;
             case 'backfill':
@@ -1347,6 +1371,8 @@ class ISXM_Tools {
                     return $instance->batch_offload( $cursor );
                 case 'retry_failed':
                     return $instance->batch_retry_failed( $cursor );
+                case 'complete_partial':
+                    return $instance->batch_pending_phased( $cursor, $instance->offload_one_callback(), [ __CLASS__, 'get_partial_ids' ] );
                 case 'download':
                     return $instance->batch_download( $cursor );
                 case 'remove':
@@ -1530,6 +1556,34 @@ class ISXM_Tools {
      *
      * @return array{ids:int[], last_id:int, done:bool}
      */
+    public static function get_partial_ids( $limit, $after_id = 0 ) {
+        global $wpdb;
+        $bucket   = (string) ISXM_Settings::get( 'bucket' );
+        $endpoint = (string) ISXM_Settings::get( 'endpoint' );
+        if ( ISXM_Items::ready() ) {
+            return ISXM_Items::partial_ids( $limit, $after_id, $bucket, $endpoint );
+        }
+        // Legacy postmeta path: the same needles get_stats() counts partials with.
+        $ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT p.ID FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = %s
+             WHERE p.post_type = 'attachment' AND p.post_status <> 'trash' AND p.ID > %d
+               AND m.meta_value LIKE %s AND m.meta_value LIKE %s AND m.meta_value LIKE %s
+             ORDER BY p.ID ASC LIMIT %d",
+            ISXM_Offload::META_KEY,
+            $after_id,
+            '%' . $wpdb->esc_like( 's:7:"missing";' ) . '%',
+            '%' . $wpdb->esc_like( 's:6:"bucket";s:' . strlen( $bucket ) . ':"' . $bucket . '"' ) . '%',
+            '%' . $wpdb->esc_like( 's:8:"endpoint";s:' . strlen( $endpoint ) . ':"' . $endpoint . '"' ) . '%',
+            $limit
+        ) ) );
+        return [
+            'ids'     => $ids,
+            'last_id' => empty( $ids ) ? $after_id : end( $ids ),
+            'done'    => count( $ids ) < $limit,
+        ];
+    }
+
     public static function get_failed_ids( $limit, $after_id = 0 ) {
         global $wpdb;
 
@@ -2437,7 +2491,12 @@ class ISXM_Tools {
         $offload = new ISXM_Offload();
 
         return function ( $id ) use ( $offload ) {
-            $res = $offload->offload_attachment( $id, null, true );
+            // Already on the bucket with sizes missing: upload only those —
+            // a full re-offload would fail on an original that "Remove Local
+            // Media" has already deleted.
+            $res = ISXM_Offload::status_for( $id )['status'] === 'partial'
+                ? ISXM_Offload::complete_missing_sizes( $id )
+                : $offload->offload_attachment( $id, null, true );
             if ( is_wp_error( $res ) ) {
                 return $res;
             }
@@ -2544,6 +2603,11 @@ class ISXM_Tools {
     private function batch_migrate( $cursor ) {
         list( $phase, $token ) = self::split_cursor( $cursor, 'count' );
 
+        if ( $phase === 'count' && ! ISXM_Settings::get( 'source_media' ) ) {
+            // Only the picked folders will be copied; the extras stage counts
+            // them itself, so a whole-bucket count would only skew the bar.
+            return [ 'processed' => 0, 'cursor' => 'run|', 'done' => false, 'errors' => [], 'total_delta' => 0, 'total_complete' => false, 'phase' => '' ];
+        }
         if ( $phase === 'count' ) {
             $counted = ISXM_Migrate::count_source_objects( [], $token );
             if ( is_wp_error( $counted ) ) {

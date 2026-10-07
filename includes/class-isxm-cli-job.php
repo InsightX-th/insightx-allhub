@@ -107,8 +107,8 @@ class ISXM_CLI_Job {
      * ## OPTIONS
      *
      * <tool>
-     * : Which tool to run. One of: offload, retry_failed, download, remove,
-     *   migrate, wc_downloads, backfill.
+     * : Which tool to run. One of: offload, retry_failed, complete_partial,
+     *   download, remove, migrate, wc_downloads, backfill.
      *
      * [--resume]
      * : Continue the existing cursor instead of starting a fresh scan. Only

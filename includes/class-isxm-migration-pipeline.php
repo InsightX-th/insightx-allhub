@@ -15,6 +15,14 @@ class ISXM_Migration_Pipeline {
         $m =& $job->migration;
         $changed = self::settings_changed( $job );
         if ( $changed ) return $changed;
+        if ( $m['stage'] === 'index' && ! ISXM_Settings::get( 'source_media' ) ) {
+            // No Media Library folder picked: nothing to index or transfer,
+            // only the picked folders to copy as-is.
+            $m['stage'] = 'extras';
+            $m['extras'] = [ 'p' => 0, 'token' => '', 'keys' => null, 'index' => 0, 'copied' => 0 ];
+            self::save( $job, false );
+            return self::result( $job );
+        }
         if ( $m['stage'] === 'index' ) {
             $before = $m['after'];
             $window = ISXM_Migration_Store::index_window( $m['after'] );
@@ -92,6 +100,12 @@ class ISXM_Migration_Pipeline {
                 $page = ISXM_Migrate::list_extra_keys( $prefixes[ $x['p'] ], $x['token'] );
                 if ( is_wp_error( $page ) ) return $page;
                 $x['keys'] = $page['keys']; $x['index'] = 0; $x['next'] = $page['next_token'];
+                if ( ! ISXM_Settings::get( 'source_media' ) ) {
+                    // Without the Media Library pass these objects ARE the run:
+                    // count them as the listing goes, like migrate's counting phase.
+                    $job->total += count( $page['keys'] );
+                    $job->total_complete = $page['next_token'] === '' && $x['p'] + 1 >= count( $prefixes );
+                }
                 self::save( $job, false );
             }
             while ( $x['index'] < count( $x['keys'] ) && ! self::stop( $job, $deadline ) ) {
@@ -107,6 +121,7 @@ class ISXM_Migration_Pipeline {
                     }
                 }
                 $x['index']++;
+                if ( ! ISXM_Settings::get( 'source_media' ) ) $job->processed++;
                 $job->activity['extras_copied'] = $x['copied'];
                 self::save( $job );
             }
@@ -188,8 +203,10 @@ class ISXM_Migration_Pipeline {
         $urls = []; $replays = [ $new => [ 'old' => $new, 'new' => $new ] ];
         foreach ( array_unique( [ $key, $encoded ] ) as $path ) {
             $old = trailingslashit( $source ) . $path;
-            $urls[ $old ] = [ 'old' => $old, 'new' => $new ];
+            // Same CDN host + same key: the link is already right.
+            if ( $old !== $new ) $urls[ $old ] = [ 'old' => $old, 'new' => $new ];
         }
+        if ( ! $urls ) return;
         ISXM_Migration_Store::put_many( $job->run_id, 'url', $urls );
         ISXM_Migration_Store::put_many( $job->run_id, 'replay', $replays );
     }
@@ -229,7 +246,7 @@ class ISXM_Migration_Pipeline {
         }
         $primary = wp_basename( ISXM_Offload::local_path( $id ) ); $guid = []; $urls = []; $replays = [];
         foreach ( $pairs as $pair ) {
-            if ( strpos( $pair['old'], 'http' ) !== 0 || strpos( $pair['old'], '\\/' ) !== false ) continue;
+            if ( strpos( $pair['old'], 'http' ) !== 0 || strpos( $pair['old'], '\\/' ) !== false || $pair['old'] === $pair['new'] ) continue;
             $urls[ $pair['old'] ] = $pair;
             $replays[ $pair['new'] ] = [ 'old' => $pair['new'], 'new' => $pair['new'] ];
             if ( wp_basename( $pair['old'] ) === $primary ) $guid[] = $pair;
@@ -255,7 +272,7 @@ class ISXM_Migration_Pipeline {
         $s = ISXM_Settings::all();
         $keys = [ 'provider', 'endpoint', 'bucket', 'region', 'path_style', 'use_prefix', 'prefix', 'use_year_month', 'use_object_version',
             'use_type_folder', 'persist_urls', 'cdn_domain', 'force_https',
-            'source_endpoint', 'source_bucket', 'source_prefix', 'source_use_year_month', 'source_public_base_url', 'source_extra_prefixes' ];
+            'source_endpoint', 'source_bucket', 'source_prefix', 'source_use_year_month', 'source_public_base_url', 'source_extra_prefixes', 'source_media' ];
         if ( ! empty( $s['use_type_folder'] ) ) {
             $keys = array_merge( $keys, [ 'product_folder', 'download_folder', 'post_folder', 'promotion_folder', 'category_folder', 'brand_folder' ] );
         }

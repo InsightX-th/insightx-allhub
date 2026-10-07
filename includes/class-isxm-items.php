@@ -465,6 +465,33 @@ class ISXM_Items {
      * ------------------------------------------------------------------ */
 
     /**
+     * Attachment IDs on the given destination with at least one size
+     * missing — what the "Upload missing sizes" tool walks.
+     *
+     * @return array{ids:int[], last_id:int, done:bool}
+     */
+    public static function partial_ids( $limit, $after_id, $bucket, $endpoint ) {
+        global $wpdb;
+        $table = self::table();
+        $limit = max( 1, (int) $limit );
+        $ids   = array_map( 'intval', $wpdb->get_col( $wpdb->prepare(
+            "SELECT p.ID FROM {$table} i INNER JOIN {$wpdb->posts} p ON p.ID = i.source_id
+             WHERE i.source_type = 'media-library' AND i.bucket = %s AND i.endpoint = %s AND i.is_partial = 1
+               AND p.ID > %d" . self::live_attachment_clause() . '
+             ORDER BY p.ID ASC LIMIT %d', // phpcs:ignore WordPress.DB.PreparedSQL -- table name from $wpdb->prefix
+            $bucket,
+            $endpoint,
+            (int) $after_id,
+            $limit
+        ) ) );
+        return [
+            'ids'     => $ids,
+            'last_id' => empty( $ids ) ? (int) $after_id : (int) end( $ids ),
+            'done'    => count( $ids ) < $limit,
+        ];
+    }
+
+    /**
      * Attachment IDs that are NOT on the given destination — no row at all,
      * or a row pointing somewhere else. A plain LEFT JOIN with the
      * destination test in the ON clause, so "not on this destination"

@@ -454,6 +454,15 @@ class ISXM_Admin {
                                 '',
                                 empty( $stats['failed'] )
                             );
+                            // Same: only when some item is "Not all sizes uploaded".
+                            $this->tool_card(
+                                'complete_partial',
+                                __( 'Upload missing sizes', 'insightx-offload' ),
+                                __( 'Upload only the image sizes that did not reach the bucket (Media page filter “Not all sizes uploaded”), from the copies still on the server — the original does not need to be here', 'insightx-offload' ),
+                                __( 'Upload missing sizes', 'insightx-offload' ),
+                                '',
+                                empty( $stats['partial'] )
+                            );
                             $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'If "Remove Local Media" was ever enabled, files may be missing from the server — use this tool to pull the missing files back', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
                             $this->tool_card( 'remove', __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Remove every media file from the bucket — files missing from the server are downloaded back before removal', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ), 'danger' );
                             if ( class_exists( 'WC_Product' ) ) {
@@ -816,6 +825,9 @@ class ISXM_Admin {
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 3v9"/><path d="m8.5 8.5 3.5-3.5 3.5 3.5"/></svg>';
             case 'retry_failed':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
+            case 'complete_partial':
+                // Picture frame with a plus: fill in what's missing.
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 9v8"/><path d="M8 13h8"/></svg>';
             case 'download':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
             case 'remove':

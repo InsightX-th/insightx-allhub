@@ -1431,3 +1431,35 @@ msgstr "อ่าน source bucket ไม่ได้ เลยหาโฟล�
 #: includes/class-isxm-tools.php
 msgid "None of the selected folders holds Media Library files — using %s. Select the folder that contains your uploads directly (e.g. wp-content/uploads/)."
 msgstr "ไม่มีโฟลเดอร์ที่เลือกไว้โฟลเดอร์ไหนมีไฟล์ของ Media Library — ตอนนี้ใช้ %s ไปก่อน ให้เลือกโฟลเดอร์ที่เก็บไฟล์อัปโหลดโดยตรง (เช่น wp-content/uploads/)"
+
+#: includes/class-isxm-tools.php
+msgid "Upload missing sizes"
+msgstr "อัปโหลดขนาดที่ขาด"
+
+#: includes/class-isxm-admin.php
+msgid "Upload only the image sizes that did not reach the bucket (Media page filter “Not all sizes uploaded”), from the copies still on the server — the original does not need to be here"
+msgstr "อัปโหลดเฉพาะขนาดรูปที่ยังไม่ขึ้น bucket (ดูได้ในหน้า Media ตัวกรอง “ขึ้นไม่ครบทุกขนาด”) จากไฟล์ที่ยังอยู่บน server — ไม่จำเป็นต้องมีไฟล์ต้นฉบับอยู่บน server"
+
+#: includes/class-isxm-offload.php
+msgid "This item has no missing sizes on the current bucket"
+msgstr "ไฟล์นี้ไม่มีขนาดที่ขาดบน bucket ปัจจุบัน"
+
+#: includes/class-isxm-offload.php
+msgid "Could not upload the missing sizes: %s"
+msgstr "อัปโหลดขนาดที่ขาดไม่สำเร็จ: %s"
+
+#: includes/class-isxm-offload.php
+msgid "The missing sizes are not on the server either: %s"
+msgstr "ขนาดที่ขาดไม่มีไฟล์อยู่บน server ด้วย: %s"
+
+#: includes/class-isxm-tools.php
+msgid "Could not read the source bucket to find the Media Library folder — the previous setting is kept. Check the source connection."
+msgstr "อ่าน source bucket ไม่ได้ เลยหาโฟลเดอร์ Media Library ไม่เจอ — ใช้ค่าเดิมไปก่อน ลองเช็กการเชื่อมต่อ source"
+
+#: includes/class-isxm-tools.php
+msgid "No Media Library folder selected — Migrate will copy only the selected folders, keeping their paths."
+msgstr "ไม่ได้เลือกโฟลเดอร์ Media Library — Migrate จะคัดลอกเฉพาะโฟลเดอร์ที่เลือก โดยใช้ path เดิม"
+
+#: includes/class-isxm-tools.php
+msgid "Saved. Note: the Source Public URL uses the same address as the destination — fine if the same CDN domain serves your media before and after the move; otherwise set it to where the old files are served from now, or links will not be rewritten."
+msgstr "บันทึกแล้ว — หมายเหตุ: Source Public URL ใช้ที่อยู่เดียวกับปลายทาง ถ้าใช้ CDN domain เดิมทั้งก่อนและหลังย้ายก็ใช้ได้ แต่ถ้าไม่ใช่ ให้ใส่ที่อยู่ที่ไฟล์เดิมเสิร์ฟอยู่ตอนนี้ ไม่อย่างนั้นลิงก์จะไม่ถูกเปลี่ยน"

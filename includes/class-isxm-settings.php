@@ -86,6 +86,7 @@ class ISXM_Settings {
             'source_use_year_month'  => true,
             'source_public_base_url' => '',        // URL the existing media is actually served from now (as found in the DB) — empty = infer from source_endpoint/bucket
             'source_extra_prefixes'  => '',        // Folders outside the Media Library copied as-is by Migrate, comma-separated (e.g. download/)
+            'source_media'           => true,      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
         ];
     }
 
@@ -474,7 +475,7 @@ class ISXM_Settings {
      * @return string Comma-separated, e.g. "wp-content/uploads/, download/".
      */
     public static function source_folders() {
-        $prefix = (string) self::get( 'source_prefix' );
+        $prefix = self::get( 'source_media' ) ? (string) self::get( 'source_prefix' ) : '';
         return implode( ', ', array_merge( $prefix !== '' ? [ $prefix ] : [], self::extra_prefixes() ) );
     }
 

@@ -1074,21 +1074,28 @@
   // The retry card is meaningless with nothing to retry, so it ships hidden
   // and appears/disappears as the failure count changes — including right
   // after a run, without a page reload.
+  // Cards that only matter while their count is non-zero: retry_failed
+  // (stats.failed) and complete_partial (stats.partial).
   const syncRetryCard = (stats) => {
     if (!stats || typeof stats.failed === "undefined") {
       return;
     }
-    const $card = cardFor("retry_failed");
-    if (!$card.length) {
-      return;
-    }
-    const job = jobs.retry_failed;
-    // Never yank the card out from under a run that's still going.
-    if (stats.failed > 0 || (job && job.state === "running")) {
-      $card.removeAttr("hidden");
-    } else {
-      $card.attr("hidden", true);
-    }
+    [
+      ["retry_failed", stats.failed],
+      ["complete_partial", stats.partial || 0],
+    ].forEach(([tool, count]) => {
+      const $card = cardFor(tool);
+      if (!$card.length) {
+        return;
+      }
+      const job = jobs[tool];
+      // Never yank the card out from under a run that's still going.
+      if (count > 0 || (job && job.state === "running")) {
+        $card.removeAttr("hidden");
+      } else {
+        $card.attr("hidden", true);
+      }
+    });
   };
 
   $(".isxs-tool .isxs-tool-run").on("click", (e) => {

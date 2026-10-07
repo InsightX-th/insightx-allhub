@@ -100,12 +100,6 @@ class ISXM_Migration_Pipeline {
                 $page = ISXM_Migrate::list_extra_keys( $prefixes[ $x['p'] ], $x['token'] );
                 if ( is_wp_error( $page ) ) return $page;
                 $x['keys'] = $page['keys']; $x['index'] = 0; $x['next'] = $page['next_token'];
-                if ( ! ISXM_Settings::get( 'source_media' ) ) {
-                    // Without the Media Library pass these objects ARE the run:
-                    // count them as the listing goes, like migrate's counting phase.
-                    $job->total += count( $page['keys'] );
-                    $job->total_complete = $page['next_token'] === '' && $x['p'] + 1 >= count( $prefixes );
-                }
                 self::save( $job, false );
             }
             while ( $x['index'] < count( $x['keys'] ) && ! self::stop( $job, $deadline ) ) {

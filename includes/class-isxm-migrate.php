@@ -46,8 +46,8 @@ class ISXM_Migrate {
      * @param string $continuation_token Resume cursor from a previous incomplete call ('' to start).
      * @return array{total:int,next_token:string,complete:bool}|WP_Error
      */
-    public static function count_source_objects( array $overrides = [], $continuation_token = '' ) {
-        return self::source_client( $overrides )->count_objects( $continuation_token );
+    public static function count_source_objects( array $overrides = [], $continuation_token = '', $prefix = '' ) {
+        return self::source_client( $overrides )->count_objects( $continuation_token, 20, $prefix );
     }
 
     /**

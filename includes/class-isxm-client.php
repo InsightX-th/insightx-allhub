@@ -486,8 +486,11 @@ class ISXM_Client {
      * @param string $continuation_token Pass the previous page's next_token to continue.
      * @return array{count:int,next_token:string}|WP_Error
      */
-    public function list_objects_page( $continuation_token = '' ) {
+    public function list_objects_page( $continuation_token = '', $prefix = '' ) {
         $query = [ 'list-type' => '2', 'max-keys' => '1000' ];
+        if ( $prefix !== '' ) {
+            $query['prefix'] = $prefix;
+        }
         if ( $continuation_token !== '' ) {
             $query['continuation-token'] = $continuation_token;
         }
@@ -681,12 +684,12 @@ class ISXM_Client {
      * @param int    $time_limit Seconds to keep paginating before giving up.
      * @return array{total:int,next_token:string,complete:bool}|WP_Error
      */
-    public function count_objects( $continuation_token = '', $time_limit = 20 ) {
+    public function count_objects( $continuation_token = '', $time_limit = 20, $prefix = '' ) {
         $started = microtime( true );
         $total   = 0;
         $token   = $continuation_token;
         do {
-            $page = $this->list_objects_page( $token );
+            $page = $this->list_objects_page( $token, $prefix );
             if ( is_wp_error( $page ) ) return $page;
             $total += $page['count'];
             $token  = $page['next_token'];

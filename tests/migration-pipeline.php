@@ -377,7 +377,8 @@ $GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$listed ) 
     parse_str( parse_url( $url, PHP_URL_QUERY ) ?? '', $q );
     if ( isset( $q['list-type'] ) ) {
         $listed[] = $q['prefix'] ?? '';
-        return migration_listing( ( $q['prefix'] ?? '' ) === 'download/Specification/' ? [ 'download/Specification/x.pdf', 'download/Specification/y.pdf' ] : [ 'm1.jpg', 'm2.jpg' ] );
+        $pfx = $q['prefix'] ?? '';
+        return migration_listing( $pfx === 'download/Specification/' ? [ 'download/Specification/x.pdf', 'download/Specification/y.pdf' ] : ( $pfx === 'download/Manual/' ? [ 'download/Manual/m.pdf', 'download/Manual/n.pdf' ] : [ 'm1.jpg', 'm2.jpg' ] ) );
     }
     if ( ! empty( $args['filename'] ) ) file_put_contents( $args['filename'], 'pdf' );
     return [ 'response' => [ 'code' => 200 ], 'body' => 'pdf' ];
@@ -385,7 +386,10 @@ $GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$listed ) 
 $count = ( new ReflectionMethod( 'ISXM_Tools', 'batch_migrate' ) );
 if ( PHP_VERSION_ID < 80100 ) $count->setAccessible( true );
 $counted = $count->invoke( new ISXM_Tools(), 'count|' );
-t( 'Counting phase skips the whole-bucket count', $counted['cursor'] === 'run|' && $counted['total_delta'] === 0 && $listed === [] );
+t( 'Counting phase counts only the picked folder, exactly', $counted['cursor'] === 'run|' && $counted['total_delta'] === 2 && $counted['total_complete'] === true && $listed === [ 'download/Specification/' ], json_encode( [ $counted, $listed ] ) );
+// What the runner does with a counting result.
+$job = ISXM_Job::get( 'migrate' ); $job->total += $counted['total_delta']; $job->total_complete = true; $job->save();
+$listed = [];
 pipeline_drain();
 $puts = [];
 foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $puts[] = $row['uri']; }
@@ -393,7 +397,12 @@ proc_terminate( $fake ); @unlink( $fake_log );
 $done = ISXM_Job::get( 'migrate' );
 t( 'Media Library untouched: only the picked folder is listed', $listed === [ 'download/Specification/' ], json_encode( $listed ) );
 t( 'Picked files copied under their own keys', $puts === [ '/media/download/Specification/x.pdf', '/media/download/Specification/y.pdf' ], json_encode( $puts ) );
-t( 'Progress counts the copied files', $done->processed === 2 && $done->total === 2 && $done->total_complete && $done->migration['stage'] === 'complete', json_encode( [ $done->processed, $done->total, $done->total_complete, $done->migration['stage'] ] ) );
+t( 'Total fixed from the start; progress ends at total/total', $done->processed === 2 && $done->total === 2 && $done->total_complete && $done->migration['stage'] === 'complete', json_encode( [ $done->processed, $done->total, $done->total_complete, $done->migration['stage'] ] ) );
+$GLOBALS['isxm_t']['options']['isxs_settings']['source_extra_prefixes'] = 'download/Specification/, download/Manual/'; ISXM_Settings::flush_cache();
+$listed = [];
+$first  = $count->invoke( new ISXM_Tools(), 'count|' );
+$second = $count->invoke( new ISXM_Tools(), $first['cursor'] );
+t( 'Several folders: counted one after the other, complete only after the last', $first['cursor'] === 'count|1:' && ! $first['total_complete'] && $first['phase'] === 'counting' && $second['cursor'] === 'run|' && $second['total_complete'] && $first['total_delta'] + $second['total_delta'] === 4 && $listed === [ 'download/Specification/', 'download/Manual/' ], json_encode( [ $first, $second, $listed ] ) );
 
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

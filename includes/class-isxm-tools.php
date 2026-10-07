@@ -2796,9 +2796,32 @@ class ISXM_Tools {
         list( $phase, $token ) = self::split_cursor( $cursor, 'count' );
 
         if ( $phase === 'count' && ! ISXM_Settings::get( 'source_media' ) ) {
-            // Only the picked folders will be copied; the extras stage counts
-            // them itself, so a whole-bucket count would only skew the bar.
-            return [ 'processed' => 0, 'cursor' => 'run|', 'done' => false, 'errors' => [], 'total_delta' => 0, 'total_complete' => false, 'phase' => '' ];
+            // Only the picked folders will be copied: count exactly those,
+            // folder by folder, so the bar shows a fixed total (no "~").
+            // Cursor: "count|<folder index>:<listing token>".
+            $prefixes = ISXM_Settings::extra_prefixes();
+            $at       = explode( ':', (string) $token, 2 );
+            $index    = (int) $at[0];
+            $delta    = 0;
+            if ( $index < count( $prefixes ) ) {
+                $counted = ISXM_Migrate::count_source_objects( [], $at[1] ?? '', $prefixes[ $index ] );
+                if ( is_wp_error( $counted ) ) {
+                    return $counted;
+                }
+                $delta = (int) $counted['total'];
+                $next  = $counted['complete'] ? ( $index + 1 ) . ':' : $index . ':' . $counted['next_token'];
+                $index = (int) explode( ':', $next, 2 )[0];
+            }
+            $complete = $index >= count( $prefixes );
+            return [
+                'processed'      => 0,
+                'cursor'         => $complete ? 'run|' : 'count|' . ( $next ?? '' ),
+                'done'           => false,
+                'errors'         => [],
+                'total_delta'    => $delta,
+                'total_complete' => $complete,
+                'phase'          => $complete ? '' : 'counting',
+            ];
         }
         if ( $phase === 'count' ) {
             $counted = ISXM_Migrate::count_source_objects( [], $token );

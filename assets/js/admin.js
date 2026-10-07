@@ -527,6 +527,23 @@
    * Stats helpers
    * ---------------------------------------------------------------- */
 
+  // Offload Status panel foot: every source counted — the Media Library
+  // plus each "Upload server folders" folder. Called from both renderers,
+  // since a poll repaints the folder rows before the stats.
+  let lastServerRows = [];
+  let lastStats = cfg.stats || {};
+  const renderStatusFoot = () => {
+    const stats = lastStats;
+    let total = stats.total || 0;
+    let onBucket = stats.in_bucket || 0;
+    lastServerRows.forEach((r) => {
+      total += r.offloaded + r.remaining;
+      onBucket += r.offloaded;
+    });
+    $("#isxs-status-total").text(total.toLocaleString());
+    $("#isxs-status-onbucket").text(onBucket.toLocaleString());
+  };
+
   const applyStats = (stats) => {
     if (!stats) {
       return;
@@ -550,8 +567,8 @@
     $("#isxs-status-percent").text(percent + "%");
     $("#isxs-status-fill").css("width", percent + "%");
     $("#isxs-status-offloaded").text(onBucket.toLocaleString());
-    $("#isxs-status-total").text(total.toLocaleString());
-    $("#isxs-status-onbucket").text(onBucket.toLocaleString());
+    lastStats = stats;
+    renderStatusFoot();
     const statusRemaining = Math.max(total - onBucket, 0);
     $("#isxs-status-remaining").text(statusRemaining.toLocaleString());
     $("#isxs-status-remaining-num").text(statusRemaining.toLocaleString());
@@ -921,6 +938,8 @@
   // the uploads row, plus a button while any of their files are left.
   const renderServerFolderRows = (rows) => {
     if (!Array.isArray(rows)) return;
+    lastServerRows = rows;
+    renderStatusFoot();
     const $body = $("#isxs-status-rows");
     $body.find(".isxs-status-folder-row").remove();
     let left = 0;

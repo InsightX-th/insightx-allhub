@@ -131,5 +131,32 @@ t( 'Ledger: "In the cloud" still includes partials', $run( [ 'isxs_status' => 'o
 ob_start(); ( new ISXM_Media_Library() )->render_filter( 'attachment' ); $html = ob_get_clean();
 t( 'Status dropdown offers it', strpos( $html, 'value="partial"' ) !== false && strpos( $html, 'Not all sizes uploaded' ) !== false );
 
+group( 'Letter avatars' );
+require_once dirname( __DIR__ ) . '/includes/class-isxm-letter-avatars.php';
+if ( ! class_exists( 'WP_User' ) ) { class WP_User { public $ID, $display_name = '', $user_login = '', $user_email = ''; } }
+if ( ! class_exists( 'WP_Comment' ) ) { class WP_Comment { public $comment_author = '', $comment_author_email = '', $user_id = 0; } }
+if ( ! class_exists( 'WP_Post' ) ) { class WP_Post { public $post_author = 0; } }
+$isxm_users = [];
+$mk = function ( $id, $display, $login, $email ) use ( &$isxm_users ) { $u = new WP_User(); $u->ID = $id; $u->display_name = $display; $u->user_login = $login; $u->user_email = $email; $isxm_users[ $id ] = $u; return $u; };
+if ( ! function_exists( 'get_userdata' ) ) { function get_userdata( $id ) { global $isxm_users; return $isxm_users[ $id ] ?? false; } }
+if ( ! function_exists( 'get_user_by' ) ) { function get_user_by( $f, $v ) { global $isxm_users; foreach ( $isxm_users as $u ) if ( $u->user_email === $v ) return $u; return false; } }
+$GLOBALS['isxm_users'] =& $isxm_users;
+$somchai = $mk( 7, 'somchai jaidee', 'somchai', 'Somchai@Example.com' );
+$mk( 8, '', 'กมล', 'kamol@example.com' );
+$svg = function ( $args ) { return base64_decode( substr( $args['url'], strlen( 'data:image/svg+xml;base64,' ) ) ); };
+$av = new ISXM_Letter_Avatars();
+isxm_test_configure( [], [ 'letter_avatars' => false ] );
+t( 'Off: avatar data untouched', $av->filter_avatar_data( [ 'url' => 'https://gravatar.example/x' ], 7 )['url'] === 'https://gravatar.example/x' );
+isxm_test_configure( [], [ 'letter_avatars' => true ] );
+$a = $av->filter_avatar_data( [ 'url' => 'https://cdn.example/stored-avatar.jpg', 'size' => 96 ], 7 );
+t( 'On: stored / Gravatar picture replaced by an SVG letter circle', strpos( $a['url'], 'data:image/svg+xml;base64,' ) === 0 && $a['found_avatar'] && strpos( $svg( $a ), '<circle' ) !== false && strpos( $svg( $a ), '>S</text>' ) !== false );
+t( 'Same person, same colour, whichever way they are passed', $svg( $av->filter_avatar_data( [], $somchai ) ) === $svg( $a ) && $svg( $av->filter_avatar_data( [], 'somchai@example.com' ) ) === $svg( $a ) );
+t( 'Thai name, falls back to user_login when display name is empty', strpos( $svg( $av->filter_avatar_data( [], 8 ) ), '>ก</text>' ) !== false );
+t( 'Thai: leading vowel skipped (เกศินี → ก), vowel marks dropped (นิดา → น)', ISXM_Letter_Avatars::initial( 'เกศินี' ) === 'ก' && ISXM_Letter_Avatars::initial( 'นิดา' ) === 'น' && ISXM_Letter_Avatars::initial( '  @john ' ) === 'J' && ISXM_Letter_Avatars::initial( '' ) === '?' );
+$c = new WP_Comment(); $c->comment_author = '<b>Guest</b>'; $c->comment_author_email = 'guest@example.com';
+$g = $svg( $av->filter_avatar_data( [], $c ) );
+t( 'Guest commenter: letter from the comment author, markup cannot leak into the SVG', strpos( $g, '>B</text>' ) !== false || strpos( $g, '>G</text>' ) !== false );
+t( 'Unknown email: letter from the address', strpos( $svg( $av->filter_avatar_data( [], 'zoe@example.com' ) ), '>Z</text>' ) !== false );
+
 echo "\n{$GLOBALS['isxm_pass']} passed; {$GLOBALS['isxm_fail']} failed\n";
 exit( $GLOBALS['isxm_fail'] ? 1 : 0 );

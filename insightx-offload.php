@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.36
+ * Version:     0.2.37
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.36' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.37' );
 
 /*
  * GitHub update checker.
@@ -76,6 +76,7 @@ $isxm_files_to_load = [
     'includes/class-isxm-tools.php',
     'includes/class-isxm-admin.php',
     'includes/class-isxm-media-library.php',
+    'includes/class-isxm-letter-avatars.php',
     'includes/class-isxm-cli.php',
     'includes/class-isxm-cli-connection.php',
     'includes/class-isxm-cli-job.php',
@@ -208,6 +209,7 @@ add_action( 'plugins_loaded', function () {
     if ( class_exists( 'ISXM_Admin' ) )   new ISXM_Admin();
     if ( is_admin() && class_exists( 'ISXM_Media_Library' ) ) new ISXM_Media_Library();
     if ( class_exists( 'ISXM_Assets' ) )  new ISXM_Assets();
+    if ( class_exists( 'ISXM_Letter_Avatars' ) ) new ISXM_Letter_Avatars();
     // Paid downloads are served as short-lived signed links, never as the
     // plain bucket URL (see ISXM_WC_Downloads::presign_download_path()).
     if ( class_exists( 'ISXM_WC_Downloads' ) ) {

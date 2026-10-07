@@ -39,6 +39,7 @@ class ISXM_Settings {
             // WordPress would still replace a wide original with a -scaled
             // copy and defeat the point. Applies to new uploads only.
             'disable_thumbnails' => false,
+            'letter_avatars'     => false, // every avatar is a letter circle (no Gravatar, stored pictures ignored)
             // Write the new remote URLs straight into post_content /
             // postmeta / options / guid after every offload (permanent
             // rewrite). When off, offloading only uploads files and relies

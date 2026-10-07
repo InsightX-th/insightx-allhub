@@ -1535,3 +1535,11 @@ msgstr "ไม่มีขนาดนี้ในข้อมูลของร
 #: includes/class-isxm-offload.php
 msgid "could not be created: %s"
 msgstr "สร้างใหม่ไม่ได้: %s"
+
+#: includes/class-isxm-admin.php
+msgid "Letter avatars"
+msgstr "รูปโปรไฟล์แบบตัวอักษร"
+
+#: includes/class-isxm-admin.php
+msgid "Show every profile picture as a coloured circle with the person's first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off"
+msgstr "แสดงรูปโปรไฟล์ของทุกคนเป็นวงกลมสีพร้อมตัวอักษรแรกของชื่อ ไม่เก็บไฟล์และไม่โหลดจาก Gravatar รูปโปรไฟล์ที่เก็บไว้เดิมยังอยู่ และจะกลับมาแสดงเมื่อปิดตัวเลือกนี้"

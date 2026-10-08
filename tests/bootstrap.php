@@ -261,7 +261,7 @@ define( 'ISXM_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 function isxm_log_error( $message ) {}
 foreach ( array(
 	'crypto', 'connections', 'settings', 'client', 'db-rewriter', 'offload', 'migrate',
-	'sync', 'items', 'job', 'tools', 'assets', 'wc-downloads', 'background', 'migrate-queue', 'migration-store', 'migration-pipeline',
+	'sync', 'items', 'job', 'pdf', 'tools', 'assets', 'wc-downloads', 'background', 'migrate-queue', 'migration-store', 'migration-pipeline',
 ) as $isxm_class ) {
 	require_once ISXM_PLUGIN_DIR . 'includes/class-isxm-' . $isxm_class . '.php';
 }

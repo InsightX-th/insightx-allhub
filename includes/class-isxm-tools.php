@@ -210,6 +210,26 @@ class ISXM_Tools {
             $settings['offload_server_folders'] = $current['offload_server_folders'];
         }
 
+        // "Shrink PDFs" card. Not posted → keep what is stored.
+        $settings['pdf_dpi']     = isset( $_POST['pdf_dpi'] ) && isset( ISXM_Pdf::PRESETS[ (int) $_POST['pdf_dpi'] ] ) ? (int) $_POST['pdf_dpi'] : (int) $current['pdf_dpi'];
+        $settings['pdf_folders'] = $current['pdf_folders'];
+        $settings['pdf_backup']  = $current['pdf_backup'];
+        if ( isset( $_POST['pdf_folders'] ) ) {
+            $pdf = self::sanitize_server_folders( wp_unslash( (string) $_POST['pdf_folders'] ) );
+            $settings['pdf_folders'] = $pdf['value'];
+            if ( $pdf['rejected'] ) {
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These folders cannot be used and were removed: %s', 'insightx-offload' ), implode( ', ', $pdf['rejected'] ) ) );
+            }
+        }
+        if ( isset( $_POST['pdf_backup'] ) ) {
+            $backup = self::check_pdf_backup( wp_unslash( (string) $_POST['pdf_backup'] ), $settings['pdf_folders'], $settings['offload_server_folders'] );
+            if ( is_wp_error( $backup ) ) {
+                $folders_warning = trim( $folders_warning . ' ' . $backup->get_error_message() );
+            } else {
+                $settings['pdf_backup'] = $backup;
+            }
+        }
+
         // A Source Public URL on the destination host is accepted silently:
         // it is legitimate when one CDN domain stays in front of the media
         // across the provider switch, and both the old refusal (blocked
@@ -462,6 +482,132 @@ class ISXM_Tools {
         }
         sort( $files, SORT_STRING );
         return $files;
+    }
+
+    /* ---------------------------------------------------------------------
+     * Shrink PDFs
+     * ------------------------------------------------------------------ */
+
+    /** Done PDFs: relpath => [mtime after, dpi], so a run never shrinks a file twice. */
+    const PDF_DONE  = 'isxs_pdf_compressed';
+    /** Bytes saved so far, shown on the card. */
+    const PDF_SAVED = 'isxs_pdf_saved';
+
+    /**
+     * The originals folder: one folder, not inside a folder being shrunk
+     * (its copies would be shrunk too) nor inside an Offload folder (they
+     * would go up to the bucket). "" = keep no originals.
+     *
+     * @return string|WP_Error
+     */
+    public static function check_pdf_backup( $value, $pdf_folders, $offload_folders ) {
+        $value = trim( (string) $value );
+        if ( $value === '' ) return '';
+        $folder = self::sanitize_prefix( $value );
+        if ( $folder === '' || preg_match( '#(^|/)\.#', $folder ) || self::server_path_blocked( $folder ) ) {
+            return new WP_Error( 'isxs_pdf_backup', __( 'That folder cannot hold the original PDFs', 'insightx-offload' ) );
+        }
+        $pdf = trim( (string) $pdf_folders ) === '' ? ISXM_Settings::server_folders() : preg_split( '/\s*,\s*/', trim( (string) $pdf_folders ) );
+        foreach ( $pdf as $f ) {
+            if ( $f !== '' && strpos( $folder, trailingslashit( $f ) ) === 0 ) {
+                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder being shrunk', 'insightx-offload' ) );
+            }
+        }
+        foreach ( preg_split( '/\s*,\s*/', trim( (string) $offload_folders ) ) as $f ) {
+            if ( $f !== '' && strpos( $folder, trailingslashit( $f ) ) === 0 ) {
+                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder on the Offload media card (the originals would go up to the bucket)', 'insightx-offload' ) );
+            }
+        }
+        return $folder;
+    }
+
+    /** PDFs in the chosen folders not shrunk yet at the current dpi (or lower). */
+    public static function pdf_pending_files() {
+        $done   = get_option( self::PDF_DONE, [] );
+        $done   = is_array( $done ) ? $done : [];
+        $dpi    = (int) ISXM_Settings::get( 'pdf_dpi' );
+        $backup = (string) ISXM_Settings::get( 'pdf_backup' );
+        $out    = [];
+        foreach ( ISXM_Settings::pdf_folders() as $folder ) {
+            foreach ( self::server_folder_files( $folder ) as $file ) {
+                if ( strtolower( substr( $file, -4 ) ) !== '.pdf' ) continue;
+                if ( $backup !== '' && strpos( $file, $backup ) === 0 ) continue;
+                $mark = $done[ $file ] ?? null;
+                if ( is_array( $mark ) && (int) $mark[0] === (int) @filemtime( ABSPATH . $file ) && (int) $mark[1] <= $dpi ) continue;
+                $out[ $file ] = true;
+            }
+        }
+        $out = array_keys( $out );
+        sort( $out, SORT_STRING );
+        return $out;
+    }
+
+    /**
+     * Shrinks one PDF: original copied to the originals folder first (when
+     * set), then replaced in place; a file already on the bucket goes up
+     * again over the same key.
+     *
+     * @return array|WP_Error {replaced, before, after, uploaded}
+     */
+    public static function compress_pdf_file( $relative ) {
+        $relative = ltrim( (string) $relative, '/' );
+        $path     = ABSPATH . $relative;
+        $dpi      = (int) ISXM_Settings::get( 'pdf_dpi' );
+        $backup   = (string) ISXM_Settings::get( 'pdf_backup' );
+        if ( ! is_file( $path ) ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-offload' ) );
+        if ( $backup !== '' ) {
+            $copy = ABSPATH . $backup . $relative;
+            if ( ! file_exists( $copy ) && ( ! wp_mkdir_p( dirname( $copy ) ) || ! @copy( $path, $copy ) ) ) {
+                return new WP_Error( 'isxs_pdf_backup_failed', __( 'Could not copy the original to the originals folder — the file was not shrunk', 'insightx-offload' ) );
+            }
+        }
+        $result = ISXM_Pdf::compress( $path, $dpi, apply_filters( 'isxs_pdf_runner', null ) );
+        if ( is_wp_error( $result ) ) return $result;
+
+        $done              = get_option( self::PDF_DONE, [] );
+        $done              = is_array( $done ) ? $done : [];
+        $done[ $relative ] = [ (int) @filemtime( $path ), $dpi ];
+        update_option( self::PDF_DONE, $done, false );
+
+        $result['uploaded'] = false;
+        if ( $result['replaced'] ) {
+            update_option( self::PDF_SAVED, (int) get_option( self::PDF_SAVED, 0 ) + $result['before'] - $result['after'], false );
+            $manifest = self::server_manifest();
+            if ( isset( $manifest[ $relative ] ) ) {
+                // Same key as before: the bucket copy is replaced. If this
+                // fails the manifest no longer matches, so the hourly watch
+                // uploads it later.
+                $put = ( new ISXM_Client() )->put_object( $relative, $path, 'application/pdf', (bool) ISXM_Settings::get( 'send_public_acl' ) );
+                if ( ! is_wp_error( $put ) ) {
+                    $manifest[ $relative ] = (int) @filemtime( $path );
+                    update_option( self::SERVER_MANIFEST, $manifest, false );
+                    $result['uploaded'] = true;
+                }
+            }
+            delete_transient( self::SERVER_STATS );
+        }
+        return $result;
+    }
+
+    /** One batch of "Shrink PDFs". Cursor: the last path done. */
+    private function batch_compress_pdf( $cursor ) {
+        $after   = (string) $cursor;
+        $started = microtime( true );
+        $budget  = self::time_budget();
+        $processed = 0; $errors = [];
+        $pending = array_values( array_filter( self::pdf_pending_files(), function ( $f ) use ( $after ) {
+            return $after === '' || $after === '0' || strcmp( $f, $after ) > 0;
+        } ) );
+        foreach ( $pending as $relative ) {
+            if ( microtime( true ) - $started >= $budget || ISXM_Job::signal( 'compress_pdf' ) !== '' ) {
+                return [ 'processed' => $processed, 'cursor' => $after, 'done' => false, 'errors' => $errors ];
+            }
+            $result = self::compress_pdf_file( $relative );
+            if ( is_wp_error( $result ) ) $errors[] = $relative . ': ' . $result->get_error_message();
+            $processed++;
+            $after = $relative;
+        }
+        return [ 'processed' => $processed, 'cursor' => $after, 'done' => true, 'errors' => $errors ];
     }
 
     /** Under a folder that is never uploaded as raw files (site code, uploads)? */
@@ -1662,6 +1808,7 @@ class ISXM_Tools {
             // run started from the old card can still finish or resume.
             'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
             'offload_folders' => __( 'Upload server folders', 'insightx-offload' ),
+            'compress_pdf' => __( 'Shrink PDFs', 'insightx-offload' ),
             'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
             'clean_local'  => __( 'Delete server copies already in the bucket', 'insightx-offload' ),
             'remove'       => __( 'Remove files from the bucket', 'insightx-offload' ),
@@ -1786,6 +1933,14 @@ class ISXM_Tools {
             // point at the server copies.
             return new WP_Error( 'isxs_clean_local_unsafe', __( 'Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies', 'insightx-offload' ) );
         }
+        if ( $tool === 'compress_pdf' ) {
+            if ( ISXM_Pdf::ghostscript() === '' && ! apply_filters( 'isxs_pdf_runner', null ) ) {
+                return new WP_Error( 'isxs_no_ghostscript', __( 'Ghostscript (gs) is not installed on this server — ask your host to install it', 'insightx-offload' ) );
+            }
+            if ( ! ISXM_Settings::pdf_folders() ) {
+                return new WP_Error( 'isxs_no_pdf_folders', __( 'Choose at least one folder first', 'insightx-offload' ) );
+            }
+        }
         if ( $tool === 'offload_folders' && ! ISXM_Settings::server_folders() ) {
             return new WP_Error( 'isxs_no_server_folders', __( 'Choose at least one server folder first', 'insightx-offload' ) );
         }
@@ -1861,6 +2016,7 @@ class ISXM_Tools {
      * @return int Item count, or 0 when it is not known up front.
      */
     public static function tool_total( $tool ) {
+        if ( $tool === 'compress_pdf' ) return count( self::pdf_pending_files() );
         if ( $tool === 'offload_folders' ) {
             // Files on disk, not attachments: no reason to run the stats queries.
             $manifest = self::server_manifest();
@@ -1921,6 +2077,8 @@ class ISXM_Tools {
                     return $instance->batch_offload( $cursor );
                 case 'retry_failed':
                     return $instance->batch_retry_failed( $cursor );
+                case 'compress_pdf':
+                    return $instance->batch_compress_pdf( $cursor );
                 case 'offload_folders':
                     return $instance->batch_offload_folders( $cursor );
                 case 'complete_partial':

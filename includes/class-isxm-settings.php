@@ -90,6 +90,9 @@ class ISXM_Settings {
             'source_media'           => true,
             'offload_media_library'  => true,      // Offload card: the uploads chip (whole Media Library) is selected
             'offload_server_folders' => '',        // Server folders outside the Media Library uploaded as-is (relative to ABSPATH), comma-separated      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
+            'pdf_folders'        => '',            // "Shrink PDFs": server folders to go through ("" = the Offload card's folders)
+            'pdf_dpi'            => 150,           // 72 | 150 | 300 (ISXM_Pdf::PRESETS)
+            'pdf_backup'         => '',            // Folder the originals are copied into first; "" = no copy
         ];
     }
 
@@ -494,6 +497,16 @@ class ISXM_Settings {
      *
      * @return string[] "folder/" entries.
      */
+    /** Folders "Shrink PDFs" goes through: its own pick, or the Offload card's folders. */
+    public static function pdf_folders() {
+        $out = [];
+        foreach ( preg_split( '/[,\r\n]+/', (string) self::get( 'pdf_folders' ) ) as $line ) {
+            $line = trim( trim( $line ), '/' );
+            if ( $line !== '' ) $out[] = $line . '/';
+        }
+        return $out ? array_values( array_unique( $out ) ) : self::server_folders();
+    }
+
     public static function server_folders() {
         $out = [];
         foreach ( preg_split( '/[,\r\n]+/', (string) self::get( 'offload_server_folders' ) ) as $line ) {

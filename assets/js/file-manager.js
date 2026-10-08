@@ -596,6 +596,15 @@
       case "openTab":
         return window.open(isDir(one) ? cfg.pageUrl + "&path=" + encodeURIComponent(one.path) : publicUrl(one), "_blank", "noopener");
       case "preview": return preview(one);
+      case "compress":
+        toast(t.compressing, false);
+        return api("compress", { path: one.path })
+          .then((d) => {
+            const text = d.replaced ? t.shrunk.replace("%1$s", sizeText(d.before)).replace("%2$s", sizeText(d.after)) : t.notShrunk;
+            toast(withNotes(text, d.uploaded ? [t.bucketUpdated] : []), false);
+            load(state.path, one.path);
+          })
+          .catch((e) => toast(e.message, true));
       case "info": return info(one || currentFolderRow());
       case "download": return download(picked[0]);
       case "upload": return $("#isxs-fm-input").trigger("click");
@@ -680,6 +689,7 @@
     all: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/>',
     invert: '<path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    compress: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m10.5 11 1.5 2-1.5 2"/><path d="m13.5 11-1.5 2 1.5 2"/>',
   };
   const closeCtx = () => $ctx.prop("hidden", true);
 
@@ -695,7 +705,9 @@
     const canPaste = clip && pasteTarget !== null && can(clip.mode === "cut" ? "move" : "upload");
     const groups = row
       ? [
-          [["open", !!single], ["openTab", !!single], ["download", file && can("download")], ["preview", file && !!previewKind(single.name)]],
+          [["open", !!single], ["openTab", !!single], ["download", file && can("download")], ["preview", file && !!previewKind(single.name)],
+            // Administrators only (cfg.access is set for them alone).
+            ["compress", file && !!cfg.access && extOf(single.name) === "pdf" && single.writable]],
           [["copy", picked.length && can("upload")], ["cut", changeable && can("move")], ["paste", canPaste], ["duplicate", picked.length && here && can("upload")]],
           [["rename", single && single.writable && can("rename")], ["delete", changeable && can("delete")], ["empty", single && isDir(single) && single.writable && can("delete")]],
           [["all", true], ["invert", true], ["info", !!single]],

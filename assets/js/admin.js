@@ -270,7 +270,7 @@
   // 'change' (fires on blur/Enter, not per keystroke) auto-saves these —
   // 'input' above only drives the live preview.
   $(
-    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-offload-folders, #isxs-source-public-url, [data-folder-field]",
+    "#isxs-prefix, #isxs-cdn-domain, #isxs-assets-cdn-domain, #isxs-source-folders, #isxs-offload-folders, #isxs-source-public-url, [data-folder-field], #isxs-pdf-folders, #isxs-pdf-backup, #isxs-pdf-dpi",
   ).on("change", () => {
     saveSettingsDebounced();
   });
@@ -330,6 +330,9 @@
       source_provider: $("#isxs-source-provider").val(),
       source_folders: $.trim($("#isxs-source-folders").val()),
       offload_folders: $.trim($("#isxs-offload-folders").val()),
+      pdf_folders: $.trim($("#isxs-pdf-folders").val()),
+      pdf_backup: $.trim($("#isxs-pdf-backup").val()),
+      pdf_dpi: $("#isxs-pdf-dpi").val(),
       source_public_base_url: $.trim($("#isxs-source-public-url").val()),
     };
     // Connection-card toggles (path_style/send_public_acl) are scoped
@@ -1736,7 +1739,8 @@
   // comma-separated value. Two instances: the Migrate source bucket (the
   // server decides on save which picked folder is the Media Library) and
   // "Upload server folders".
-  const folderPicker = ($field, $input, action, mediaBadge) => {
+  // single: one folder at most (picking another replaces it).
+  const folderPicker = ($field, $input, action, mediaBadge, single) => {
     const $chips = $field.find(".isxs-folder-chips");
     const $type = $field.find(".isxs-folder-type");
     const $browse = $field.find(".isxs-folder-browse");
@@ -1769,9 +1773,10 @@
     };
 
     const setSelected = (folder, on) => {
-      const list = selected().filter((f) => f !== folder);
+      const list = single && on ? [] : selected().filter((f) => f !== folder);
       if (on) list.push(folder);
       $input.val(list.join(", ")).trigger("change");
+      if (single) $tree.find("input[type=checkbox]").prop("checked", false);
       $tree.find("input[type=checkbox]").filter((i, el) => $(el).data("folder") === folder).prop("checked", on);
       renderChips();
     };
@@ -1849,10 +1854,17 @@
   [
     ["#isxs-source-folders", "isxs_source_folders", () => cfg.sourceMedia],
     ["#isxs-offload-folders", "isxs_server_folders", () => cfg.uploadsPath],
-  ].forEach(([input, action, badge]) => {
+    ["#isxs-pdf-folders", "isxs_server_folders", null],
+    ["#isxs-pdf-backup", "isxs_server_folders", null, true],
+  ].forEach(([input, action, badge, single]) => {
     const $field = $(input).closest(".isxs-folder-field");
-    if ($field.length) folderPicker($field, $(input), action, badge);
+    if ($field.length) folderPicker($field, $(input), action, badge, single);
   });
+
+  // Shrink PDFs cannot start without Ghostscript on the server.
+  if ($(".isxs-gs-status").attr("data-ok") === "0") {
+    $('.isxs-tool[data-tool="compress_pdf"] .isxs-tool-run').prop("disabled", true);
+  }
 
   // Custom provider picker on the Storage card — a button + listbox
   // (native <select> can't render the provider logos). Picking an option

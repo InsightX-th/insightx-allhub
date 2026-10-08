@@ -137,6 +137,7 @@ class ISXM_File_Manager_Admin {
                     'all'       => __( 'Select all', 'insightx-offload' ),
                     'invert'    => __( 'Invert selection', 'insightx-offload' ),
                     'info'      => __( 'Get info', 'insightx-offload' ),
+                    'compress'  => __( 'Shrink PDF', 'insightx-offload' ),
                 ],
                 /* translators: %s: folder name. */
                 'emptyAsk'      => __( 'Delete everything inside "%s"? The folder itself is kept. This cannot be undone.', 'insightx-offload' ),
@@ -147,6 +148,11 @@ class ISXM_File_Manager_Admin {
                 'clipCopy'      => __( '%d item(s) copied, paste them in another folder', 'insightx-offload' ),
                 /* translators: %d: number of items. */
                 'clipCut'       => __( '%d item(s) cut, paste them in another folder', 'insightx-offload' ),
+                'compressing'   => __( 'Shrinking…', 'insightx-offload' ),
+                /* translators: 1: size before, 2: size after. */
+                'shrunk'        => __( 'Shrunk from %1$s to %2$s', 'insightx-offload' ),
+                'notShrunk'     => __( 'Already small — left as it is', 'insightx-offload' ),
+                'bucketUpdated' => __( 'bucket copy replaced', 'insightx-offload' ),
                 'noPreview'     => __( 'This file type cannot be previewed. Download it instead.', 'insightx-offload' ),
                 'close'         => __( 'Close', 'insightx-offload' ),
                 'infoPath'      => __( 'Path', 'insightx-offload' ),
@@ -303,7 +309,7 @@ class ISXM_File_Manager_Admin {
     public function ajax() {
         check_ajax_referer( self::NONCE, 'nonce' );
         $op      = isset( $_POST['op'] ) ? sanitize_key( $_POST['op'] ) : '';
-        $allowed = in_array( $op, [ 'users', 'save_access' ], true )
+        $allowed = in_array( $op, [ 'users', 'save_access', 'compress' ], true )
             ? current_user_can( 'manage_options' )
             : isset( self::OP_ACTION[ $op ] ) && ISXM_File_Manager_Access::can( self::OP_ACTION[ $op ] );
         if ( ! $allowed ) wp_send_json_error( [ 'code' => 'isxfm_denied', 'message' => __( 'You do not have permission to do this.', 'insightx-offload' ) ], 403 );
@@ -341,6 +347,14 @@ class ISXM_File_Manager_Admin {
                 // Only files this user can see may be looked up on the bucket.
                 $file   = $fs->resolve( $path );
                 $result = is_wp_error( $file ) ? $file : ( is_file( $file ) ? ISXM_Tools::server_file_status( $fs->normalize( $path ) ) : new WP_Error( 'isxfm_not_file', __( 'File not found.', 'insightx-offload' ) ) );
+                break;
+            case 'compress':
+                // Heavy (Ghostscript), so administrators only — see the guard above.
+                $file = $fs->resolve( $path );
+                if ( is_wp_error( $file ) ) { $result = $file; break; }
+                $result = ( is_file( $file ) && strtolower( substr( $file, -4 ) ) === '.pdf' )
+                    ? ISXM_Tools::compress_pdf_file( $fs->normalize( $path ) )
+                    : new WP_Error( 'isxfm_not_pdf', __( 'Not a PDF file.', 'insightx-offload' ) );
                 break;
             case 'mkfile':
                 $result = $fs->make_file( $path, $name );

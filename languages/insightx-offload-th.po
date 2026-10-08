@@ -2126,3 +2126,119 @@ msgstr "ลบใน %s แล้ว"
 msgid "Files on %s are deleted too; links to them will stop working."
 msgstr "ไฟล์ใน %s จะถูกลบด้วย ลิงก์ที่ชี้ไปไฟล์เหล่านี้จะเปิดไม่ได้"
 
+
+#: includes/class-isxm-admin.php
+msgid "Images & Files"
+msgstr "รูปภาพ/ไฟล์"
+
+#: includes/class-isxm-admin.php
+msgid "Shrink PDFs"
+msgstr "ย่อไฟล์ PDF"
+
+#: includes/class-isxm-admin.php
+msgid "Shrink PDF"
+msgstr "ย่อไฟล์ PDF"
+
+#: includes/class-isxm-admin.php
+msgid "Ghostscript (gs) is not installed on this server — ask your host to install it"
+msgstr "เซิร์ฟเวอร์ไม่มี Ghostscript (gs) ให้ host ติดตั้งให้"
+
+#: includes/class-isxm-admin.php
+msgid "File not found"
+msgstr "ไม่พบไฟล์"
+
+#: includes/class-isxm-admin.php
+msgid "Ghostscript could not process this PDF"
+msgstr "Ghostscript ประมวลผล PDF นี้ไม่ได้"
+
+#: includes/class-isxm-admin.php
+msgid "Could not replace the file — check folder permissions"
+msgstr "แทนที่ไฟล์ไม่ได้ ตรวจสิทธิ์ของโฟลเดอร์"
+
+#: includes/class-isxm-admin.php
+msgid "Choose at least one folder first"
+msgstr "เลือกอย่างน้อย 1 โฟลเดอร์ก่อน"
+
+#: includes/class-isxm-admin.php
+msgid "These folders cannot be used and were removed: %s"
+msgstr "ใช้โฟลเดอร์เหล่านี้ไม่ได้ จึงเอาออก: %s"
+
+#: includes/class-isxm-admin.php
+msgid "That folder cannot hold the original PDFs"
+msgstr "ใช้โฟลเดอร์นี้เก็บต้นฉบับไม่ได้"
+
+#: includes/class-isxm-admin.php
+msgid "The originals folder cannot be inside a folder being shrunk"
+msgstr "โฟลเดอร์เก็บต้นฉบับต้องไม่อยู่ในโฟลเดอร์ที่จะย่อ"
+
+#: includes/class-isxm-admin.php
+msgid "The originals folder cannot be inside a folder on the Offload media card (the originals would go up to the bucket)"
+msgstr "โฟลเดอร์เก็บต้นฉบับต้องไม่อยู่ในโฟลเดอร์ของการ์ด Offload media (ไม่อย่างนั้นต้นฉบับจะถูกอัปขึ้น bucket)"
+
+#: includes/class-isxm-admin.php
+msgid "Could not copy the original to the originals folder — the file was not shrunk"
+msgstr "คัดลอกต้นฉบับไปโฟลเดอร์เก็บต้นฉบับไม่ได้ จึงไม่ได้ย่อไฟล์นี้"
+
+#: includes/class-isxm-admin.php
+msgid "Ghostscript %s found"
+msgstr "พบ Ghostscript %s"
+
+#: includes/class-isxm-admin.php
+msgid "Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)"
+msgstr "ไม่พบ Ghostscript (gs) บนเซิร์ฟเวอร์ ให้ host ติดตั้งให้ (เช่น apt install ghostscript)"
+
+#: includes/class-isxm-admin.php
+msgid "Folders to shrink"
+msgstr "โฟลเดอร์ที่จะย่อ"
+
+#: includes/class-isxm-admin.php
+msgid "Resolution"
+msgstr "ความละเอียด"
+
+#: includes/class-isxm-admin.php
+msgid "72 dpi — smallest, for screens only"
+msgstr "72 dpi — เล็กสุด ดูบนจออย่างเดียว"
+
+#: includes/class-isxm-admin.php
+msgid "150 dpi — balanced, sharp text (recommended)"
+msgstr "150 dpi — สมดุล ตัวหนังสือคมชัด (แนะนำ)"
+
+#: includes/class-isxm-admin.php
+msgid "300 dpi — print quality, smaller savings"
+msgstr "300 dpi — คุณภาพพิมพ์ ลดได้น้อย"
+
+#: includes/class-isxm-admin.php
+msgid "Keep the originals in"
+msgstr "เก็บต้นฉบับไว้ที่"
+
+#: includes/class-isxm-admin.php
+msgid "One folder outside the folders above, e.g. pdf-originals/. Each original is copied there under its own path before it is shrunk. Leave empty to keep no originals — the files are then overwritten and cannot be restored"
+msgstr "เลือก 1 โฟลเดอร์ที่อยู่นอกโฟลเดอร์ด้านบน เช่น pdf-originals/ ต้นฉบับจะถูกคัดลอกไปเก็บตาม path เดิมก่อนย่อ ถ้าเว้นว่าง จะไม่เก็บต้นฉบับ ไฟล์ถูกเขียนทับและย้อนกลับไม่ได้"
+
+#: includes/class-isxm-admin.php
+msgid "Saved so far: %s"
+msgstr "ประหยัดไปแล้ว: %s"
+
+#: includes/class-isxm-admin.php
+msgid "Shrink the PDFs in the chosen folders with Ghostscript and put them back under the same name. Files already on the bucket go up again over the same key. Files that would shrink by less than 10% are left as they are. Runs on the server, so you can close this tab"
+msgstr "ย่อ PDF ในโฟลเดอร์ที่เลือกด้วย Ghostscript แล้วเก็บกลับด้วยชื่อเดิม ไฟล์ที่อยู่ใน bucket แล้วจะถูกอัปทับ key เดิม ไฟล์ที่ย่อได้น้อยกว่า 10% จะไม่ถูกแตะ ทำงานบนเซิร์ฟเวอร์ ปิดแท็บนี้ได้"
+
+#: includes/class-isxm-admin.php
+msgid "Not a PDF file."
+msgstr "ไม่ใช่ไฟล์ PDF"
+
+#: includes/class-isxm-admin.php
+msgid "Shrinking…"
+msgstr "กำลังย่อ…"
+
+#: includes/class-isxm-admin.php
+msgid "Shrunk from %1$s to %2$s"
+msgstr "ย่อจาก %1$s เหลือ %2$s"
+
+#: includes/class-isxm-admin.php
+msgid "Already small — left as it is"
+msgstr "ไฟล์เล็กอยู่แล้ว ไม่ได้แก้"
+
+#: includes/class-isxm-admin.php
+msgid "bucket copy replaced"
+msgstr "อัปทับใน bucket แล้ว"

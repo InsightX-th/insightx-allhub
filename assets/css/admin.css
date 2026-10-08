@@ -2617,3 +2617,28 @@
   color: var(--isxs-danger);
   font-size: 12.5px;
 }
+
+/* ---------- Images & Files: Shrink PDFs ---------- */
+.isxs-pdf-wrap {
+  max-width: 50%;
+}
+.isxs-gs-status {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--isxs-ok-soft);
+  color: #067a56;
+}
+.isxs-gs-status[data-ok="0"] {
+  background: var(--isxs-warn-soft);
+  color: var(--isxs-warn);
+}
+.isxs-pdf-saved {
+  font-weight: 600;
+}
+@media (max-width: 960px) {
+  .isxs-pdf-wrap {
+    max-width: none;
+  }
+}

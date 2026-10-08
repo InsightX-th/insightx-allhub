@@ -679,6 +679,81 @@ delete_option( ISXM_Tools::SERVER_MANIFEST );
 $set( [ 'remove_local' => false ] );
 proc_terminate( $fake ); @unlink( $fake_log );
 
+group( 'Shrink PDFs' );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_pdf_' . getmypid() . '.jsonl';
+$fake_port = 28000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+migration_fixture( 0 );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn ); ISXM_Settings::flush_cache();
+$pdf_puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = rawurldecode( substr( $row['uri'], strpos( $row['uri'], 'download/' ) ) ); } return $o; };
+delete_option( ISXM_Tools::SERVER_MANIFEST ); delete_option( ISXM_Tools::PDF_DONE ); delete_option( ISXM_Tools::PDF_SAVED );
+$pdf_dir = ABSPATH . 'download/PDF Spec/';
+wp_mkdir_p( $pdf_dir );
+file_put_contents( $pdf_dir . 'big one.pdf', '%PDF-' . str_repeat( 'x', 995 ) );   // 1000 B → shrinks to 400
+file_put_contents( $pdf_dir . 'small.pdf', '%PDF-' . str_repeat( 'y', 95 ) );      // 100 B → only 5% smaller
+file_put_contents( $pdf_dir . 'broken.pdf', '%PDF-' . str_repeat( 'z', 195 ) );    // runner fails on it
+file_put_contents( $pdf_dir . 'notes.txt', 'not a pdf' );
+$commands = [];
+// Fake Ghostscript: reads -sOutputFile, writes a shrunk copy (or fails / barely shrinks).
+$GLOBALS['isxm_t']['filters']['isxs_pdf_runner'] = function () use ( &$commands ) {
+    return function ( $cmd ) use ( &$commands ) {
+        $commands[] = $cmd;
+        preg_match( "#-sOutputFile='([^']+)' '([^']+)'#", $cmd, $m );
+        if ( strpos( $m[2], 'broken' ) !== false ) return 1;
+        $in = (int) filesize( $m[2] );
+        file_put_contents( $m[1], '%PDF-' . str_repeat( 's', (int) ( $in * ( strpos( $m[2], 'small' ) !== false ? 0.95 : 0.4 ) ) - 5 ) );
+        return 0;
+    };
+};
+$set( [ 'offload_server_folders' => 'download/PDF Spec/', 'pdf_folders' => '', 'pdf_dpi' => 150, 'pdf_backup' => '' ] );
+update_option( ISXM_Tools::SERVER_MANIFEST, [ 'download/PDF Spec/big one.pdf' => filemtime( $pdf_dir . 'big one.pdf' ) ] );
+t( 'Without its own pick it goes through the Offload card\'s folders', ISXM_Settings::pdf_folders() === [ 'download/PDF Spec/' ] );
+t( 'Only PDFs are counted', ISXM_Tools::tool_total( 'compress_pdf' ) === 3 && ! in_array( 'download/PDF Spec/notes.txt', ISXM_Tools::pdf_pending_files(), true ) );
+t( 'A run can start (a runner stands in for Ghostscript)', ISXM_Tools::precheck_tool( 'compress_pdf' ) === true || ! is_wp_error( ISXM_Tools::precheck_tool( 'compress_pdf' ) ) || ISXM_Tools::precheck_tool( 'compress_pdf' )->get_error_code() !== 'isxs_no_ghostscript' );
+$batch = new ReflectionMethod( 'ISXM_Tools', 'batch_compress_pdf' );
+if ( PHP_VERSION_ID < 80100 ) $batch->setAccessible( true );
+$r = $batch->invoke( new ISXM_Tools(), '' );
+t( 'The command asks for /ebook and quotes paths with spaces', strpos( $commands[0], '-dPDFSETTINGS=/ebook' ) !== false && strpos( $commands[0], "'" . $pdf_dir . "big one.pdf'" ) !== false, $commands[0] ?? '' );
+t( 'A PDF that shrinks is replaced under the same name', filesize( $pdf_dir . 'big one.pdf' ) === 400 );
+t( '…and, being on the bucket, goes up again over the same key', $pdf_puts() === [ 'download/PDF Spec/big one.pdf' ], json_encode( $pdf_puts() ) );
+t( '…so the manifest has its new time (the hourly watch will not send it again)', ISXM_Tools::server_manifest()['download/PDF Spec/big one.pdf'] === filemtime( $pdf_dir . 'big one.pdf' ) && ! in_array( 'download/PDF Spec/big one.pdf', ISXM_Tools::server_pending_files( 'download/PDF Spec/' ), true ) );
+t( 'A PDF that shrinks by under 10% is left as it is, and not uploaded', filesize( $pdf_dir . 'small.pdf' ) === 100 && count( $pdf_puts() ) === 1 );
+t( 'Ghostscript failing: the file is untouched and the error is reported', filesize( $pdf_dir . 'broken.pdf' ) === 200 && count( $r['errors'] ) === 1 && strpos( $r['errors'][0], 'broken.pdf' ) !== false, json_encode( $r ) );
+t( 'No temporary files are left behind', glob( $pdf_dir . '.isxs-*' ) === [] );
+t( 'Bytes saved are counted', (int) get_option( ISXM_Tools::PDF_SAVED ) === 600 );
+t( 'A second run has only the failed file left', ISXM_Tools::pdf_pending_files() === [ 'download/PDF Spec/broken.pdf' ] );
+$set( [ 'pdf_dpi' => 72 ] );
+t( 'A lower resolution makes the done files work again', count( ISXM_Tools::pdf_pending_files() ) === 3 );
+$set( [ 'pdf_dpi' => 300 ] );
+t( 'A higher one does not', ISXM_Tools::pdf_pending_files() === [ 'download/PDF Spec/broken.pdf' ] );
+
+// Originals folder
+$set( [ 'pdf_dpi' => 150, 'pdf_backup' => 'pdf-originals/' ] );
+delete_option( ISXM_Tools::PDF_DONE );
+file_put_contents( $pdf_dir . 'big one.pdf', '%PDF-' . str_repeat( 'o', 995 ) );
+$orig = file_get_contents( $pdf_dir . 'big one.pdf' );
+ISXM_Tools::compress_pdf_file( 'download/PDF Spec/big one.pdf' );
+t( 'With an originals folder, the original is copied there under its own path first', file_get_contents( ABSPATH . 'pdf-originals/download/PDF Spec/big one.pdf' ) === $orig && filesize( $pdf_dir . 'big one.pdf' ) === 400 );
+file_put_contents( $pdf_dir . 'big one.pdf', '%PDF-' . str_repeat( 'n', 995 ) );
+ISXM_Tools::compress_pdf_file( 'download/PDF Spec/big one.pdf' );
+t( '…and the first original kept there is never overwritten', file_get_contents( ABSPATH . 'pdf-originals/download/PDF Spec/big one.pdf' ) === $orig );
+t( 'The originals folder is never shrunk itself', ! array_filter( ISXM_Tools::pdf_pending_files(), function ( $f ) { return strpos( $f, 'pdf-originals/' ) === 0; } ) );
+t( 'An originals folder inside a folder being shrunk is refused', is_wp_error( ISXM_Tools::check_pdf_backup( 'download/PDF Spec/orig', 'download/PDF Spec/', '' ) ) );
+t( 'An originals folder inside an Offload folder is refused (it would go up)', is_wp_error( ISXM_Tools::check_pdf_backup( 'download/orig', 'other/', 'download/' ) ) );
+t( 'Site code is refused', is_wp_error( ISXM_Tools::check_pdf_backup( 'wp-content/plugins/x', '', '' ) ) );
+t( 'A folder elsewhere is fine; empty means no originals', ISXM_Tools::check_pdf_backup( 'pdf-originals', 'download/', 'download/' ) === 'pdf-originals/' && ISXM_Tools::check_pdf_backup( '', '', '' ) === '' );
+
+unset( $GLOBALS['isxm_t']['filters']['isxs_pdf_runner'] );
+t( 'No Ghostscript: a run cannot start, and says to ask the host', ISXM_Pdf::ghostscript() !== '' || ( is_wp_error( ISXM_Tools::precheck_tool( 'compress_pdf' ) ) && ISXM_Tools::precheck_tool( 'compress_pdf' )->get_error_code() === 'isxs_no_ghostscript' ) );
+foreach ( glob( $pdf_dir . '*' ) as $f ) @unlink( $f ); @rmdir( $pdf_dir );
+exec( 'rm -rf ' . escapeshellarg( ABSPATH . 'pdf-originals' ) );
+delete_option( ISXM_Tools::SERVER_MANIFEST ); delete_option( ISXM_Tools::PDF_DONE ); delete_option( ISXM_Tools::PDF_SAVED );
+$set( [ 'pdf_backup' => '' ] );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];

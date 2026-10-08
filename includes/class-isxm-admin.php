@@ -282,7 +282,7 @@ class ISXM_Admin {
 
                 <nav class="isxs-nav" role="tablist">
                     <button type="button" class="isxs-nav-item is-active" data-tab="media" role="tab"><?php esc_html_e( 'Media', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="images" role="tab"><?php esc_html_e( 'Images', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="images" role="tab"><?php esc_html_e( 'Images & Files', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="assets" role="tab"><?php esc_html_e( 'Assets', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="tools" role="tab"><?php esc_html_e( 'Tools', 'insightx-offload' ); ?></button>
                     <button type="button" class="isxs-nav-item" data-tab="migrate" role="tab"><?php esc_html_e( 'Migrate', 'insightx-offload' ); ?></button>
@@ -421,6 +421,9 @@ class ISXM_Admin {
                                     <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-offload' ), 'warn' ); ?>
                                     <?php $this->toggle( 'letter_avatars', $s['letter_avatars'], __( 'Letter avatars', 'insightx-offload' ), __( 'Show every profile picture as a coloured circle with the person\'s first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off', 'insightx-offload' ) ); ?>
                             </div>
+                        </div>
+                        <div class="isxs-pdf-wrap">
+                            <?php $this->pdf_card( $s ); ?>
                         </div>
                     </section>
 
@@ -899,10 +902,79 @@ class ISXM_Admin {
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7Z"/></svg>';
             case 'migrate':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h4v4"/><path d="m20 3-8 8"/><path d="M8 21H4v-4"/><path d="m4 21 8-8"/></svg>';
+            case 'compress_pdf':
+                // Document with arrows pointing inwards.
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="m10.5 11 1.5 2-1.5 2"/><path d="m13.5 11-1.5 2 1.5 2"/></svg>';
             case 'sync':
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
         }
         return '';
+    }
+
+    /**
+     * "Shrink PDFs": folders, resolution, where the originals go, and
+     * whether Ghostscript is there — then the usual tool card controls.
+     */
+    private function pdf_card( array $s ) {
+        $version = ISXM_Pdf::version();
+        $saved   = (int) get_option( ISXM_Tools::PDF_SAVED, 0 );
+        ob_start();
+        ?>
+        <p class="isxs-gs-status" data-ok="<?php echo $version !== '' ? '1' : '0'; ?>">
+            <?php
+            if ( $version !== '' ) {
+                /* translators: %s: Ghostscript version. */
+                printf( esc_html__( 'Ghostscript %s found', 'insightx-offload' ), esc_html( $version ) );
+            } else {
+                esc_html_e( 'Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)', 'insightx-offload' );
+            }
+            ?>
+        </p>
+        <div class="isxs-field isxs-folder-field">
+            <label for="isxs-pdf-folders-type"><?php esc_html_e( 'Folders to shrink', 'insightx-offload' ); ?></label>
+            <input type="hidden" id="isxs-pdf-folders" value="<?php echo esc_attr( implode( ', ', ISXM_Settings::pdf_folders() ) ); ?>">
+            <?php $this->folder_picker_markup( 'isxs-pdf-folders-type' ); ?>
+        </div>
+        <div class="isxs-field">
+            <label for="isxs-pdf-dpi"><?php esc_html_e( 'Resolution', 'insightx-offload' ); ?></label>
+            <select id="isxs-pdf-dpi" class="isxs-select">
+                <?php
+                $dpis = [
+                    72  => __( '72 dpi — smallest, for screens only', 'insightx-offload' ),
+                    150 => __( '150 dpi — balanced, sharp text (recommended)', 'insightx-offload' ),
+                    300 => __( '300 dpi — print quality, smaller savings', 'insightx-offload' ),
+                ];
+                foreach ( $dpis as $dpi => $label ) :
+                    ?>
+                    <option value="<?php echo esc_attr( $dpi ); ?>" <?php selected( (int) $s['pdf_dpi'], $dpi ); ?>><?php echo esc_html( $label ); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="isxs-field isxs-folder-field isxs-folder-single">
+            <label for="isxs-pdf-backup-type"><?php esc_html_e( 'Keep the originals in', 'insightx-offload' ); ?></label>
+            <input type="hidden" id="isxs-pdf-backup" value="<?php echo esc_attr( $s['pdf_backup'] ); ?>">
+            <?php $this->folder_picker_markup( 'isxs-pdf-backup-type' ); ?>
+            <p class="isxs-hint"><?php esc_html_e( 'One folder outside the folders above, e.g. pdf-originals/. Each original is copied there under its own path before it is shrunk. Leave empty to keep no originals — the files are then overwritten and cannot be restored', 'insightx-offload' ); ?></p>
+        </div>
+        <?php if ( $saved > 0 ) : ?>
+            <p class="isxs-hint isxs-pdf-saved">
+                <?php
+                /* translators: %s: size, e.g. 120 MB. */
+                printf( esc_html__( 'Saved so far: %s', 'insightx-offload' ), esc_html( size_format( $saved, 1 ) ) );
+                ?>
+            </p>
+        <?php endif; ?>
+        <?php
+        $extra = ob_get_clean();
+        $this->tool_card(
+            'compress_pdf',
+            __( 'Shrink PDFs', 'insightx-offload' ),
+            __( 'Shrink the PDFs in the chosen folders with Ghostscript and put them back under the same name. Files already on the bucket go up again over the same key. Files that would shrink by less than 10% are left as they are. Runs on the server, so you can close this tab', 'insightx-offload' ),
+            __( 'Shrink PDFs', 'insightx-offload' ),
+            '',
+            false,
+            $extra
+        );
     }
 
     /**

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.46
+ * Version:     0.2.47
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.46' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.47' );
 
 /*
  * GitHub update checker.
@@ -73,6 +73,7 @@ $isxm_files_to_load = [
     'includes/class-isxm-background.php',
     'includes/class-isxm-wc-downloads.php',
     'includes/class-isxm-assets.php',
+    'includes/class-isxm-pdf.php',
     'includes/class-isxm-tools.php',
     'includes/class-isxm-admin.php',
     'includes/class-isxm-file-manager.php',
@@ -236,6 +237,8 @@ function isxm_plugin_uninstall() {
     delete_option( 'isxs_migrate_last' );
     delete_option( 'isxs_server_manifest' );
     delete_option( 'isxs_fm_access' );
+    delete_option( 'isxs_pdf_compressed' );
+    delete_option( 'isxs_pdf_saved' );
     delete_transient( 'isxs_server_folder_stats' );
     delete_option( 'isxs_items_db_version' );
     delete_option( 'isxs_items_backfilled' );

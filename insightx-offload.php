@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.44
+ * Version:     0.2.45
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.44' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.45' );
 
 /*
  * GitHub update checker.
@@ -75,6 +75,9 @@ $isxm_files_to_load = [
     'includes/class-isxm-assets.php',
     'includes/class-isxm-tools.php',
     'includes/class-isxm-admin.php',
+    'includes/class-isxm-file-manager.php',
+    'includes/class-isxm-file-manager-access.php',
+    'includes/class-isxm-file-manager-admin.php',
     'includes/class-isxm-media-library.php',
     'includes/class-isxm-letter-avatars.php',
     'includes/class-isxm-cli.php',
@@ -207,6 +210,7 @@ add_action( 'plugins_loaded', function () {
     // healthcheck from the front end.
     if ( class_exists( 'ISXM_Background' ) ) new ISXM_Background();
     if ( class_exists( 'ISXM_Admin' ) )   new ISXM_Admin();
+    if ( is_admin() && class_exists( 'ISXM_File_Manager_Admin' ) ) new ISXM_File_Manager_Admin();
     if ( is_admin() && class_exists( 'ISXM_Media_Library' ) ) new ISXM_Media_Library();
     if ( class_exists( 'ISXM_Assets' ) )  new ISXM_Assets();
     if ( class_exists( 'ISXM_Letter_Avatars' ) ) new ISXM_Letter_Avatars();
@@ -231,6 +235,7 @@ function isxm_plugin_uninstall() {
     delete_option( 'isxs_jobs' );
     delete_option( 'isxs_migrate_last' );
     delete_option( 'isxs_server_manifest' );
+    delete_option( 'isxs_fm_access' );
     delete_transient( 'isxs_server_folder_stats' );
     delete_option( 'isxs_items_db_version' );
     delete_option( 'isxs_items_backfilled' );

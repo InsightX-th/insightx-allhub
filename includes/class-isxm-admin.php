@@ -31,6 +31,9 @@ class ISXM_Admin {
             'dashicons-cloud-upload',
             77 // Right after InsightX Backup (76) — keeps the InsightX tools together.
         );
+        // Same slug as the parent: renames the first sub-item (WordPress
+        // would repeat "InsightX Offload") now that File Manager sits under it.
+        add_submenu_page( self::PAGE_SLUG, __( 'InsightX Offload', 'insightx-offload' ), __( 'Offload', 'insightx-offload' ), 'manage_options', self::PAGE_SLUG, [ $this, 'render_page' ] );
     }
 
     public function enqueue_assets( $hook ) {

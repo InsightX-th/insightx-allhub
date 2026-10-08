@@ -82,6 +82,12 @@ jobs:
       - name: Migration pipeline
         run: php tests/migration-pipeline.php
 
+      - name: File Manager (sandbox, names, file operations)
+        run: php tests/file-manager.php
+
+      - name: File Manager access rules
+        run: php tests/file-manager-access.php
+
       - name: Parallel transfers (threaded S3 fixture)
         run: php tests/migration-transfers.php
 

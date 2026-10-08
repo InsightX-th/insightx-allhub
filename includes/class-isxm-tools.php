@@ -78,6 +78,7 @@ class ISXM_Tools {
         add_action( 'wp_ajax_isxs_sync_orphan_cleanup', [ $this, 'ajax_sync_orphan_cleanup' ] );
         add_action( 'wp_ajax_isxs_diagnostic', [ $this, 'ajax_diagnostic' ] );
         add_action( self::WATCH_HOOK, [ __CLASS__, 'watch_server_folders' ] );
+        add_filter( 'isxfm_file_written', [ __CLASS__, 'offload_server_file' ], 10, 2 );
         // Sites that already had folders and auto-offload on before this
         // version get their schedule without having to save again.
         add_action( 'admin_init', [ __CLASS__, 'sync_watch_schedule' ] );
@@ -452,13 +453,7 @@ class ISXM_Tools {
                 if ( strpos( $item->getFilename(), '.' ) === 0 ) return false;
                 // Picking "wp-content/" must not walk into plugins/ or themes/,
                 // nor into uploads (the Media Library goes up as attachments).
-                if ( $item->isDir() ) {
-                    $relative = substr( $item->getPathname(), strlen( $root ) ) . '/';
-                    foreach ( array_merge( self::BLOCKED_SERVER_FOLDERS, [ ISXM_Settings::uploads_relative() ] ) as $blocked ) {
-                        if ( strpos( $relative, $blocked ) === 0 ) return false;
-                    }
-                }
-                return true;
+                return ! $item->isDir() || ! self::server_path_blocked( substr( $item->getPathname(), strlen( $root ) ) . '/' );
             }
         ) );
         foreach ( $iter as $item ) {
@@ -466,6 +461,81 @@ class ISXM_Tools {
         }
         sort( $files, SORT_STRING );
         return $files;
+    }
+
+    /** Under a folder that is never uploaded as raw files (site code, uploads)? */
+    private static function server_path_blocked( $relative ) {
+        foreach ( array_merge( self::BLOCKED_SERVER_FOLDERS, [ ISXM_Settings::uploads_relative() ] ) as $blocked ) {
+            if ( strpos( $relative, $blocked ) === 0 ) return true;
+        }
+        return false;
+    }
+
+    /**
+     * A File Manager write (upload, new file, copy, rename, move) anywhere
+     * outside the Media Library goes up at once when "Offload Media" is on.
+     * A file outside the Offload card's folders first adds its folder there
+     * (so links to it are rewritten and the hourly watch retries a failed
+     * upload). Filter `isxfm_file_written`: returns $notes plus lines for
+     * the toast.
+     *
+     * @return string[]
+     */
+    public static function offload_server_file( $notes, $relative ) {
+        $notes    = (array) $notes;
+        $relative = ltrim( (string) $relative, '/' );
+        if ( ! ISXM_Settings::get( 'offload_enabled' ) || ! is_file( ABSPATH . $relative ) ) return $notes;
+        if ( preg_match( '#(^|/)\.#', $relative ) || self::server_path_blocked( $relative ) ) return $notes;
+
+        $added = self::add_server_folder_for( $relative );
+        if ( $added !== '' ) {
+            /* translators: %s: folder, e.g. download/. */
+            $notes[] = sprintf( __( 'added %s to the Offload media card', 'insightx-offload' ), $added );
+        }
+
+        $type   = wp_check_filetype( wp_basename( $relative ) );
+        $client = new ISXM_Client();
+        $result = $client->put_object( $relative, ABSPATH . $relative, $type['type'] ?: 'application/octet-stream', (bool) ISXM_Settings::get( 'send_public_acl' ) );
+        if ( is_wp_error( $result ) ) {
+            /* translators: %s: storage error. */
+            array_unshift( $notes, sprintf( __( 'Not on the bucket yet: %s (retried on the next hourly check)', 'insightx-offload' ), $result->get_error_message() ) );
+            return $notes;
+        }
+        $manifest              = self::server_manifest();
+        $manifest[ $relative ] = (int) @filemtime( ABSPATH . $relative );
+        update_option( self::SERVER_MANIFEST, $manifest, false );
+        delete_transient( self::SERVER_STATS );
+        array_unshift( $notes, __( 'Uploaded to the bucket', 'insightx-offload' ) );
+        return $notes;
+    }
+
+    /**
+     * Puts a file's folder on the Offload card when no chosen folder holds
+     * it: the top folder ("download/"), or under wp-content/ the one below
+     * it ("wp-content/files/") so caches and backups there are not swept
+     * in. Chosen folders inside the new one are folded into it. A file at
+     * the site root adds nothing (robots.txt must stay on the site).
+     *
+     * @return string The folder added, or "".
+     */
+    private static function add_server_folder_for( $relative ) {
+        $folders = ISXM_Settings::server_folders();
+        foreach ( $folders as $folder ) {
+            if ( strpos( $relative, $folder ) === 0 ) return '';
+        }
+        $parts = explode( '/', $relative );
+        $depth = $parts[0] === 'wp-content' ? 2 : 1;
+        if ( count( $parts ) <= $depth ) return '';
+        $new = implode( '/', array_slice( $parts, 0, $depth ) ) . '/';
+        if ( self::server_folder_path( $new ) === '' ) return '';
+        $kept = array_values( array_filter( $folders, function ( $f ) use ( $new ) { return strpos( $f, $new ) !== 0; } ) );
+        $kept[] = $new;
+        $settings = ISXM_Settings::all();
+        $settings['offload_server_folders'] = implode( ', ', $kept );
+        ISXM_Settings::save( $settings );
+        delete_transient( self::SERVER_STATS );
+        self::sync_watch_schedule();
+        return $new;
     }
 
     /**

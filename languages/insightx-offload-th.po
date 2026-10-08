@@ -1611,3 +1611,455 @@ msgstr "ต้องการลบแบบไหน"
 #: includes/class-isxm-admin.php
 msgid "Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour"
 msgstr "คัดลอกไฟล์ขึ้น storage อัตโนมัติ: media ทันทีหลังอัปโหลด และไฟล์ใหม่ในโฟลเดอร์ที่เลือกไว้ในการ์ด Offload media ทุกชั่วโมง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Offload"
+msgstr "Offload"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File Manager"
+msgstr "จัดการไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Files on this server. Uploads into the Offload card's folders go to the bucket at once."
+msgstr "ไฟล์บนเซิร์ฟเวอร์ ไฟล์ที่อัปโหลดลงโฟลเดอร์ที่เลือกไว้ในการ์ด Offload media จะขึ้น bucket ทันที"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Folder path"
+msgstr "ตำแหน่งโฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Upload"
+msgstr "อัปโหลด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "New folder"
+msgstr "โฟลเดอร์ใหม่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Rename"
+msgstr "เปลี่ยนชื่อ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Move"
+msgstr "ย้าย"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Download"
+msgstr "ดาวน์โหลด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Delete"
+msgstr "ลบ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Drop files to upload here"
+msgstr "วางไฟล์ตรงนี้เพื่ออัปโหลด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Maximum upload size: %s per file"
+msgstr "อัปโหลดได้สูงสุด %s ต่อไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "WordPress"
+msgstr "WordPress"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Name"
+msgstr "ชื่อ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Size"
+msgstr "ขนาด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Modified"
+msgstr "แก้ไขล่าสุด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "This folder is empty. Drop files here to upload."
+msgstr "โฟลเดอร์นี้ว่าง วางไฟล์ตรงนี้เพื่ออัปโหลด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Loading…"
+msgstr "กำลังโหลด…"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "View only: this location holds the site's code."
+msgstr "ดูได้อย่างเดียว: ตำแหน่งนี้เก็บโค้ดของเว็บ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Folder name"
+msgstr "ชื่อโฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "New name"
+msgstr "ชื่อใหม่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Move to"
+msgstr "ย้ายไปที่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Move here"
+msgstr "ย้ายมาที่นี่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Delete %d item(s)? Folders are deleted with everything in them. This cannot be undone."
+msgstr "ลบ %d รายการ? โฟลเดอร์จะถูกลบพร้อมทุกอย่างข้างใน ย้อนกลับไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Replace"
+msgstr "แทนที่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Skip"
+msgstr "ข้าม"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "These files already exist. Replace them?"
+msgstr "มีไฟล์ชื่อนี้อยู่แล้ว แทนที่ไหม"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Larger than the server allows (%s)"
+msgstr "ใหญ่เกินที่เซิร์ฟเวอร์รับได้ (%s)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Uploaded"
+msgstr "อัปโหลดแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Folder created"
+msgstr "สร้างโฟลเดอร์แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Renamed"
+msgstr "เปลี่ยนชื่อแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Moved"
+msgstr "ย้ายแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Deleted"
+msgstr "ลบแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "On the bucket"
+msgstr "อยู่ใน bucket แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Request failed. Please try again."
+msgstr "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Not allowed."
+msgstr "ไม่มีสิทธิ์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "The upload did not reach the server."
+msgstr "ไฟล์ส่งไม่ถึงเซิร์ฟเวอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Unknown action."
+msgstr "ไม่รู้จักคำสั่งนี้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File not found."
+msgstr "ไม่พบไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Uploaded to the bucket"
+msgstr "ขึ้น bucket แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Not on the bucket yet: %s (retried on the next hourly check)"
+msgstr "ยังไม่ขึ้น bucket: %s (ระบบจะลองใหม่ในรอบตรวจรายชั่วโมง)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "That path is not allowed."
+msgstr "ใช้ path นี้ไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File or folder not found."
+msgstr "ไม่พบไฟล์หรือโฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Not a folder."
+msgstr "ไม่ใช่โฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "That name is not allowed."
+msgstr "ใช้ชื่อนี้ไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Names starting with a dot are not allowed."
+msgstr "ชื่อที่ขึ้นต้นด้วยจุดใช้ไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Executable files (such as .php) are not allowed."
+msgstr "ไม่อนุญาตไฟล์ที่รันได้ (เช่น .php)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File changes are turned off on this site (DISALLOW_FILE_MODS)."
+msgstr "เว็บนี้ปิดการแก้ไขไฟล์ไว้ (DISALLOW_FILE_MODS)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "This location holds the site's code and can only be viewed."
+msgstr "ตำแหน่งนี้เก็บโค้ดของเว็บ ดูได้อย่างเดียว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "A file or folder with that name already exists."
+msgstr "มีไฟล์หรือโฟลเดอร์ชื่อนี้อยู่แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "A folder cannot be moved into itself."
+msgstr "ย้ายโฟลเดอร์เข้าไปในตัวเองไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "The server could not complete this. Check folder permissions."
+msgstr "เซิร์ฟเวอร์ทำรายการนี้ไม่สำเร็จ ตรวจสิทธิ์ของโฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Permissions"
+msgstr "สิทธิ์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Kind"
+msgstr "ประเภท"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "read and write"
+msgstr "อ่านและเขียน"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "read only"
+msgstr "อ่านอย่างเดียว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Folder"
+msgstr "โฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%s file"
+msgstr "ไฟล์ %s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File"
+msgstr "ไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%1$d items, %2$s"
+msgstr "%1$d รายการ, รวม %2$s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%1$d selected, %2$s"
+msgstr "เลือก %1$d รายการ, %2$s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Results for \"%1$s\" in /%2$s: %3$d"
+msgstr "ผลการค้นหา \"%1$s\" ใน /%2$s: %3$d รายการ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "(first results only, narrow the search)"
+msgstr "(แสดงเฉพาะผลแรกๆ ลองค้นให้เจาะจงขึ้น)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Clear"
+msgstr "ล้าง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Searching…"
+msgstr "กำลังค้นหา…"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Nothing found."
+msgstr "ไม่พบไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Saved"
+msgstr "บันทึกแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Choose"
+msgstr "เลือก"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Whole site"
+msgstr "ทั้งเว็บ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Use this folder"
+msgstr "ใช้โฟลเดอร์นี้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "No matching users (administrators always have full access)."
+msgstr "ไม่พบผู้ใช้ (ผู้ดูแลระบบมีสิทธิ์ครบเสมอ)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "View"
+msgstr "ดู"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Role"
+msgstr "Role"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "User"
+msgstr "ผู้ใช้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Files"
+msgstr "ไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Access"
+msgstr "สิทธิ์การใช้งาน"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Search files in this folder"
+msgstr "ค้นหาไฟล์ในโฟลเดอร์นี้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Search files"
+msgstr "ค้นหาไฟล์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Who may use File Manager"
+msgstr "ใครใช้ จัดการไฟล์ ได้บ้าง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Administrators can always do everything. A person listed under \"Per person\" uses their own row instead of their role's."
+msgstr "ผู้ดูแลระบบทำได้ทุกอย่างเสมอ คนที่อยู่ใน \"รายบุคคล\" จะใช้สิทธิ์ในแถวของตัวเองแทนสิทธิ์ของ role"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "By role"
+msgstr "ตาม role"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Per person"
+msgstr "รายบุคคล"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Find a user by name or email"
+msgstr "ค้นหาผู้ใช้ด้วยชื่อหรืออีเมล"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "You do not have permission to do this."
+msgstr "คุณไม่มีสิทธิ์ทำรายการนี้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Open in new tab"
+msgstr "เปิดในแท็บใหม่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Preview"
+msgstr "ดูตัวอย่าง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Upload files here"
+msgstr "อัปโหลดไฟล์มาที่นี่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Copy"
+msgstr "คัดลอก"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Cut"
+msgstr "ตัด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Paste"
+msgstr "วาง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Duplicate"
+msgstr "ทำสำเนา"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Empty the folder"
+msgstr "ล้างโฟลเดอร์"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Select all"
+msgstr "เลือกทั้งหมด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Invert selection"
+msgstr "กลับการเลือก"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Get info"
+msgstr "ข้อมูล"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Delete everything inside \"%s\"? The folder itself is kept. This cannot be undone."
+msgstr "ลบทุกอย่างใน \"%s\"? ตัวโฟลเดอร์ยังอยู่ ย้อนกลับไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Folder emptied"
+msgstr "ล้างโฟลเดอร์แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Copied"
+msgstr "คัดลอกแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Duplicated"
+msgstr "ทำสำเนาแล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%d item(s) copied, paste them in another folder"
+msgstr "คัดลอก %d รายการแล้ว ไปวางในโฟลเดอร์อื่นได้เลย"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%d item(s) cut, paste them in another folder"
+msgstr "ตัด %d รายการแล้ว ไปวางในโฟลเดอร์อื่นได้เลย"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "This file type cannot be previewed. Download it instead."
+msgstr "ไฟล์ประเภทนี้ดูตัวอย่างไม่ได้ ดาวน์โหลดแทนได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Close"
+msgstr "ปิด"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Path"
+msgstr "Path"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "URL"
+msgstr "URL"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Yes"
+msgstr "ใช่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "No"
+msgstr "ไม่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "New file"
+msgstr "ไฟล์ใหม่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File name, e.g. readme.txt"
+msgstr "ชื่อไฟล์ เช่น readme.txt"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "File created"
+msgstr "สร้างไฟล์แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "HTML and SVG files can only be added by administrators."
+msgstr "ไฟล์ HTML และ SVG เพิ่มได้เฉพาะผู้ดูแลระบบ"
+
+#: includes/class-isxm-tools.php
+msgid "added %s to the Offload media card"
+msgstr "เพิ่ม %s ในการ์ด Offload media แล้ว"
+
+#: includes/class-isxm-tools.php
+msgid "Files on this server. Files added outside the Media Library go to the bucket at once while Offload Media is on."
+msgstr "ไฟล์บนเซิร์ฟเวอร์ ไฟล์ที่เพิ่มนอก Media Library จะขึ้น provider ทันทีเมื่อเปิด Offload Media"

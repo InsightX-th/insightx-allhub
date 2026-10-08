@@ -2717,3 +2717,30 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* File Manager: thin bar while a folder that is not cached yet loads. */
+.isxs-fm-main.is-loading::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 40%;
+  background: var(--isxs-accent);
+  animation: isxs-fm-loading 0.9s ease-in-out infinite;
+}
+@keyframes isxs-fm-loading {
+  from { left: -40%; }
+  to { left: 100%; }
+}
+.isxs-fm-main {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .isxs-fm-main.is-loading::before {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}

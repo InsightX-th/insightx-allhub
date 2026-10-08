@@ -128,38 +128,70 @@
       $('<button type="button" class="isxs-fm-node-name">').html(folderSvg).append($("<span>").text(name))
     );
 
-  const expand = ($li, open) => {
-    const $tw = $li.children(".isxs-fm-twist");
-    if (!open) { $li.children("ul").remove(); $tw.attr("aria-expanded", "false").text("▸"); return Promise.resolve(); }
-    if ($li.children("ul").length) return Promise.resolve();
-    $tw.attr("aria-expanded", "true").text("▾");
-    return api("list", { path: $li.attr("data-path") })
+  /* Listings are cached per folder: going back to a folder, folding and
+     unfolding the tree, or revealing a path is instant; the server is
+     asked again in the background and only changes are re-drawn. */
+  const cache = new Map(); // path => listing
+  const inflight = new Map(); // path => pending request
+  const fetchList = (path) => {
+    if (inflight.has(path)) return inflight.get(path);
+    const req = api("list", { path })
       .then((d) => {
-        const $ul = $("<ul>");
-        d.dirs.forEach((dir) => $ul.append(treeNode(dir.name, dir.path)));
-        if (!d.dirs.length) $tw.addClass("is-leaf");
-        $li.append($ul);
+        cache.set(d.path, d);
+        $(".isxs-fm-tree li" + sel(d.path)).each(function () { fillNode($(this), d.dirs); });
+        return d;
       })
-      .catch(() => {});
+      .finally(() => inflight.delete(path));
+    inflight.set(path, req);
+    return req;
+  };
+  // Forget folders after a change (they are fetched again when shown).
+  const invalidate = (paths) => paths.forEach((p) => cache.delete(p));
+  const parentPath = (p) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
+
+  // (Re)draws a node's children, keeping sub-trees already unfolded.
+  const fillNode = ($li, dirs) => {
+    const $old = $li.children("ul");
+    const $ul = $("<ul>").prop("hidden", $old.length ? $old.prop("hidden") : $li.children(".isxs-fm-twist").attr("aria-expanded") !== "true");
+    dirs.forEach((dir) => {
+      const $keep = $old.children("li" + sel(dir.path));
+      $ul.append($keep.length ? $keep : treeNode(dir.name, dir.path));
+    });
+    $old.remove();
+    $li.children(".isxs-fm-twist").toggleClass("is-leaf", !dirs.length);
+    $li.append($ul);
   };
 
-  // Opens the tree down to `path`, one level at a time.
+  const expand = ($li, open) => {
+    const $tw = $li.children(".isxs-fm-twist");
+    $tw.attr("aria-expanded", open ? "true" : "false").text(open ? "▾" : "▸");
+    const $ul = $li.children("ul");
+    $ul.prop("hidden", !open);
+    if (!open || $ul.length) return Promise.resolve();
+    const path = $li.attr("data-path");
+    if (cache.has(path)) { fillNode($li, cache.get(path).dirs); return Promise.resolve(); }
+    return fetchList(path).catch(() => {});
+  };
+
+  // Opens the tree down to `path`: missing levels are fetched all at once,
+  // not one after another.
   const reveal = ($tree, path) => {
     const base = $tree.data("base");
     const rest = path.slice(base.length).replace(/^\//, "");
     const parts = rest ? rest.split("/") : [];
-    let chain = expand($tree.find("> ul > li").first(), true);
-    parts.forEach((_, i) => {
-      const sub = (base ? base + "/" : "") + parts.slice(0, i + 1).join("/");
-      chain = chain.then(() => {
-        const $li = $tree.find("li" + sel(sub)).first();
-        return $li.length ? expand($li, true) : null;
+    const levels = [base].concat(parts.map((_, i) => (base ? base + "/" : "") + parts.slice(0, i + 1).join("/")));
+    const unfold = levels;
+    return Promise.all(unfold.filter((p) => !cache.has(p)).map((p) => fetchList(p).catch(() => null))).then(() => {
+      unfold.forEach((p) => {
+        const $li = $tree.find("li" + sel(p)).first();
+        if ($li.length) expand($li, true);
       });
+      markCurrent($tree, path);
     });
-    return chain.then(() => {
-      $tree.find(".is-current").removeClass("is-current");
-      $tree.find("li" + sel(path)).first().children(".isxs-fm-node-name").addClass("is-current");
-    });
+  };
+  const markCurrent = ($tree, path) => {
+    $tree.find(".is-current").removeClass("is-current");
+    $tree.find("li" + sel(path)).first().children(".isxs-fm-node-name").addClass("is-current");
   };
 
   const buildTree = ($tree, base) => {
@@ -243,7 +275,9 @@
     );
   };
 
-  const rowOf = (path) => state.rows.find((r) => r.path === path);
+  let byPath = new Map();
+  const setRows = (rows) => { state.rows = rows; byPath = new Map(rows.map((r) => [r.path, r])); };
+  const rowOf = (path) => byPath.get(path);
 
   const syncButtons = () => {
     const picked = [...state.selected].map(rowOf).filter(Boolean);
@@ -272,32 +306,63 @@
     syncButtons();
   };
 
+  // Draws a listing. keep: stay on the current selection (a background refresh).
+  const render = (d, select, keep) => {
+    state.path = d.path;
+    state.listing = d;
+    setRows(d.dirs.concat(d.files));
+    state.search = null;
+    if (keep) {
+      state.selected = new Set([...state.selected].filter((p) => byPath.has(p)));
+    } else {
+      state.selected = new Set(select ? [select] : []);
+      state.anchor = select || null;
+    }
+    $("#isxs-fm-results").prop("hidden", true);
+    if (!keep) $("#isxs-fm-q").val("");
+    renderCrumbs(d.path);
+    renderTable();
+    $("#isxs-fm-note").text(t.readOnly).prop("hidden", d.writable);
+    syncButtons();
+    if (select && !keep) {
+      const $row = $table.find("tr" + sel(select));
+      if ($row.length) $row[0].scrollIntoView({ block: "center" });
+    }
+  };
+
+  let loadSeq = 0;
+  // Shows a folder: from the cache at once when it has been opened before
+  // (then refreshed quietly), otherwise after the request, with the current
+  // table left in place and a thin loading bar meanwhile.
   const load = (path, select) => {
-    $table.html('<tbody><tr class="isxs-fm-empty"><td>' + esc(t.loading) + "</td></tr></tbody>");
-    return api("list", { path })
+    const seq = ++loadSeq;
+    const $main = $("#isxs-fm-main");
+    renderCrumbs(path);
+    markCurrent($("#isxs-fm-tree"), path);
+    const cached = cache.get(path);
+    if (cached) render(cached, select, false);
+    const slow = cached ? null : setTimeout(() => $main.addClass("is-loading"), 150);
+    reveal($("#isxs-fm-tree"), path);
+    return fetchList(path)
       .then((d) => {
-        state.path = d.path;
-        state.listing = d;
-        state.rows = d.dirs.concat(d.files);
-        state.search = null;
-        state.selected = new Set(select ? [select] : []);
-        state.anchor = select || null;
-        $("#isxs-fm-results").prop("hidden", true);
-        $("#isxs-fm-q").val("");
-        renderCrumbs(d.path);
-        renderTable();
-        $("#isxs-fm-note").text(t.readOnly).prop("hidden", d.writable);
-        syncButtons();
-        if (select) {
-          const $row = $table.find("tr" + sel(select));
-          if ($row.length) $row[0].scrollIntoView({ block: "center" });
-        }
-        reveal($("#isxs-fm-tree"), d.path);
+        if (seq !== loadSeq) return; // another folder was opened meanwhile
+        if (!cached) render(d, select, false);
+        else if (JSON.stringify(cached) !== JSON.stringify(d)) render(d, select, true);
       })
       .catch((e) => {
+        if (seq !== loadSeq) return;
         toast(e.message, true);
-        if (path !== cfg.jail) load(cfg.jail);
+        if (!cached && path !== cfg.jail) load(cfg.jail);
+      })
+      .finally(() => {
+        clearTimeout(slow);
+        if (seq === loadSeq) $main.removeClass("is-loading");
       });
+  };
+  // After a change: forget these folders (and the open one), then show it fresh.
+  const reloadAfter = (paths, select) => {
+    invalidate([state.path].concat(paths || []));
+    return load(state.path, select);
   };
 
   /* ---------- selection & navigation ---------- */
@@ -352,7 +417,7 @@
     api("search", { path: base, q })
       .then((d) => {
         state.search = { query: d.query, path: d.path, truncated: d.truncated };
-        state.rows = d.items;
+        setRows(d.items);
         state.selected.clear();
         state.anchor = null;
         renderTable();
@@ -434,6 +499,7 @@
     }
     if (done) toast(withNotes(t.uploaded + " " + done, [...new Set(notes)]), false);
     setTimeout(() => $queue.find("li.is-ok").fadeOut(300, function () { $(this).remove(); if (!$queue.children().length) $queue.prop("hidden", true); }), 4000);
+    invalidate([dir]);
     if (state.path === dir && !state.search) load(dir);
   };
 
@@ -476,9 +542,8 @@
       }
     }
     if (done === paths.length) toast(withNotes(okText, [...new Set(notes)]), false);
-    // Folders may have been renamed, moved or deleted: re-read the tree.
-    $("#isxs-fm-tree > ul > li").children("ul").remove();
-    load(state.path);
+    // The open folder, where things went (to), and where they came from.
+    reloadAfter([extra.to].concat(paths.map(parentPath)).filter((p) => typeof p === "string"));
   };
 
   // A folder picked from a tree in the modal; resolves "" for the root.
@@ -604,7 +669,7 @@
           .then((d) => {
             const text = d.replaced ? t.shrunk.replace("%1$s", sizeText(d.before)).replace("%2$s", sizeText(d.after)) : t.notShrunk;
             toast(withNotes(text, d.uploaded ? [t.bucketUpdated] : []), false);
-            load(state.path, one.path);
+            reloadAfter([], one.path);
           })
           .catch((e) => toast(e.message, true));
       case "info": return info(one || currentFolderRow());
@@ -626,7 +691,7 @@
         const name = await modal({ title: t.newFile, html: "<label>" + esc(t.fileName) + "</label>", input: "" });
         if (!name) return;
         return api("mkfile", { path: state.path, name })
-          .then((d) => { toast(withNotes(t.fileCreated, d.notes), false); load(state.path, d.path); })
+          .then((d) => { toast(withNotes(t.fileCreated, d.notes), false); reloadAfter([], d.path); })
           .catch((e) => toast(e.message, true));
       }
       case "mkdir": {
@@ -635,8 +700,7 @@
         return api("mkdir", { path: state.path, name })
           .then(() => {
             toast(t.created, false);
-            $("#isxs-fm-tree").find("li" + sel(state.path)).first().children("ul").remove();
-            load(state.path);
+            reloadAfter([]);
           })
           .catch((e) => toast(e.message, true));
       }

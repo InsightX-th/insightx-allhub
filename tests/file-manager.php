@@ -221,4 +221,38 @@ check( 'emptying a folder reports every file that was in it', $gone === [ 'downl
 $gone = [];
 check( 'a refused delete reports nothing', is_wp_error( $fs->delete( 'index.php' ) ) && $gone === [] );
 
+group( 'Private files: configuration, dot-files, backups' );
+$root = fresh_root();
+$fs   = new ISXM_File_Manager( $root, false );
+file_put_contents( $root . '.htaccess', 'rules' );
+file_put_contents( $root . '.env', 'SECRET=1' );
+file_put_contents( $root . 'wp-config-sample.php', '<?php' );
+file_put_contents( $root . 'download/dump.sql', 'x' );
+file_put_contents( $root . 'download/site.sql.gz', 'x' );
+file_put_contents( $root . 'download/backup-guide.pdf', 'fine' );
+mkdir( $root . 'wp-content/updraft' );
+file_put_contents( $root . 'wp-content/updraft/db.gz', 'x' );
+mkdir( $root . 'wp-content/insightx-backup' );
+file_put_contents( $root . 'wp-content/insightx-backup/site.zip', 'x' );
+mkdir( $root . 'download/.git' );
+file_put_contents( $root . 'download/.git/config', 'x' );
+$names = function ( $l ) { return array_merge( array_column( $l['dirs'], 'name' ), array_column( $l['files'], 'name' ) ); };
+check( 'wp-config.php is unreadable', code_of( $fs->readable( $root . 'wp-config.php' ) ) === 'isxfm_secret' && code_of( $fs->readable( $root . 'wp-config-sample.php' ) ) === 'isxfm_secret' );
+check( '…and not listed at the root', ! array_intersect( [ 'wp-config.php', 'wp-config-sample.php', '.htaccess', '.env' ], $names( $fs->listing( '' ) ) ) );
+check( '.env and .git are unreadable', code_of( $fs->readable( $root . '.env' ) ) === 'isxfm_secret' && code_of( $fs->readable( $root . 'download/.git/config' ) ) === 'isxfm_secret' );
+check( 'database dumps are unreadable and not listed', code_of( $fs->readable( $root . 'download/dump.sql' ) ) === 'isxfm_secret' && code_of( $fs->readable( $root . 'download/site.sql.gz' ) ) === 'isxfm_secret' && ! array_intersect( [ 'dump.sql', 'site.sql.gz' ], $names( $fs->listing( 'download' ) ) ) );
+check( 'a PDF with "backup" in its name is fine', $fs->readable( $root . 'download/backup-guide.pdf' ) === true && in_array( 'backup-guide.pdf', $names( $fs->listing( 'download' ) ), true ) );
+check( 'backup folders are not listed and cannot be opened', ! array_intersect( [ 'updraft', 'insightx-backup' ], $names( $fs->listing( 'wp-content' ) ) ) && code_of( $fs->listing( 'wp-content/insightx-backup' ) ) === 'isxfm_secret' && code_of( $fs->readable( $root . 'wp-content/updraft/db.gz' ) ) === 'isxfm_secret' );
+check( 'search does not find them', ! array_filter( array_column( $fs->search( '', 'db' )['items'], 'path' ), function ( $p ) { return strpos( $p, 'updraft' ) !== false; } ) && ! in_array( 'dump.sql', array_column( $fs->search( '', 'dump' )['items'], 'name' ), true ) );
+check( '.htaccess cannot be deleted', is_wp_error( $fs->delete( '.htaccess' ) ) && is_file( $root . '.htaccess' ) );
+check( '…renamed', is_wp_error( $fs->rename( '.htaccess', 'htaccess.txt' ) ) && is_file( $root . '.htaccess' ) );
+check( '…or moved', is_wp_error( $fs->move( '.htaccess', 'download' ) ) && is_file( $root . '.htaccess' ) );
+mkdir( $root . 'download/guarded' );
+file_put_contents( $root . 'download/guarded/.htaccess', 'deny' );
+file_put_contents( $root . 'download/guarded/a.pdf', 'a' );
+check( 'emptying a folder holding a dot-file deletes nothing', is_wp_error( $fs->empty_dir( 'download/guarded' ) ) && is_file( $root . 'download/guarded/a.pdf' ) && is_file( $root . 'download/guarded/.htaccess' ) );
+mkdir( $root . 'download/outer/inner', 0777, true );
+file_put_contents( $root . 'download/outer/inner/.htaccess', 'deny' );
+check( 'deleting a folder with a dot-file anywhere inside is refused', is_wp_error( $fs->delete( 'download/outer' ) ) && is_file( $root . 'download/outer/inner/.htaccess' ) );
+
 finish();

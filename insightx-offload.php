@@ -2,12 +2,12 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.50
+ * Version:     0.2.51
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
  * Domain Path: /languages
- * Description: Offload media to S3-compatible storage (Minio, Amazon S3, Cloudflare R2, DigitalOcean Spaces) with URL rewriting, provider switching/migration, Assets Pull (serve CSS/JS through a CDN), bulk tools and diagnostics — by InsightX
+ * Description: Offload WordPress media and server folders to S3-compatible storage, with CDN delivery, provider migration, File Manager, automatic PDF compression and background jobs — by InsightX
  * License:     GPLv3 or later
  *
  * Copyright (C) 2026 InsightX. Original work — not derived from any third-party plugin.
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.50' );
+define( 'ISXM_PLUGIN_VERSION', '0.2.51' );
 
 /*
  * GitHub update checker.

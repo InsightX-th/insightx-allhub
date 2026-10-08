@@ -224,6 +224,8 @@ function wp_remote_request( $url, $args = array() ) {
 	return $response;
 }
 function wp_remote_retrieve_header( $r, $name ) { return is_array( $r ) && isset( $r['headers'][ strtolower( $name ) ] ) ? (string) $r['headers'][ strtolower( $name ) ] : ''; }
+// Administrator unless a test says otherwise ($GLOBALS['isxm_t']['not_admin'] = true).
+function current_user_can( $cap ) { return empty( $GLOBALS['isxm_t']['not_admin'] ); }
 function size_format( $bytes, $decimals = 0 ) { return number_format( $bytes / 1024, $decimals ) . ' KB'; }
 function wp_remote_retrieve_response_code( $r ) { return is_array( $r ) ? (int) $r['response']['code'] : ''; }
 function wp_remote_retrieve_body( $r ) { return is_array( $r ) ? (string) $r['body'] : ''; }

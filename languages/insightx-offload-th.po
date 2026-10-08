@@ -11,8 +11,8 @@ msgstr ""
 "X-Domain: insightx-offload\n"
 
 #: header
-msgid "Offload media to S3-compatible storage (Minio, Amazon S3, Cloudflare R2, DigitalOcean Spaces) with URL rewriting, provider switching/migration, Assets Pull (serve CSS/JS through a CDN), bulk tools and diagnostics — by InsightX"
-msgstr "Offload media ไปยัง S3-compatible storage (Minio, Amazon S3, Cloudflare R2, DigitalOcean Spaces) พร้อมระบบ URL rewrite, เปลี่ยน/ย้าย provider, Assets Pull (เสิร์ฟ CSS/JS ผ่าน CDN), bulk tools และ diagnostic — โดย InsightX"
+msgid "Offload WordPress media and server folders to S3-compatible storage, with CDN delivery, provider migration, File Manager, automatic PDF compression and background jobs — by InsightX"
+msgstr "จัดเก็บสื่อ WordPress และโฟลเดอร์บนเซิร์ฟเวอร์บน S3-compatible storage พร้อมเสิร์ฟผ่าน CDN ย้ายผู้ให้บริการ จัดการไฟล์ ย่อ PDF อัตโนมัติ และงานเบื้องหลัง — โดย InsightX"
 
 #: insightx-offload.php:154
 msgid "InsightX Storage is still active — both plugins share the same data (options / postmeta / ledger table) and must never run together. Please <strong>deactivate InsightX Storage</strong> first, then re-activate InsightX Offload. All existing data is picked up immediately, nothing needs to be offloaded again."
@@ -372,8 +372,8 @@ msgid "Media delivery cannot be tested until storage connects successfully — s
 msgstr "ไม่สามารถทดสอบการเสิร์ฟ media ได้จนกว่าจะเชื่อมต่อ storage สำเร็จ — ดูหัวข้อ \"การตั้งค่าจัดเก็บไฟล์\" ด้านซ้าย"
 
 #: includes/class-isxm-admin.php:194
-msgid "Offload media to S3-compatible storage (Minio · S3 · R2 · Spaces) + provider migration"
-msgstr "Offload media ไปยัง S3-compatible storage (Minio · S3 · R2 · Spaces) + ย้าย provider"
+msgid "Media and server folders on cloud storage, with CDN delivery, File Manager and PDF compression"
+msgstr "จัดเก็บสื่อและโฟลเดอร์บนคลาวด์ พร้อมเสิร์ฟผ่าน CDN จัดการไฟล์ และย่อ PDF"
 
 #: includes/class-isxm-admin.php:206
 msgid "Offload Status"
@@ -2262,3 +2262,7 @@ msgstr "ย่อจาก %1$s เหลือ %2$s"
 #: includes/class-isxm-file-manager-admin.php
 msgid "recorded as uploaded"
 msgstr "บันทึกว่าขึ้นแล้ว"
+
+#: includes/class-isxm-file-manager.php
+msgid "This file or folder is private to the server (configuration, backups, logs) and is not available here."
+msgstr "ไฟล์หรือโฟลเดอร์นี้เป็นของเซิร์ฟเวอร์ (การตั้งค่า, backup, log) เปิดจากที่นี่ไม่ได้"

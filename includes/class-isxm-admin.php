@@ -212,7 +212,7 @@ class ISXM_Admin {
                         </div>
                         <div>
                             <h1><?php esc_html_e( 'InsightX Offload', 'insightx-offload' ); ?></h1>
-                            <p class="isxs-tagline"><?php esc_html_e( 'Offload media to S3-compatible storage (Minio · S3 · R2 · Spaces) + provider migration', 'insightx-offload' ); ?></p>
+                            <p class="isxs-tagline"><?php esc_html_e( 'Media and server folders on cloud storage, with CDN delivery, File Manager and PDF compression', 'insightx-offload' ); ?></p>
                         </div>
                     </div>
 

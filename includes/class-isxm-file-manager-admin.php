@@ -347,12 +347,16 @@ class ISXM_File_Manager_Admin {
             case 'check':
                 // Only files this user can see may be looked up on the bucket.
                 $file   = $fs->resolve( $path );
+                if ( ! is_wp_error( $file ) && $fs->readable( $file ) !== true ) $file = $fs->readable( $file );
                 $result = is_wp_error( $file ) ? $file : ( is_file( $file ) ? ISXM_Tools::server_file_status( $fs->normalize( $path ), true ) : new WP_Error( 'isxfm_not_file', __( 'File not found.', 'insightx-offload' ) ) );
                 break;
             case 'compress':
                 // Heavy (Ghostscript), so administrators only — see the guard above.
                 $file = $fs->resolve( $path );
                 if ( is_wp_error( $file ) ) { $result = $file; break; }
+                // Rewrites the file in place: same rules as any other change.
+                $ok = $fs->changeable( $file );
+                if ( is_wp_error( $ok ) ) { $result = $ok; break; }
                 $result = ( is_file( $file ) && strtolower( substr( $file, -4 ) ) === '.pdf' )
                     ? ISXM_Tools::compress_pdf_file( $fs->normalize( $path ) )
                     : new WP_Error( 'isxfm_not_pdf', __( 'Not a PDF file.', 'insightx-offload' ) );
@@ -403,7 +407,7 @@ class ISXM_File_Manager_Admin {
         if ( ! ISXM_File_Manager_Access::can( 'download' ) ) wp_die( esc_html__( 'You do not have permission to do this.', 'insightx-offload' ), 403 );
         $fs   = $this->fs();
         $file = $fs->resolve( isset( $_GET['path'] ) ? (string) wp_unslash( $_GET['path'] ) : '' );
-        if ( is_wp_error( $file ) || ! is_file( $file ) ) wp_die( esc_html__( 'File not found.', 'insightx-offload' ), 404 );
+        if ( is_wp_error( $file ) || ! is_file( $file ) || $fs->readable( $file ) !== true ) wp_die( esc_html__( 'File not found.', 'insightx-offload' ), 404 );
         $name   = basename( $file );
         $ext    = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
         $inline = ! empty( $_GET['inline'] ) && isset( self::INLINE_TYPES[ $ext ] );

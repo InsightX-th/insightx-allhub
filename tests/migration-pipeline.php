@@ -841,6 +841,37 @@ foreach ( glob( $mf_dir . '*' ) as $f ) @unlink( $f ); @rmdir( $mf_dir );
 delete_option( ISXM_Tools::SERVER_MANIFEST );
 proc_terminate( $fake ); @unlink( $fake_log );
 
+group( 'Only administrators widen the Offload card or shrink PDFs automatically' );
+migration_fixture( 0 );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_sec_' . getmypid() . '.jsonl';
+$fake_port = 30000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn ); ISXM_Settings::flush_cache();
+$sec_puts = function () use ( $fake_log ) { $n = 0; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { if ( json_decode( $line, true )['method'] === 'PUT' ) $n++; } return $n; };
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+$set( [ 'offload_enabled' => true, 'offload_server_folders' => 'download/Chosen/', 'pdf_auto' => true, 'pdf_folders' => 'download/Chosen/' ] );
+wp_mkdir_p( ABSPATH . 'download/Chosen/' ); wp_mkdir_p( ABSPATH . 'download/Other/' ); wp_mkdir_p( ABSPATH . 'wp-content/updraft/' );
+file_put_contents( ABSPATH . 'download/Other/x.pdf', 'x' );
+file_put_contents( ABSPATH . 'download/Chosen/c.pdf', '%PDF-' . str_repeat( 'c', 995 ) );
+file_put_contents( ABSPATH . 'wp-content/updraft/backup-db.gz', 'db' );
+$GLOBALS['isxm_t']['not_admin'] = true;
+t( 'Not an administrator: a file outside the chosen folders does not go up…', ISXM_Tools::offload_server_file( [], 'download/Other/x.pdf' ) === [] && $sec_puts() === 0 );
+t( '…and the Offload card is not changed', ISXM_Settings::server_folders() === [ 'download/Chosen/' ] );
+$GLOBALS['isxm_t']['filters']['isxs_pdf_runner'] = function () { return function () { return 0; }; };
+t( 'Not an administrator: PDFs are not shrunk automatically', ISXM_Tools::auto_compress_pdf( [], 'download/Chosen/c.pdf' ) === [] && filesize( ABSPATH . 'download/Chosen/c.pdf' ) === 1000 );
+t( '…but a file inside a chosen folder still goes up', count( ISXM_Tools::offload_server_file( [], 'download/Chosen/c.pdf' ) ) === 1 && $sec_puts() === 1 );
+unset( $GLOBALS['isxm_t']['not_admin'], $GLOBALS['isxm_t']['filters']['isxs_pdf_runner'] );
+t( 'Administrator: a backup folder is never added (and its files do not go up)', ISXM_Tools::offload_server_file( [], 'wp-content/updraft/backup-db.gz' ) === [] && ISXM_Settings::server_folders() === [ 'download/Chosen/' ] && $sec_puts() === 1 );
+t( 'Ghostscript is stopped after a time limit when `timeout` exists', strpos( ISXM_Pdf::command( 'gs', 'in.pdf', 'out.pdf', 150, '/usr/bin/timeout' ), "'/usr/bin/timeout' -k 5 60 'gs'" ) === 0 && strpos( ISXM_Pdf::command( 'gs', 'in.pdf', 'out.pdf', 150, '' ), "'gs'" ) === 0 );
+foreach ( [ 'download/Chosen/c.pdf', 'download/Other/x.pdf', 'wp-content/updraft/backup-db.gz' ] as $f ) @unlink( ABSPATH . $f );
+@rmdir( ABSPATH . 'download/Chosen' ); @rmdir( ABSPATH . 'download/Other' ); @rmdir( ABSPATH . 'wp-content/updraft' );
+$set( [ 'pdf_auto' => false, 'pdf_folders' => '' ] );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];

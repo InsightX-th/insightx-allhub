@@ -619,6 +619,9 @@ class ISXM_Tools {
         $notes    = (array) $notes;
         $relative = ltrim( (string) $relative, '/' );
         if ( ! ISXM_Settings::get( 'pdf_auto' ) || strtolower( substr( $relative, -4 ) ) !== '.pdf' ) return $notes;
+        // Ghostscript only ever sees PDFs from administrators: a crafted PDF
+        // is how its past sandbox escapes were triggered.
+        if ( ! current_user_can( 'manage_options' ) ) return $notes;
         $backup = (string) ISXM_Settings::get( 'pdf_backup' );
         if ( $backup !== '' && strpos( $relative, $backup ) === 0 ) return $notes;
         $inside = false;
@@ -684,7 +687,16 @@ class ISXM_Tools {
         if ( ! ISXM_Settings::get( 'offload_enabled' ) || ! is_file( ABSPATH . $relative ) ) return $notes;
         if ( preg_match( '#(^|/)\.#', $relative ) || self::server_path_blocked( $relative ) ) return $notes;
 
-        $added = self::add_server_folder_for( $relative );
+        // Only administrators widen the Offload card. Anyone else's file goes
+        // up only when it is inside a folder already chosen there — a file
+        // dropped into wp-content/updraft/ must not send every backup there
+        // to a public bucket.
+        $chosen = false;
+        foreach ( ISXM_Settings::server_folders() as $folder ) {
+            if ( strpos( $relative, $folder ) === 0 ) { $chosen = true; break; }
+        }
+        $added = $chosen || ! current_user_can( 'manage_options' ) ? '' : self::add_server_folder_for( $relative );
+        if ( ! $chosen && $added === '' && strpos( $relative, '/' ) !== false ) return $notes;
         if ( $added !== '' ) {
             /* translators: %s: folder, e.g. download/. */
             $notes[] = sprintf( __( 'added %s to the Offload media card', 'insightx-offload' ), $added );
@@ -785,6 +797,8 @@ class ISXM_Tools {
         if ( count( $parts ) <= $depth ) return '';
         $new = implode( '/', array_slice( $parts, 0, $depth ) ) . '/';
         if ( self::server_folder_path( $new ) === '' ) return '';
+        // Backups, caches and logs are never added on their own.
+        if ( preg_match( '#(backup|updraft|cache|upgrade|logs?/)#i', $new ) ) return '';
         $kept = array_values( array_filter( $folders, function ( $f ) use ( $new ) { return strpos( $f, $new ) !== 0; } ) );
         $kept[] = $new;
         $settings = ISXM_Settings::all();

@@ -41,10 +41,24 @@ class ISXM_Pdf {
         return trim( (string) ( $out[0] ?? '' ) );
     }
 
+    /** Seconds one PDF may take before Ghostscript is stopped. */
+    const TIMEOUT = 60;
+
+    /** Path of coreutils `timeout`, or "" (then Ghostscript runs unbounded). */
+    public static function timeout_bin() {
+        foreach ( [ '/usr/bin/timeout', '/bin/timeout', '/usr/local/bin/timeout', '/opt/homebrew/bin/gtimeout' ] as $path ) {
+            if ( @is_executable( $path ) ) return $path;
+        }
+        return '';
+    }
+
     /** The Ghostscript command line that writes $in shrunk to $out. */
-    public static function command( $gs, $in, $out, $dpi ) {
-        $preset = self::PRESETS[ (int) $dpi ] ?? self::PRESETS[150];
-        return escapeshellarg( $gs ) . ' -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -dCompatibilityLevel=1.5'
+    public static function command( $gs, $in, $out, $dpi, $timeout = null ) {
+        $preset  = self::PRESETS[ (int) $dpi ] ?? self::PRESETS[150];
+        $timeout = $timeout ?? self::timeout_bin();
+        // A PDF that makes Ghostscript loop must not hold a PHP worker forever.
+        $prefix  = $timeout !== '' ? escapeshellarg( $timeout ) . ' -k 5 ' . self::TIMEOUT . ' ' : '';
+        return $prefix . escapeshellarg( $gs ) . ' -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -dCompatibilityLevel=1.5'
             . ' -dPDFSETTINGS=' . $preset . ' -sOutputFile=' . escapeshellarg( $out ) . ' ' . escapeshellarg( $in ) . ' 2>&1';
     }
 

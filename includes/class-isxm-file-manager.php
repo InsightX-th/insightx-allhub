@@ -154,9 +154,59 @@ class ISXM_File_Manager {
     public function changeable( $absolute ) {
         $ok = $this->writable( $absolute );
         if ( is_wp_error( $ok ) ) return $ok;
+        $ok = $this->readable( $absolute );
+        if ( is_wp_error( $ok ) ) return $ok;
         if ( rtrim( $absolute, '/' ) . '/' === $this->jail ) return $this->error( 'protected' );
+        // Scripts and dot-files (.htaccess, .user.ini …) are the site's own:
+        // never renamed, moved or deleted from here.
         $name = $this->valid_name( basename( $absolute ) );
-        return is_wp_error( $name ) && $name->get_error_code() === 'isxfm_executable' ? $this->error( 'protected' ) : true;
+        if ( is_wp_error( $name ) && in_array( $name->get_error_code(), [ 'isxfm_executable', 'isxfm_hidden_name' ], true ) ) return $this->error( 'protected' );
+        return true;
+    }
+
+    /** Never shown, read or downloaded: credentials, backups, logs. */
+    const SECRET_EXT = [ 'sql', 'sqlite', 'sqlite3', 'db', 'bak', 'log', 'key', 'pem', 'p12', 'pfx' ];
+
+    /** Folder names (any part of them) that hold backups: UpdraftPlus, BackWPup, WPvivid, Duplicator, All-in-One WP Migration … */
+    const SECRET_DIRS = [ 'backup', 'updraft', 'backwpup', 'wpvivid', 'duplicator', 'ai1wm' ];
+
+    /**
+     * May this path be shown, read or downloaded? Not wp-config*, nothing
+     * hidden (.env, .git/, .htaccess), no database dumps or keys, nothing
+     * inside a backup folder (wp-content/updraft/, ai1wm-backups/,
+     * insightx-backup/ … any folder named *backup*).
+     *
+     * @return true|WP_Error
+     */
+    public function readable( $absolute ) {
+        // Callers pass resolved paths; anything else is resolved through its
+        // parent first so the root prefix always matches.
+        if ( strpos( $absolute, rtrim( $this->root, '/' ) ) !== 0 ) {
+            $parent = realpath( dirname( $absolute ) );
+            if ( $parent === false ) return $this->error( 'not_found' );
+            $absolute = $parent . '/' . basename( $absolute );
+        }
+        $relative = strtolower( $this->relative( $absolute ) );
+        if ( $relative === '' ) return true;
+        $parts = explode( '/', $relative );
+        $name  = end( $parts );
+        $backup_dir = function ( $part ) {
+            foreach ( self::SECRET_DIRS as $word ) {
+                if ( strpos( $part, $word ) !== false ) return true;
+            }
+            return false;
+        };
+        foreach ( $parts as $i => $part ) {
+            if ( $part !== '' && $part[0] === '.' ) return $this->error( 'secret' );
+            // Folder names only: a file called "backup-guide.pdf" is fine.
+            if ( $i < count( $parts ) - 1 && $backup_dir( $part ) ) return $this->error( 'secret' );
+        }
+        if ( is_dir( $absolute ) && $backup_dir( $name ) ) return $this->error( 'secret' );
+        if ( strpos( $name, 'wp-config' ) === 0 ) return $this->error( 'secret' );
+        foreach ( array_slice( explode( '.', $name ), 1 ) as $ext ) {
+            if ( in_array( $ext, self::SECRET_EXT, true ) ) return $this->error( 'secret' );
+        }
+        return true;
     }
 
     /**
@@ -168,12 +218,15 @@ class ISXM_File_Manager {
         $dir = $this->resolve( $relative );
         if ( is_wp_error( $dir ) ) return $dir;
         if ( ! is_dir( $dir ) ) return $this->error( 'not_dir' );
+        $ok = $this->readable( $dir );
+        if ( is_wp_error( $ok ) ) return $ok;
         $base  = $this->relative( $dir );
         $dirs  = [];
         $files = [];
         foreach ( (array) scandir( $dir ) as $name ) {
             if ( $name === '' || $name[0] === '.' ) continue;
             $path  = $dir . '/' . $name;
+            if ( $this->readable( $path ) !== true ) continue;
             $entry = $this->entry( $path, $name );
             if ( isset( $entry['size'] ) ) $files[] = $entry; else $dirs[] = $entry;
         }
@@ -208,11 +261,12 @@ class ISXM_File_Manager {
             $stop = microtime( true ) + $seconds;
             $iter = new RecursiveIteratorIterator( new RecursiveCallbackFilterIterator(
                 new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
-                function ( $item ) { return strpos( $item->getFilename(), '.' ) !== 0; }
+                function ( $item ) { return strpos( $item->getFilename(), '.' ) !== 0 && ( ! $item->isDir() || $this->readable( $item->getPathname() ) === true ); }
             ), RecursiveIteratorIterator::SELF_FIRST, RecursiveIteratorIterator::CATCH_GET_CHILD );
             foreach ( $iter as $item ) {
                 if ( count( $items ) >= $limit || microtime( true ) > $stop ) { $truncated = true; break; }
                 if ( mb_stripos( $item->getFilename(), $query, 0, 'UTF-8' ) === false ) continue;
+                if ( $this->readable( $item->getPathname() ) !== true ) continue;
                 $items[] = $this->entry( $item->getPathname(), $item->getFilename() );
             }
         }
@@ -283,6 +337,7 @@ class ISXM_File_Manager {
         if ( is_wp_error( $path ) ) return $path;
         $ok = $this->changeable( $path );
         if ( is_wp_error( $ok ) ) return $ok;
+        if ( $this->holds_hidden( $path ) ) return $this->error( 'protected' );
         $files = $this->files_in( $path );
         if ( ! $this->remove( $path ) ) return $this->error( 'failed' );
         return [ 'notes' => $this->removed( $files ) ];
@@ -345,6 +400,7 @@ class ISXM_File_Manager {
         foreach ( $items as $name ) {
             $ok = $this->changeable( $dir . '/' . $name );
             if ( is_wp_error( $ok ) ) return $ok;
+            if ( $this->holds_hidden( $dir . '/' . $name ) ) return $this->error( 'protected' );
         }
         $files = $this->files_in( $dir );
         foreach ( $items as $name ) {
@@ -401,6 +457,16 @@ class ISXM_File_Manager {
         // New names first (they go up), then the old ones are let go.
         $notes = $this->written( $this->files_in( $to ) );
         return [ 'path' => $this->relative( $to ), 'notes' => array_values( array_unique( array_merge( $notes, $this->removed( $old ) ) ) ) ];
+    }
+
+    /** Does a folder hold a dot-file anywhere below it (.htaccess guarding uploads …)? */
+    private function holds_hidden( $path ) {
+        if ( is_link( $path ) || ! is_dir( $path ) ) return false;
+        $iter = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::SELF_FIRST );
+        foreach ( $iter as $item ) {
+            if ( strpos( $item->getFilename(), '.' ) === 0 ) return true;
+        }
+        return false;
     }
 
     /** Root-relative paths of a file, or of every file under a folder. */
@@ -463,6 +529,7 @@ class ISXM_File_Manager {
             'markup'      => __( 'HTML and SVG files can only be added by administrators.', 'insightx-offload' ),
             'read_only'   => __( 'File changes are turned off on this site (DISALLOW_FILE_MODS).', 'insightx-offload' ),
             'protected'   => __( 'This location holds the site\'s code and can only be viewed.', 'insightx-offload' ),
+            'secret'      => __( 'This file or folder is private to the server (configuration, backups, logs) and is not available here.', 'insightx-offload' ),
             'exists'      => __( 'A file or folder with that name already exists.', 'insightx-offload' ),
             'into_itself' => __( 'A folder cannot be moved into itself.', 'insightx-offload' ),
             'failed'      => __( 'The server could not complete this. Check folder permissions.', 'insightx-offload' ),

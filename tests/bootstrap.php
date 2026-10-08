@@ -163,6 +163,12 @@ function is_serialized( $data, $strict = true ) {
 
 // ---------- Options / transients ----------
 function get_option( $key, $default = false ) {
+	// Tests can run code at the moment an option is read (e.g. a concurrent write).
+	if ( isset( $GLOBALS['isxm_t']['on_get_option'][ $key ] ) ) {
+		$cb = $GLOBALS['isxm_t']['on_get_option'][ $key ];
+		unset( $GLOBALS['isxm_t']['on_get_option'][ $key ] ); // once
+		$cb();
+	}
 	return array_key_exists( $key, $GLOBALS['isxm_t']['options'] ) ? $GLOBALS['isxm_t']['options'][ $key ] : $default;
 }
 function update_option( $key, $value, $autoload = null ) {
@@ -217,7 +223,7 @@ function wp_remote_request( $url, $args = array() ) {
 	}
 	return $response;
 }
-function wp_remote_retrieve_header( $r, $name ) { return ''; }
+function wp_remote_retrieve_header( $r, $name ) { return is_array( $r ) && isset( $r['headers'][ strtolower( $name ) ] ) ? (string) $r['headers'][ strtolower( $name ) ] : ''; }
 function size_format( $bytes, $decimals = 0 ) { return number_format( $bytes / 1024, $decimals ) . ' KB'; }
 function wp_remote_retrieve_response_code( $r ) { return is_array( $r ) ? (int) $r['response']['code'] : ''; }
 function wp_remote_retrieve_body( $r ) { return is_array( $r ) ? (string) $r['body'] : ''; }

@@ -557,9 +557,11 @@
           api("check", { path: row.path })
             .then((d) => {
               if (d.exists) {
-                $out.addClass("is-ok").text(t.foundOn.replace("%1$s", d.destination).replace("%2$s", sizeText(d.size))).append(
+                $out.addClass("is-ok").text(t.foundOn.replace("%1$s", d.destination).replace("%2$s", sizeText(d.size)) + (d.healed ? " · " + t.healed : "")).append(
                   " · ", $('<a target="_blank" rel="noopener">').attr("href", d.url).text(t.openOnBucket)
                 );
+                // Fixed a missing record: refresh so the cloud icon shows.
+                if (d.healed) load(state.search ? state.search.path : state.path, row.path);
               } else {
                 $out.addClass("is-error").text(t.notFoundOn.replace("%s", d.destination));
               }

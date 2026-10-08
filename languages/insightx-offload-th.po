@@ -2258,3 +2258,7 @@ msgstr "ย่อไม่ได้: %s"
 #: includes/class-isxm-tools.php
 msgid "shrunk from %1$s to %2$s"
 msgstr "ย่อจาก %1$s เหลือ %2$s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "recorded as uploaded"
+msgstr "บันทึกว่าขึ้นแล้ว"

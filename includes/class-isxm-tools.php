@@ -566,8 +566,7 @@ class ISXM_Tools {
                 // uploads it later.
                 $put = ( new ISXM_Client() )->put_object( $relative, $path, 'application/pdf', (bool) ISXM_Settings::get( 'send_public_acl' ) );
                 if ( ! is_wp_error( $put ) ) {
-                    $manifest[ $relative ] = (int) @filemtime( $path );
-                    update_option( self::SERVER_MANIFEST, $manifest, false );
+                    self::manifest_merge( [ $relative => (int) @filemtime( $path ) ] );
                     $result['uploaded'] = true;
                 }
             }
@@ -699,10 +698,7 @@ class ISXM_Tools {
             array_unshift( $notes, sprintf( __( 'Not on %1$s yet: %2$s (retried on the next hourly check)', 'insightx-offload' ), self::destination_label(), $result->get_error_message() ) );
             return $notes;
         }
-        $manifest              = self::server_manifest();
-        $manifest[ $relative ] = (int) @filemtime( ABSPATH . $relative );
-        update_option( self::SERVER_MANIFEST, $manifest, false );
-        delete_transient( self::SERVER_STATS );
+        self::manifest_merge( [ $relative => (int) @filemtime( ABSPATH . $relative ) ] );
         /* translators: %s: destination, e.g. "Cloudflare R2 · bucket shop". */
         array_unshift( $notes, sprintf( __( 'Uploaded to %s', 'insightx-offload' ), self::destination_label() ) );
         return $notes;
@@ -726,9 +722,7 @@ class ISXM_Tools {
             $notes[] = sprintf( __( 'still on %1$s: %2$s', 'insightx-offload' ), self::destination_label(), $done->get_error_message() );
             return $notes;
         }
-        unset( $manifest[ $relative ] );
-        update_option( self::SERVER_MANIFEST, $manifest, false );
-        delete_transient( self::SERVER_STATS );
+        self::manifest_merge( [], [ $relative ] );
         /* translators: %s: destination. */
         $note = sprintf( __( 'removed from %s', 'insightx-offload' ), self::destination_label() );
         if ( ! in_array( $note, $notes, true ) ) $notes[] = $note;
@@ -749,12 +743,22 @@ class ISXM_Tools {
      * Is a server file on the destination bucket right now? Asks the
      * bucket itself (HEAD), so it answers "where did my file go?".
      *
-     * @return array|WP_Error {destination, key, exists, size?, modified?, url}
+     * @return array|WP_Error {destination, key, exists, size?, modified?, url, healed}
      */
-    public static function server_file_status( $relative ) {
+    public static function server_file_status( $relative, $heal = false ) {
         $key  = ltrim( (string) $relative, '/' );
         $head = ( new ISXM_Client() )->head_object( $key );
         if ( is_wp_error( $head ) ) return $head;
+        // On the bucket with the server copy's exact size but missing from
+        // the manifest (an entry lost to a concurrent write): record it, so
+        // the cloud icon, bucket URL and delete-on-bucket work again.
+        $head['healed'] = false;
+        $local = ABSPATH . $key;
+        if ( $heal && ! empty( $head['exists'] ) && is_file( $local ) && (int) $head['size'] === (int) filesize( $local )
+            && (int) ( self::server_manifest()[ $key ] ?? -1 ) !== (int) filemtime( $local ) ) {
+            self::manifest_merge( [ $key => (int) filemtime( $local ) ] );
+            $head['healed'] = true;
+        }
         return array_merge( $head, [
             'destination' => self::destination_label(),
             'key'         => $key,
@@ -824,6 +828,7 @@ class ISXM_Tools {
         $acl     = (bool) ISXM_Settings::get( 'send_public_acl' );
         $processed = 0; $errors = [];
         $manifest  = self::server_manifest();
+        $changed   = [];
 
         while ( $index < count( $folders ) && microtime( true ) - $started < $budget ) {
             // New or changed files only, after the cursor.
@@ -837,7 +842,7 @@ class ISXM_Tools {
                 if ( is_wp_error( $result ) ) {
                     $errors[] = $relative . ': ' . $result->get_error_message();
                 } else {
-                    $manifest[ $relative ] = (int) @filemtime( ABSPATH . $relative );
+                    $manifest[ $relative ] = $changed[ $relative ] = (int) @filemtime( ABSPATH . $relative );
                 }
                 $processed++;
                 $after = $relative;
@@ -847,10 +852,10 @@ class ISXM_Tools {
 
         // Saved before anything else can go wrong: a later failure must not
         // send these files up again.
-        if ( $processed ) {
-            update_option( self::SERVER_MANIFEST, $manifest, false );
-            delete_transient( self::SERVER_STATS );
-        }
+        // Only what this batch uploaded is added: writing back the whole
+        // snapshot read at the start lost files File Manager recorded while
+        // the batch was running (on the bucket, yet "not uploaded").
+        if ( $changed ) self::manifest_merge( $changed );
 
         $uploaded_all = $index >= count( $folders );
         // Inside the Offload run the caller sequences the rewrite itself.
@@ -1014,6 +1019,21 @@ class ISXM_Tools {
     const SERVER_MANIFEST = 'isxs_server_manifest';
     /** Cached per-folder counts for the header Offload Status panel. */
     const SERVER_STATS = 'isxs_server_folder_stats';
+
+    /**
+     * Adds and removes manifest entries against its latest stored value, so
+     * two requests writing at once do not drop each other's entries. The
+     * per-request option cache is skipped: a long batch would otherwise
+     * read its own stale copy.
+     */
+    public static function manifest_merge( array $set, array $unset = [] ) {
+        wp_cache_delete( self::SERVER_MANIFEST, 'options' );
+        $manifest = self::server_manifest();
+        foreach ( $unset as $key ) unset( $manifest[ $key ] );
+        foreach ( $set as $key => $mtime ) $manifest[ $key ] = (int) $mtime;
+        update_option( self::SERVER_MANIFEST, $manifest, false );
+        delete_transient( self::SERVER_STATS );
+    }
 
     /** @return array<string,int> */
     public static function server_manifest() {

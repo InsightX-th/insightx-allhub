@@ -789,6 +789,58 @@ delete_option( ISXM_Tools::SERVER_MANIFEST ); delete_option( ISXM_Tools::PDF_DON
 $set( [ 'pdf_backup' => '' ] );
 proc_terminate( $fake ); @unlink( $fake_log );
 
+group( 'Manifest: no lost entries, and "Check on the bucket" repairs them' );
+migration_fixture( 0 );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+update_option( ISXM_Tools::SERVER_MANIFEST, [ 'a/1.pdf' => 1, 'a/2.pdf' => 2 ] );
+ISXM_Tools::manifest_merge( [ 'a/3.pdf' => 3, 'a/1.pdf' => 10 ], [ 'a/2.pdf' ] );
+t( 'manifest_merge adds, updates and removes only what it is given', ISXM_Tools::server_manifest() === [ 'a/1.pdf' => 10, 'a/3.pdf' => 3 ], json_encode( ISXM_Tools::server_manifest() ) );
+
+// A batch that started before File Manager recorded a file must not drop it.
+$mf_dir = ABSPATH . 'download/MF/';
+wp_mkdir_p( $mf_dir );
+file_put_contents( $mf_dir . 'batch.pdf', 'b' );
+$set( [ 'offload_server_folders' => 'download/MF/', 'offload_enabled' => true ] );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_mf_' . getmypid() . '.jsonl';
+$fake_port = 29000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn ); ISXM_Settings::flush_cache();
+// The batch checks its stop signal before each upload — after it has read the
+// manifest. That is when another request (File Manager) records its file.
+$GLOBALS['isxm_t']['on_get_option'][ ISXM_Job::SIGNAL_PREFIX . 'offload_folders' ] = function () {
+    ISXM_Tools::manifest_merge( [ 'download/MF/from-file-manager.pdf' => 123 ] );
+};
+$batch = new ReflectionMethod( 'ISXM_Tools', 'batch_offload_folders' );
+if ( PHP_VERSION_ID < 80100 ) $batch->setAccessible( true );
+$batch->invoke( new ISXM_Tools(), '0|', false );
+t( 'A folder batch keeps an entry another request recorded meanwhile, and adds its own', ( ISXM_Tools::server_manifest()['download/MF/from-file-manager.pdf'] ?? 0 ) === 123 && isset( ISXM_Tools::server_manifest()['download/MF/batch.pdf'] ), json_encode( ISXM_Tools::server_manifest() ) );
+$prev_provider = $GLOBALS['isxm_t']['http_provider'] ?? null;
+
+// Heal: on the bucket with the same size, but missing from the manifest.
+file_put_contents( $mf_dir . 'lost.pdf', str_repeat( 'l', 1234 ) );
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) {
+    if ( strpos( $url, 'missing.pdf' ) !== false ) return [ 'response' => [ 'code' => 404 ], 'body' => '' ];
+    return [ 'response' => [ 'code' => 200 ], 'body' => '', 'headers' => [ 'content-length' => strpos( $url, 'other-size' ) !== false ? '99' : '1234' ] ];
+};
+$st = ISXM_Tools::server_file_status( 'download/MF/lost.pdf', true );
+t( '"Check on the bucket" records a file it finds there with the same size', $st['exists'] && $st['healed'] === true && ISXM_Tools::server_manifest()['download/MF/lost.pdf'] === filemtime( $mf_dir . 'lost.pdf' ), json_encode( $st ) );
+t( '…once (a second check changes nothing)', ISXM_Tools::server_file_status( 'download/MF/lost.pdf', true )['healed'] === false );
+file_put_contents( $mf_dir . 'other-size.pdf', str_repeat( 'o', 1234 ) );
+t( 'A different size on the bucket is not recorded', ISXM_Tools::server_file_status( 'download/MF/other-size.pdf', true )['healed'] === false && ! isset( ISXM_Tools::server_manifest()['download/MF/other-size.pdf'] ) );
+file_put_contents( $mf_dir . 'missing.pdf', 'm' );
+t( 'Not on the bucket: nothing recorded', ISXM_Tools::server_file_status( 'download/MF/missing.pdf', true )['exists'] === false && ! isset( ISXM_Tools::server_manifest()['download/MF/missing.pdf'] ) );
+t( 'Without heal it only looks', ( function () use ( $mf_dir ) { file_put_contents( $mf_dir . 'look.pdf', str_repeat( 'k', 1234 ) ); $r = ISXM_Tools::server_file_status( 'download/MF/look.pdf' ); return $r['healed'] === false && ! isset( ISXM_Tools::server_manifest()['download/MF/look.pdf'] ); } )() );
+
+$GLOBALS['isxm_t']['http_provider'] = $prev_provider;
+if ( $prev_provider === null ) unset( $GLOBALS['isxm_t']['http_provider'] );
+foreach ( glob( $mf_dir . '*' ) as $f ) @unlink( $f ); @rmdir( $mf_dir );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+proc_terminate( $fake ); @unlink( $fake_log );
+
 group( 'Source folder picker' );
 migration_fixture( 2 );
 $seen = [];

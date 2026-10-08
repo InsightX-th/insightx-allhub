@@ -167,6 +167,7 @@ class ISXM_File_Manager_Admin {
                 /* translators: %s: destination. */
                 'notFoundOn'    => __( 'Not found on %s', 'insightx-offload' ),
                 'openOnBucket'  => __( 'Open the bucket copy', 'insightx-offload' ),
+                'healed'        => __( 'recorded as uploaded', 'insightx-offload' ),
                 'no'            => __( 'No', 'insightx-offload' ),
                 'user'          => __( 'User', 'insightx-offload' ),
                 'folder'        => __( 'Folder', 'insightx-offload' ),
@@ -346,7 +347,7 @@ class ISXM_File_Manager_Admin {
             case 'check':
                 // Only files this user can see may be looked up on the bucket.
                 $file   = $fs->resolve( $path );
-                $result = is_wp_error( $file ) ? $file : ( is_file( $file ) ? ISXM_Tools::server_file_status( $fs->normalize( $path ) ) : new WP_Error( 'isxfm_not_file', __( 'File not found.', 'insightx-offload' ) ) );
+                $result = is_wp_error( $file ) ? $file : ( is_file( $file ) ? ISXM_Tools::server_file_status( $fs->normalize( $path ), true ) : new WP_Error( 'isxfm_not_file', __( 'File not found.', 'insightx-offload' ) ) );
                 break;
             case 'compress':
                 // Heavy (Ghostscript), so administrators only — see the guard above.

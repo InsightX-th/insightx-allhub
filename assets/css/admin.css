@@ -1963,6 +1963,7 @@
 
 /* ---- tree ---- */
 .isxs-fm-tree {
+  user-select: none;
   border-right: 1px solid var(--isxs-line);
   background: var(--isxs-bg);
   padding: 8px 6px;
@@ -2575,4 +2576,44 @@
 }
 .isxs-fm-info td {
   word-break: break-all;
+}
+
+.isxs-fm-dest {
+  display: block;
+  margin-top: 2px;
+}
+.isxs-fm-dest strong {
+  color: var(--isxs-ink);
+}
+.isxs-fm-check {
+  margin-top: 14px;
+}
+.isxs-fm-check .isxs-btn {
+  padding: 6px 14px;
+}
+.isxs-fm-check-out {
+  margin: 8px 0 0;
+  font-size: 13px;
+  word-break: break-all;
+}
+.isxs-fm-check-out.is-ok {
+  color: #067a56;
+}
+.isxs-fm-check-out.is-error {
+  color: var(--isxs-danger);
+}
+.isxs-fm-check-out code {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--isxs-muted);
+}
+
+.isxs-fm-warn {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--isxs-danger-soft);
+  color: var(--isxs-danger);
+  font-size: 12.5px;
 }

@@ -2063,3 +2063,66 @@ msgstr "เพิ่ม %s ในการ์ด Offload media แล้ว"
 #: includes/class-isxm-tools.php
 msgid "Files on this server. Files added outside the Media Library go to the bucket at once while Offload Media is on."
 msgstr "ไฟล์บนเซิร์ฟเวอร์ ไฟล์ที่เพิ่มนอก Media Library จะขึ้น provider ทันทีเมื่อเปิด Offload Media"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Uploaded to %s"
+msgstr "ขึ้น %s แล้ว"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Not on %1$s yet: %2$s (retried on the next hourly check)"
+msgstr "ยังไม่ขึ้น %1$s: %2$s (ระบบจะลองใหม่ในรอบตรวจรายชั่วโมง)"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "%1$s · bucket %2$s"
+msgstr "%1$s · bucket %2$s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Destination: %s"
+msgstr "ปลายทาง: %s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Offload Media is off"
+msgstr "ปิด Offload Media อยู่"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Check on the bucket"
+msgstr "ตรวจใน bucket"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Checking…"
+msgstr "กำลังตรวจ…"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "On %1$s · %2$s"
+msgstr "อยู่ใน %1$s · %2$s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Not found on %s"
+msgstr "ไม่พบใน %s"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Open the bucket copy"
+msgstr "เปิดไฟล์ใน bucket"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Bucket URL"
+msgstr "URL บน bucket"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Server URL"
+msgstr "URL บนเซิร์ฟเวอร์"
+
+
+#: includes/class-isxm-tools.php
+msgid "still on %1$s: %2$s"
+msgstr "ยังค้างใน %1$s: %2$s"
+
+#: includes/class-isxm-tools.php
+msgid "removed from %s"
+msgstr "ลบใน %s แล้ว"
+
+
+#: includes/class-isxm-tools.php
+msgid "Files on %s are deleted too; links to them will stop working."
+msgstr "ไฟล์ใน %s จะถูกลบด้วย ลิงก์ที่ชี้ไปไฟล์เหล่านี้จะเปิดไม่ได้"
+

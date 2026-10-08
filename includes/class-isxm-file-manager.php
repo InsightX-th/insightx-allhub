@@ -277,13 +277,15 @@ class ISXM_File_Manager {
         return $this->relocate( $from, $to );
     }
 
-    /** @return true|WP_Error */
+    /** @return array|WP_Error {notes} */
     public function delete( $relative ) {
         $path = $this->item( $relative );
         if ( is_wp_error( $path ) ) return $path;
         $ok = $this->changeable( $path );
         if ( is_wp_error( $ok ) ) return $ok;
-        return $this->remove( $path ) ? true : $this->error( 'failed' );
+        $files = $this->files_in( $path );
+        if ( ! $this->remove( $path ) ) return $this->error( 'failed' );
+        return [ 'notes' => $this->removed( $files ) ];
     }
 
     /**
@@ -344,10 +346,11 @@ class ISXM_File_Manager {
             $ok = $this->changeable( $dir . '/' . $name );
             if ( is_wp_error( $ok ) ) return $ok;
         }
+        $files = $this->files_in( $dir );
         foreach ( $items as $name ) {
             if ( ! $this->remove( $dir . '/' . $name ) ) return $this->error( 'failed' );
         }
-        return true;
+        return [ 'notes' => $this->removed( $files ) ];
     }
 
     /** @return true|WP_Error Every name under $path could have been made here by hand. */
@@ -393,8 +396,11 @@ class ISXM_File_Manager {
     private function relocate( $from, $to ) {
         if ( is_wp_error( $to ) ) return $to;
         if ( file_exists( $to ) || is_link( $to ) ) return $this->error( 'exists' );
+        $old = $this->files_in( $from );
         if ( ! @rename( $from, $to ) ) return $this->error( 'failed' );
-        return [ 'path' => $this->relative( $to ), 'notes' => $this->written( $this->files_in( $to ) ) ];
+        // New names first (they go up), then the old ones are let go.
+        $notes = $this->written( $this->files_in( $to ) );
+        return [ 'path' => $this->relative( $to ), 'notes' => array_values( array_unique( array_merge( $notes, $this->removed( $old ) ) ) ) ];
     }
 
     /** Root-relative paths of a file, or of every file under a folder. */
@@ -419,6 +425,20 @@ class ISXM_File_Manager {
         $notes = [];
         foreach ( $files as $file ) {
             $notes = (array) apply_filters( 'isxfm_file_written', $notes, $file );
+        }
+        return array_values( array_unique( array_map( 'strval', $notes ) ) );
+    }
+
+    /**
+     * Tells other plugins (InsightX Offload) which files are gone from
+     * these paths, so their bucket copies can go too.
+     *
+     * @return string[]
+     */
+    private function removed( array $files ) {
+        $notes = [];
+        foreach ( $files as $file ) {
+            $notes = (array) apply_filters( 'isxfm_file_removed', $notes, $file );
         }
         return array_values( array_unique( array_map( 'strval', $notes ) ) );
     }

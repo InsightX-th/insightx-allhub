@@ -17,6 +17,18 @@ $line = json_encode( array(
 ) );
 file_put_contents( getenv( 'ISXM_FAKE_S3_LOG' ), $line . "\n", FILE_APPEND | LOCK_EX );
 
+// HEAD: 200 with the size if this key was PUT earlier, else 404.
+if ( $_SERVER['REQUEST_METHOD'] === 'HEAD' ) {
+	$size = null;
+	foreach ( file( getenv( 'ISXM_FAKE_S3_LOG' ) ) as $logged ) {
+		$row = json_decode( $logged, true );
+		if ( $row['method'] === 'PUT' && $row['uri'] === $_SERVER['REQUEST_URI'] ) $size = $row['size'];
+	}
+	http_response_code( $size === null ? 404 : 200 );
+	if ( $size !== null ) header( 'Content-Length: ' . $size );
+	return true;
+}
+
 if ( strpos( $_SERVER['REQUEST_URI'], 'deny-' ) !== false ) {
 	http_response_code( 403 );
 	echo '<?xml version="1.0"?><Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>';

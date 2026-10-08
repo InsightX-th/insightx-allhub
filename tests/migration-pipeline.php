@@ -577,24 +577,39 @@ wp_mkdir_p( ABSPATH . 'download/Other/' ); file_put_contents( ABSPATH . 'downloa
 file_put_contents( ISXM_TEST_UPLOADS . '/fm.jpg', 'j' );
 $set( [ 'offload_enabled' => true, 'offload_server_folders' => 'download/FM Spec/' ] );
 set_transient( ISXM_Tools::SERVER_STATS, [ 'stale' ], 300 );
+$up_note = 'Uploaded to ' . ISXM_Tools::destination_label();
 $notes = ISXM_Tools::offload_server_file( [], 'download/FM Spec/JBL PartyBox.pdf' );
 t( 'A file in a chosen folder is uploaded under its own path', count( $fm_puts() ) === 1 && substr( $fm_puts()[0], -strlen( 'download/FM Spec/JBL PartyBox.pdf' ) ) === 'download/FM Spec/JBL PartyBox.pdf', json_encode( $fm_puts() ) );
 t( '…recorded in the manifest with its mtime, stats cache dropped', ( ISXM_Tools::server_manifest()['download/FM Spec/JBL PartyBox.pdf'] ?? 0 ) === filemtime( $fm_dir . 'JBL PartyBox.pdf' ) && get_transient( ISXM_Tools::SERVER_STATS ) === false );
-t( '…and the toast says so', $notes === [ 'Uploaded to the bucket' ], json_encode( $notes ) );
+t( '…and the toast names where it went (provider · bucket)', $notes === [ $up_note ] && strpos( $up_note, ' · bucket ' ) !== false, json_encode( $notes ) );
+$heads = [];
+$prev_provider = $GLOBALS['isxm_t']['http_provider'] ?? null;
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$heads ) {
+    $heads[] = [ 'url' => $url, 'args' => $args ];
+    return [ 'response' => [ 'code' => strpos( $url, 'never-sent' ) !== false ? 404 : 200 ], 'body' => '' ];
+};
+$st = ISXM_Tools::server_file_status( 'download/FM Spec/JBL PartyBox.pdf' );
+$head = end( $heads );
+t( '"Check on the bucket" asks the bucket with HEAD for that key', $head && $head['args']['method'] === 'HEAD' && strpos( $head['url'], '/download/FM%20Spec/JBL%20PartyBox.pdf' ) !== false, json_encode( $head ) );
+t( '…finds it, with its key and bucket URL', ! is_wp_error( $st ) && $st['exists'] === true && $st['key'] === 'download/FM Spec/JBL PartyBox.pdf' && substr( $st['url'], -strlen( 'download/FM%20Spec/JBL%20PartyBox.pdf' ) ) === 'download/FM%20Spec/JBL%20PartyBox.pdf', json_encode( $st ) );
+$st = ISXM_Tools::server_file_status( 'download/never-sent.pdf' );
+t( '…and says so when a file is not there', ! is_wp_error( $st ) && $st['exists'] === false && $st['destination'] === ISXM_Tools::destination_label(), json_encode( $st ) );
+$GLOBALS['isxm_t']['http_provider'] = $prev_provider;
+if ( $prev_provider === null ) unset( $GLOBALS['isxm_t']['http_provider'] );
 t( 'So the hourly watch has nothing left for it', ISXM_Tools::server_pending_files( 'download/FM Spec/' ) === [] );
 $GLOBALS['isxm_t']['cron'] = [];
 $notes = ISXM_Tools::offload_server_file( [], 'download/Other/o.pdf' );
 t( 'A file outside the chosen folders goes up too…', count( $fm_puts() ) === 2 && isset( ISXM_Tools::server_manifest()['download/Other/o.pdf'] ) );
 t( '…and its top folder replaces the chosen sub-folder on the Offload card', ISXM_Settings::server_folders() === [ 'download/' ], json_encode( ISXM_Settings::server_folders() ) );
-t( '…which the toast says', $notes === [ 'Uploaded to the bucket', 'added download/ to the Offload media card' ], json_encode( $notes ) );
+t( '…which the toast says', $notes === [ $up_note, 'added download/ to the Offload media card' ], json_encode( $notes ) );
 t( '…and the hourly watch is now scheduled', (bool) wp_next_scheduled( ISXM_Tools::WATCH_HOOK ) );
-t( 'A second file there adds nothing more', ISXM_Tools::offload_server_file( [], 'download/FM Spec/JBL PartyBox.pdf' ) === [ 'Uploaded to the bucket' ] && ISXM_Settings::server_folders() === [ 'download/' ] );
+t( 'A second file there adds nothing more', ISXM_Tools::offload_server_file( [], 'download/FM Spec/JBL PartyBox.pdf' ) === [ $up_note ] && ISXM_Settings::server_folders() === [ 'download/' ] );
 wp_mkdir_p( ABSPATH . 'wp-content/files/' ); file_put_contents( ABSPATH . 'wp-content/files/w.pdf', 'w' );
 ISXM_Tools::offload_server_file( [], 'wp-content/files/w.pdf' );
 t( 'Under wp-content/ the folder below it is added, not wp-content/ itself', ISXM_Settings::server_folders() === [ 'download/', 'wp-content/files/' ], json_encode( ISXM_Settings::server_folders() ) );
 file_put_contents( ABSPATH . 'robots-fm.txt', 'r' );
 $puts_before = count( $fm_puts() );
-t( 'A file at the site root goes up but adds no folder (its links stay on the site)', ISXM_Tools::offload_server_file( [], 'robots-fm.txt' ) === [ 'Uploaded to the bucket' ] && count( $fm_puts() ) === $puts_before + 1 && count( ISXM_Settings::server_folders() ) === 2 );
+t( 'A file at the site root goes up but adds no folder (its links stay on the site)', ISXM_Tools::offload_server_file( [], 'robots-fm.txt' ) === [ $up_note ] && count( $fm_puts() ) === $puts_before + 1 && count( ISXM_Settings::server_folders() ) === 2 );
 t( 'A Media Library file is left alone (it goes up as an attachment)', ISXM_Tools::offload_server_file( [], ISXM_Settings::uploads_relative() . 'fm.jpg' ) === [] && count( $fm_puts() ) === $puts_before + 1 );
 wp_mkdir_p( ABSPATH . 'wp-content/plugins/zz/' ); file_put_contents( ABSPATH . 'wp-content/plugins/zz/a.txt', 'a' );
 t( 'Site code is left alone', ISXM_Tools::offload_server_file( [], 'wp-content/plugins/zz/a.txt' ) === [] && count( ISXM_Settings::server_folders() ) === 2 );
@@ -613,6 +628,55 @@ $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isx
 @unlink( ABSPATH . 'wp-content/plugins/zz/a.txt' ); @rmdir( ABSPATH . 'wp-content/plugins/zz' ); @unlink( ABSPATH . 'newtop/n.pdf' ); @rmdir( ABSPATH . 'newtop' );
 $GLOBALS['isxm_t']['cron'] = [];
 delete_option( ISXM_Tools::SERVER_MANIFEST );
+proc_terminate( $fake ); @unlink( $fake_log );
+
+group( 'File Manager deletes reach the bucket' );
+if ( ! function_exists( 'site_url' ) ) { function site_url( $path = '' ) { return home_url( $path ); } }
+$fake_log  = sys_get_temp_dir() . '/isxm_fake_s3_rm_' . getmypid() . '.jsonl';
+$fake_port = 27000 + ( getmypid() % 1000 );
+@unlink( $fake_log );
+$fake = proc_open( [ PHP_BINARY, '-S', "127.0.0.1:$fake_port", __DIR__ . '/fake-s3.php' ],
+    [ 0 => [ 'pipe', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $pipes, null, [ 'ISXM_FAKE_S3_LOG' => $fake_log ] );
+for ( $i = 0; $i < 50 && ! @fsockopen( '127.0.0.1', $fake_port ); $i++ ) usleep( 100000 );
+migration_fixture( 0 );
+$conn = get_option( 'isxs_connections' ); $conn['custom']['endpoint'] = "http://127.0.0.1:$fake_port"; update_option( 'isxs_connections', $conn ); ISXM_Settings::flush_cache();
+$rm_puts = function () use ( $fake_log ) { $o = []; foreach ( is_file( $fake_log ) ? file( $fake_log ) : [] as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $o[] = rawurldecode( $row['uri'] ); } return $o; };
+$calls = [];
+$prev_provider = $GLOBALS['isxm_t']['http_provider'] ?? null;
+$delete_code = 204;
+$GLOBALS['isxm_t']['http_provider'] = function ( $url, $args ) use ( &$calls, &$delete_code ) {
+    $calls[] = [ 'method' => $args['method'] ?? 'GET', 'url' => rawurldecode( $url ) ];
+    return [ 'response' => [ 'code' => ( $args['method'] ?? '' ) === 'DELETE' ? $delete_code : 200 ], 'body' => '' ];
+};
+$deletes = function () use ( &$calls ) { return array_values( array_map( function ( $c ) { return $c['url']; }, array_filter( $calls, function ( $c ) { return $c['method'] === 'DELETE'; } ) ) ); };
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+$rm_dir = ABSPATH . 'download/RM/';
+wp_mkdir_p( $rm_dir );
+$set( [ 'offload_enabled' => true, 'offload_server_folders' => 'download/RM/', 'remove_local' => false, 'persist_urls' => true, 'deliver_enabled' => false ] );
+$label = ISXM_Tools::destination_label();
+
+update_option( ISXM_Tools::SERVER_MANIFEST, [ 'download/RM/up.pdf' => 1 ] );
+$notes = ISXM_Tools::forget_server_file( [], 'download/RM/up.pdf' );
+t( 'Deleting a file this plugin uploaded deletes its bucket copy', count( $deletes() ) === 1 && substr( $deletes()[0], -strlen( '/download/RM/up.pdf' ) ) === '/download/RM/up.pdf', json_encode( $calls ) );
+t( '…forgets it, and says where', ! isset( ISXM_Tools::server_manifest()['download/RM/up.pdf'] ) && $notes === [ 'removed from ' . $label ], json_encode( $notes ) );
+$calls = [];
+t( 'A file it never uploaded is not touched on the bucket', ISXM_Tools::forget_server_file( [ 'x' ], 'download/RM/other.pdf' ) === [ 'x' ] && $deletes() === [] );
+update_option( ISXM_Tools::SERVER_MANIFEST, [ 'download/RM/up.pdf' => 1 ] );
+$delete_code = 403;
+$notes = ISXM_Tools::forget_server_file( [], 'download/RM/up.pdf' );
+t( 'Bucket delete failing: still remembered, and the toast says it is still there', isset( ISXM_Tools::server_manifest()['download/RM/up.pdf'] ) && strpos( $notes[0] ?? '', 'still on ' . $label ) === 0, json_encode( $notes ) );
+$delete_code = 204;
+
+file_put_contents( $rm_dir . 'kept.pdf', 'k' );
+$set( [ 'remove_local' => true, 'persist_urls' => true ] );
+ISXM_Tools::offload_server_file( [], 'download/RM/kept.pdf' );
+t( 'Remove Local Media does not touch files outside the Media Library', is_file( $rm_dir . 'kept.pdf' ) && isset( ISXM_Tools::server_manifest()['download/RM/kept.pdf'] ) );
+
+$GLOBALS['isxm_t']['http_provider'] = $prev_provider;
+if ( $prev_provider === null ) unset( $GLOBALS['isxm_t']['http_provider'] );
+foreach ( glob( $rm_dir . '*' ) as $f ) @unlink( $f ); @rmdir( $rm_dir );
+delete_option( ISXM_Tools::SERVER_MANIFEST );
+$set( [ 'remove_local' => false ] );
 proc_terminate( $fake ); @unlink( $fake_log );
 
 group( 'Source folder picker' );

@@ -18,7 +18,7 @@ $outside = sys_get_temp_dir() . '/isxfm_outside';
 @symlink( $outside, $root . 'download/escape' );
 check( 'a symlink out of the root is refused', code_of( $fs->resolve( 'download/escape' ) ) === 'isxfm_bad_path' );
 check( 'nothing can be uploaded through it', code_of( $fs->upload( 'download/escape', 'a.pdf', $tmp(), false, $copy ) ) === 'isxfm_bad_path' );
-check( 'deleting it removes the link, not the target', $fs->delete( 'download/escape' ) === true && ! is_link( $root . 'download/escape' ) && is_dir( $outside ) );
+check( 'deleting it removes the link, not the target', ! is_wp_error( $fs->delete( 'download/escape' ) ) && ! is_link( $root . 'download/escape' ) && is_dir( $outside ) );
 
 group( 'The site\'s code can only be viewed' );
 check( 'no upload into wp-admin/', code_of( $fs->upload( 'wp-admin', 'x.pdf', $tmp(), false, $copy ) ) === 'isxfm_protected' );
@@ -81,7 +81,7 @@ check( 'nothing can be moved into wp-content/plugins/', code_of( $fs->move( 'dow
 file_put_contents( $root . 'download/ADAM AUDIO/deep.pdf', 'd' );
 mkdir( $root . 'download/ADAM AUDIO/sub' );
 file_put_contents( $root . 'download/ADAM AUDIO/sub/x.pdf', 'x' );
-check( 'delete a folder with everything in it', $fs->delete( 'download/ADAM AUDIO' ) === true && ! file_exists( $root . 'download/ADAM AUDIO' ) );
+check( 'delete a folder with everything in it', ! is_wp_error( $fs->delete( 'download/ADAM AUDIO' ) ) && ! file_exists( $root . 'download/ADAM AUDIO' ) );
 check( 'deleting a missing item says not found', code_of( $fs->delete( 'download/ADAM AUDIO' ) ) === 'isxfm_not_found' );
 check( 'the root itself cannot be deleted', code_of( $fs->delete( '' ) ) === 'isxfm_bad_path' );
 
@@ -169,7 +169,7 @@ $d1 = $fs->duplicate( 'download/ADAM AUDIO/old.pdf' );
 $d2 = $fs->duplicate( 'download/ADAM AUDIO/old.pdf' );
 check( 'duplicate names: "old copy.pdf", then "old copy 2.pdf"', $d1['path'] === 'download/ADAM AUDIO/old copy.pdf' && $d2['path'] === 'download/ADAM AUDIO/old copy 2.pdf' );
 check( 'a folder duplicates as "… copy"', $fs->duplicate( 'download/ADAM AUDIO' )['path'] === 'download/ADAM AUDIO copy' );
-check( 'empty a folder: contents gone, folder kept', $fs->empty_dir( 'download/ADAM AUDIO' ) === true && is_dir( $root . 'download/ADAM AUDIO' ) && scandir( $root . 'download/ADAM AUDIO' ) === [ '.', '..' ] );
+check( 'empty a folder: contents gone, folder kept', ! is_wp_error( $fs->empty_dir( 'download/ADAM AUDIO' ) ) && is_dir( $root . 'download/ADAM AUDIO' ) && scandir( $root . 'download/ADAM AUDIO' ) === [ '.', '..' ] );
 file_put_contents( $root . 'download/ADAM AUDIO/a.pdf', 'a' );
 file_put_contents( $root . 'download/ADAM AUDIO/z.php', '<?php' );
 check( 'a folder holding a script is not emptied at all', code_of( $fs->empty_dir( 'download/ADAM AUDIO' ) ) === 'isxfm_protected' && is_file( $root . 'download/ADAM AUDIO/a.pdf' ) );
@@ -197,5 +197,28 @@ foreach ( [ 'a.html', 'a.HTM', 'logo.svg', 'a.svg.pdf' ] as $bad ) {
 check( '…on upload too', code_of( $plain->upload( 'download', 'x.svg', $tmp(), false, $copy ) ) === 'isxfm_markup' );
 check( '…and renaming a PDF to .html', code_of( $plain->rename( 'download/readme.txt', 'readme.html' ) ) === 'isxfm_markup' );
 check( 'other files are fine for them', $plain->valid_name( 'spec.pdf' ) === true && ! is_wp_error( $plain->make_file( 'download', 'notes.txt' ) ) );
+
+group( 'Removed files are reported (so their bucket copies go too)' );
+$root = fresh_root();
+$fs   = new ISXM_File_Manager( $root, false );
+$gone = []; $made = [];
+add_filter( 'isxfm_file_removed', function ( $notes, $file ) use ( &$gone ) { $gone[] = $file; $notes[] = 'gone ' . $file; return $notes; } );
+add_filter( 'isxfm_file_written', function ( $notes, $file ) use ( &$made ) { $made[] = $file; return $notes; } );
+mkdir( $root . 'download/Specification/ADAM AUDIO/sub' );
+file_put_contents( $root . 'download/Specification/ADAM AUDIO/sub/s.pdf', 's' );
+$r = $fs->delete( 'download/Specification/ADAM AUDIO/old.pdf' );
+check( 'deleting a file reports it, and its notes come back', $gone === [ 'download/Specification/ADAM AUDIO/old.pdf' ] && $r['notes'] === [ 'gone download/Specification/ADAM AUDIO/old.pdf' ] );
+file_put_contents( $root . 'download/Specification/ADAM AUDIO/old.pdf', 'pdf' );
+$gone = []; $made = [];
+$fs->rename( 'download/Specification/ADAM AUDIO', 'ADAM' );
+check( 'renaming a folder: new paths written, old paths removed', $made === [ 'download/Specification/ADAM/old.pdf', 'download/Specification/ADAM/sub/s.pdf' ] && $gone === [ 'download/Specification/ADAM AUDIO/old.pdf', 'download/Specification/ADAM AUDIO/sub/s.pdf' ], json_encode( [ $made, $gone ] ) );
+$gone = [];
+$fs->move( 'download/Specification/ADAM/old.pdf', 'download' );
+check( 'moving a file removes its old path', $gone === [ 'download/Specification/ADAM/old.pdf' ] );
+$gone = [];
+$fs->empty_dir( 'download/Specification/ADAM' );
+check( 'emptying a folder reports every file that was in it', $gone === [ 'download/Specification/ADAM/sub/s.pdf' ] );
+$gone = [];
+check( 'a refused delete reports nothing', is_wp_error( $fs->delete( 'index.php' ) ) && $gone === [] );
 
 finish();

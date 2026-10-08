@@ -265,6 +265,25 @@ class ISXM_Client {
      * @param string $acl Canned ACL value, e.g. 'private' or 'public-read'.
      * @return true|WP_Error
      */
+    /**
+     * Is this object on the bucket? HEAD, no body.
+     *
+     * @return array|WP_Error {exists, size?, modified?, code?}
+     */
+    public function head_object( $key ) {
+        $response = $this->request_with_retry( 'HEAD', $key );
+        if ( is_wp_error( $response ) ) return $response;
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        // Without ListBucket permission S3 answers a missing key with 403.
+        if ( $code === 404 || $code === 403 ) return [ 'exists' => false, 'code' => $code ];
+        if ( $code !== 200 ) return new WP_Error( 'isxs_http_' . $code, sprintf( 'HTTP %d', $code ) );
+        return [
+            'exists'   => true,
+            'size'     => (int) wp_remote_retrieve_header( $response, 'content-length' ),
+            'modified' => (string) wp_remote_retrieve_header( $response, 'last-modified' ),
+        ];
+    }
+
     public function set_object_acl( $key, $acl = 'private' ) {
         $response = $this->request( 'PUT', $key, [
             'query'   => [ 'acl' => '' ],

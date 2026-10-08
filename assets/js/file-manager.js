@@ -182,6 +182,7 @@
   ];
 
   const isDir = (r) => r.size === undefined;
+  const permText = (r) => (r.writable ? t.readWrite : t.readOnlyShort);
   const parentOf = (r) => r.path.slice(0, r.path.length - r.name.length).replace(/\/$/, "");
 
   const sortRows = (rows) => {
@@ -218,8 +219,8 @@
       const where = state.search ? '<small class="isxs-fm-where">/' + esc(parentOf(r)) + "</small>" : "";
       return '<tr data-path="' + esc(r.path) + '" class="' + (state.selected.has(r.path) ? "is-selected" : "") + '">' +
         '<td class="isxs-fm-name"><div>' + (isDir(r) ? folderSvg : fileSvg) + '<span class="isxs-fm-label"><span>' + esc(r.name) + "</span>" + where + "</span>" + (r.bucket ? cloudSvg : "") + "</div></td>" +
-        "<td>" + esc(r.writable ? t.readWrite : t.readOnlyShort) + "</td>" +
-        "<td>" + esc(dateText(r.mtime)) + "</td>" +
+        "<td>" + esc(permText(r)) + "</td>" +
+        "<td>" + esc(r.mtime ? dateText(r.mtime) : "—") + "</td>" +
         '<td class="is-num">' + (isDir(r) ? "—" : esc(sizeText(r.size))) + "</td>" +
         "<td>" + esc(kindOf(r)) + "</td></tr>";
     });
@@ -509,6 +510,9 @@
   const listHtml = (paths) => '<ul class="isxs-fm-list">' + paths.map((p) => "<li>" + esc(nameOf(p)) + "</li>").join("") + "</ul>";
   const PREVIEW = { image: ["jpg", "jpeg", "png", "gif", "webp", "avif"], frame: ["pdf", "txt", "csv", "log"], video: ["mp4", "webm"], audio: ["mp3", "wav"] };
   const previewKind = (name) => Object.keys(PREVIEW).find((k) => PREVIEW[k].includes(extOf(name)));
+  const urlOf = (base, path) => base + path.split("/").map(encodeURIComponent).join("/");
+  // A file on the bucket is linked there (the CDN domain); anything else on this server.
+  const publicUrl = (row) => urlOf(row.bucket && cfg.bucketUrl ? cfg.bucketUrl : cfg.siteUrl, row.path);
   const fileUrl = (path, inline) =>
     cfg.downloadUrl + "&_wpnonce=" + encodeURIComponent(cfg.nonce) + "&path=" + encodeURIComponent(path) + (inline ? "&inline=1" : "");
 
@@ -530,7 +534,7 @@
 
   const info = (row) => {
     const line = (k, v) => "<tr><th>" + esc(k) + "</th><td>" + v + "</td></tr>";
-    const url = cfg.siteUrl + row.path.split("/").map(encodeURIComponent).join("/");
+    const link = (u) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(u) + "</a>";
     modal({
       title: row.name,
       html: '<table class="isxs-fm-info">' +
@@ -538,12 +542,33 @@
         line(t.infoPath, "<code>/" + esc(row.path) + "</code>") +
         (isDir(row) ? "" : line(t.size, esc(sizeText(row.size)) + " (" + row.size.toLocaleString() + " B)")) +
         (row.mtime ? line(t.modified, esc(dateText(row.mtime))) : "") +
-        line(t.perm, esc(row.writable ? t.readWrite : t.readOnlyShort)) +
+        line(t.perm, esc(permText(row))) +
         (isDir(row) ? "" : line(t.infoBucket, esc(row.bucket ? t.yes : t.no))) +
-        line(t.infoUrl, '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + "</a>") +
-        "</table>",
+        (row.bucket && cfg.bucketUrl ? line(t.infoUrl, link(urlOf(cfg.bucketUrl, row.path))) : "") +
+        (row.path ? line(t.infoSiteUrl, link(urlOf(cfg.siteUrl, row.path))) : "") +
+        "</table>" +
+        (isDir(row) || !row.path ? "" : '<div class="isxs-fm-check"><button type="button" class="isxs-btn isxs-btn-ghost isxs-fm-check-btn">' + esc(t.checkBucket) + '</button><p class="isxs-fm-check-out"></p></div>'),
       ok: t.close,
       cancel: null,
+      onOpen: ($body) => {
+        $body.on("click", ".isxs-fm-check-btn", function () {
+          const $out = $body.find(".isxs-fm-check-out").removeClass("is-ok is-error").text(t.checking);
+          $(this).prop("disabled", true);
+          api("check", { path: row.path })
+            .then((d) => {
+              if (d.exists) {
+                $out.addClass("is-ok").text(t.foundOn.replace("%1$s", d.destination).replace("%2$s", sizeText(d.size))).append(
+                  " · ", $('<a target="_blank" rel="noopener">').attr("href", d.url).text(t.openOnBucket)
+                );
+              } else {
+                $out.addClass("is-error").text(t.notFoundOn.replace("%s", d.destination));
+              }
+              $out.append($("<code>").text(d.key));
+            })
+            .catch((e) => $out.addClass("is-error").text(e.message))
+            .finally(() => $(this).prop("disabled", false));
+        });
+      },
     });
   };
 
@@ -569,7 +594,7 @@
         if (state.search) return load(parentOf(one), one.path);
         return previewKind(one.name) ? preview(one) : can("download") && download(one.path);
       case "openTab":
-        return window.open(isDir(one) ? cfg.pageUrl + "&path=" + encodeURIComponent(one.path) : cfg.siteUrl + one.path.split("/").map(encodeURIComponent).join("/"), "_blank", "noopener");
+        return window.open(isDir(one) ? cfg.pageUrl + "&path=" + encodeURIComponent(one.path) : publicUrl(one), "_blank", "noopener");
       case "preview": return preview(one);
       case "info": return info(one || currentFolderRow());
       case "download": return download(picked[0]);
@@ -616,12 +641,14 @@
         return runEach(picked, "move", { to }, t.moved);
       }
       case "delete": {
-        const yes = await modal({ title: t.delete, html: "<p>" + esc(t.deleteAsk.replace("%d", picked.length)) + "</p>" + listHtml(picked), ok: t.delete, danger: true });
+        const onBucket = rows.some((r) => r.bucket) || rows.some((r) => isDir(r));
+        const warn = onBucket ? '<p class="isxs-fm-warn">' + esc(t.deleteBucket.replace("%s", t.destination)) + "</p>" : "";
+        const yes = await modal({ title: t.delete, html: "<p>" + esc(t.deleteAsk.replace("%d", picked.length)) + "</p>" + warn + listHtml(picked), ok: t.delete, danger: true });
         if (yes) runEach(picked, "delete", {}, t.deleted);
         return;
       }
       case "empty": {
-        const yes = await modal({ title: t.menu.empty, html: "<p>" + esc(t.emptyAsk.replace("%s", one.name)) + "</p>", ok: t.menu.empty, danger: true });
+        const yes = await modal({ title: t.menu.empty, html: "<p>" + esc(t.emptyAsk.replace("%s", one.name)) + '</p><p class="isxs-fm-warn">' + esc(t.deleteBucket.replace("%s", t.destination)) + "</p>", ok: t.menu.empty, danger: true });
         if (yes) runEach([one.path], "empty", {}, t.emptied);
         return;
       }
@@ -712,6 +739,22 @@
     if ($(e.target).closest("tbody tr[data-path], thead").length) return;
     openCtx(e, null);
   });
+  // Right-click a folder in the tree: open its parent with it picked, then
+  // show the same menu as for that row. The top folder gets the menu of the
+  // folder itself (upload, new file, paste …).
+  $("#isxs-fm-tree").on("contextmenu", ".isxs-fm-node-name", async function (e) {
+    e.preventDefault();
+    const at = { clientX: e.clientX, clientY: e.clientY, metaKey: false, ctrlKey: false, preventDefault() {} };
+    const path = $(this).closest("li").attr("data-path");
+    if (path === cfg.jail) {
+      await load(path);
+      return openCtx(at, null);
+    }
+    await load(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "", path);
+    const row = rowOf(path);
+    if (row) openCtx(at, row);
+  });
+
   $ctx.on("click", "button[data-op]", function () {
     const op = $(this).attr("data-op");
     const target = $ctx.data("target");

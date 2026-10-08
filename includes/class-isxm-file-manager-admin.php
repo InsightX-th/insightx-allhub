@@ -54,6 +54,7 @@ class ISXM_File_Manager_Admin {
             'start'       => $this->start_path( $fs ),
             'pageUrl'     => menu_page_url( self::SLUG, false ),
             'siteUrl'     => trailingslashit( site_url() ),
+            'bucketUrl'   => trailingslashit( ISXM_Settings::public_base_url() ),
             'can'         => $rules['actions'],
             'access'      => $admin ? $this->access_data() : null,
             'i18n'        => [
@@ -94,6 +95,9 @@ class ISXM_File_Manager_Admin {
                 'kind'          => __( 'Kind', 'insightx-offload' ),
                 'readWrite'     => __( 'read and write', 'insightx-offload' ),
                 'readOnlyShort' => __( 'read only', 'insightx-offload' ),
+                /* translators: %s: destination, e.g. "Cloudflare R2 · bucket shop". */
+                'deleteBucket'  => __( 'Files on %s are deleted too; links to them will stop working.', 'insightx-offload' ),
+                'destination'   => ISXM_Tools::destination_label(),
                 'kindFolder'    => __( 'Folder', 'insightx-offload' ),
                 /* translators: %s: file extension in capitals, e.g. PDF. */
                 'kindFile'      => __( '%s file', 'insightx-offload' ),
@@ -146,9 +150,17 @@ class ISXM_File_Manager_Admin {
                 'noPreview'     => __( 'This file type cannot be previewed. Download it instead.', 'insightx-offload' ),
                 'close'         => __( 'Close', 'insightx-offload' ),
                 'infoPath'      => __( 'Path', 'insightx-offload' ),
-                'infoUrl'       => __( 'URL', 'insightx-offload' ),
+                'infoUrl'       => __( 'Bucket URL', 'insightx-offload' ),
+                'infoSiteUrl'   => __( 'Server URL', 'insightx-offload' ),
                 'infoBucket'    => __( 'On the bucket', 'insightx-offload' ),
                 'yes'           => __( 'Yes', 'insightx-offload' ),
+                'checkBucket'   => __( 'Check on the bucket', 'insightx-offload' ),
+                'checking'      => __( 'Checking…', 'insightx-offload' ),
+                /* translators: 1: destination, 2: file size. */
+                'foundOn'       => __( 'On %1$s · %2$s', 'insightx-offload' ),
+                /* translators: %s: destination. */
+                'notFoundOn'    => __( 'Not found on %s', 'insightx-offload' ),
+                'openOnBucket'  => __( 'Open the bucket copy', 'insightx-offload' ),
                 'no'            => __( 'No', 'insightx-offload' ),
                 'user'          => __( 'User', 'insightx-offload' ),
                 'folder'        => __( 'Folder', 'insightx-offload' ),
@@ -179,7 +191,12 @@ class ISXM_File_Manager_Admin {
                         </div>
                         <div>
                             <h1><?php esc_html_e( 'File Manager', 'insightx-offload' ); ?></h1>
-                            <p class="isxs-tagline"><?php esc_html_e( 'Files on this server. Files added outside the Media Library go to the bucket at once while Offload Media is on.', 'insightx-offload' ); ?></p>
+                            <p class="isxs-tagline"><?php esc_html_e( 'Files on this server. Files added outside the Media Library go to the bucket at once while Offload Media is on.', 'insightx-offload' ); ?>
+                                <span class="isxs-fm-dest"><?php
+                                    /* translators: %s: destination, e.g. "Cloudflare R2 · bucket shop". */
+                                    printf( esc_html__( 'Destination: %s', 'insightx-offload' ), '<strong>' . esc_html( ISXM_Tools::destination_label() ) . '</strong>' );
+                                    if ( ! ISXM_Settings::get( 'offload_enabled' ) ) echo ' · ' . esc_html__( 'Offload Media is off', 'insightx-offload' );
+                                ?></span></p>
                         </div>
                     </div>
                 </div>
@@ -275,7 +292,7 @@ class ISXM_File_Manager_Admin {
     }
 
     /** The action each request needs; admin-only ops need manage_options. */
-    const OP_ACTION = [ 'list' => 'view', 'search' => 'view', 'mkdir' => 'mkdir', 'upload' => 'upload', 'rename' => 'rename', 'move' => 'move', 'delete' => 'delete',
+    const OP_ACTION = [ 'list' => 'view', 'search' => 'view', 'check' => 'view', 'mkdir' => 'mkdir', 'upload' => 'upload', 'rename' => 'rename', 'move' => 'move', 'delete' => 'delete',
         // A copy is new files, like an upload; emptying a folder is deleting.
         'copy' => 'upload', 'duplicate' => 'upload', 'mkfile' => 'upload', 'empty' => 'delete' ];
 
@@ -319,6 +336,11 @@ class ISXM_File_Manager_Admin {
                 break;
             case 'mkdir':
                 $result = $fs->make_dir( $path, $name );
+                break;
+            case 'check':
+                // Only files this user can see may be looked up on the bucket.
+                $file   = $fs->resolve( $path );
+                $result = is_wp_error( $file ) ? $file : ( is_file( $file ) ? ISXM_Tools::server_file_status( $fs->normalize( $path ) ) : new WP_Error( 'isxfm_not_file', __( 'File not found.', 'insightx-offload' ) ) );
                 break;
             case 'mkfile':
                 $result = $fs->make_file( $path, $name );

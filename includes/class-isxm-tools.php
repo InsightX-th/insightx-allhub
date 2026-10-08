@@ -79,6 +79,7 @@ class ISXM_Tools {
         add_action( 'wp_ajax_isxs_diagnostic', [ $this, 'ajax_diagnostic' ] );
         add_action( self::WATCH_HOOK, [ __CLASS__, 'watch_server_folders' ] );
         add_filter( 'isxfm_file_written', [ __CLASS__, 'offload_server_file' ], 10, 2 );
+        add_filter( 'isxfm_file_removed', [ __CLASS__, 'forget_server_file' ], 10, 2 );
         // Sites that already had folders and auto-offload on before this
         // version get their schedule without having to save again.
         add_action( 'admin_init', [ __CLASS__, 'sync_watch_schedule' ] );
@@ -497,16 +498,71 @@ class ISXM_Tools {
         $client = new ISXM_Client();
         $result = $client->put_object( $relative, ABSPATH . $relative, $type['type'] ?: 'application/octet-stream', (bool) ISXM_Settings::get( 'send_public_acl' ) );
         if ( is_wp_error( $result ) ) {
-            /* translators: %s: storage error. */
-            array_unshift( $notes, sprintf( __( 'Not on the bucket yet: %s (retried on the next hourly check)', 'insightx-offload' ), $result->get_error_message() ) );
+            /* translators: 1: destination, e.g. "Cloudflare R2 · bucket shop", 2: storage error. */
+            array_unshift( $notes, sprintf( __( 'Not on %1$s yet: %2$s (retried on the next hourly check)', 'insightx-offload' ), self::destination_label(), $result->get_error_message() ) );
             return $notes;
         }
         $manifest              = self::server_manifest();
         $manifest[ $relative ] = (int) @filemtime( ABSPATH . $relative );
         update_option( self::SERVER_MANIFEST, $manifest, false );
         delete_transient( self::SERVER_STATS );
-        array_unshift( $notes, __( 'Uploaded to the bucket', 'insightx-offload' ) );
+        /* translators: %s: destination, e.g. "Cloudflare R2 · bucket shop". */
+        array_unshift( $notes, sprintf( __( 'Uploaded to %s', 'insightx-offload' ), self::destination_label() ) );
         return $notes;
+    }
+
+    /**
+     * A File Manager delete / rename / move: the bucket copy of a file this
+     * plugin uploaded goes too, and it is forgotten. Keys it never uploaded
+     * are not touched. Filter `isxfm_file_removed`.
+     *
+     * @return string[]
+     */
+    public static function forget_server_file( $notes, $relative ) {
+        $notes    = (array) $notes;
+        $relative = ltrim( (string) $relative, '/' );
+        $manifest = self::server_manifest();
+        if ( ! isset( $manifest[ $relative ] ) ) return $notes;
+        $done = ( new ISXM_Client() )->delete_object( $relative );
+        if ( is_wp_error( $done ) ) {
+            /* translators: 1: destination, 2: storage error. */
+            $notes[] = sprintf( __( 'still on %1$s: %2$s', 'insightx-offload' ), self::destination_label(), $done->get_error_message() );
+            return $notes;
+        }
+        unset( $manifest[ $relative ] );
+        update_option( self::SERVER_MANIFEST, $manifest, false );
+        delete_transient( self::SERVER_STATS );
+        /* translators: %s: destination. */
+        $note = sprintf( __( 'removed from %s', 'insightx-offload' ), self::destination_label() );
+        if ( ! in_array( $note, $notes, true ) ) $notes[] = $note;
+        return $notes;
+    }
+
+    /** Where offloaded files go, for people: "Cloudflare R2 · bucket shop". */
+    public static function destination_label() {
+        $slug      = (string) ISXM_Settings::get( 'provider' );
+        $providers = ISXM_Connections::providers();
+        $label     = $providers[ $slug ]['label'] ?? $providers['custom']['label'];
+        $bucket    = (string) ( ISXM_Connections::get( $slug )['bucket'] ?? '' );
+        /* translators: 1: provider name, 2: bucket name. */
+        return $bucket === '' ? $label : sprintf( __( '%1$s · bucket %2$s', 'insightx-offload' ), $label, $bucket );
+    }
+
+    /**
+     * Is a server file on the destination bucket right now? Asks the
+     * bucket itself (HEAD), so it answers "where did my file go?".
+     *
+     * @return array|WP_Error {destination, key, exists, size?, modified?, url}
+     */
+    public static function server_file_status( $relative ) {
+        $key  = ltrim( (string) $relative, '/' );
+        $head = ( new ISXM_Client() )->head_object( $key );
+        if ( is_wp_error( $head ) ) return $head;
+        return array_merge( $head, [
+            'destination' => self::destination_label(),
+            'key'         => $key,
+            'url'         => ISXM_Settings::public_base_url() . '/' . implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) ),
+        ] );
     }
 
     /**

@@ -1817,7 +1817,9 @@
               .prop("checked", chosen.includes(folder))
               .on("change", (e) => setSelected(folder, e.currentTarget.checked))
               .appendTo($label);
-            $("<span class='isxs-tree-name'>").text("📁 " + folder.slice(prefix.length).replace(/\/$/, "")).appendTo($label);
+            // Same folder icon as the File Manager tree.
+            $label.append('<svg class="isxs-tree-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
+            $("<span class='isxs-tree-name'>").text(folder.slice(prefix.length).replace(/\/$/, "")).appendTo($label);
             if (media() && folder === media()) {
               $("<span class='isxs-folder-badge'>").text(cfg.i18n.folderMedia).appendTo($label);
             }

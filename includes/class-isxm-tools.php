@@ -78,6 +78,8 @@ class ISXM_Tools {
         add_action( 'wp_ajax_isxs_sync_orphan_cleanup', [ $this, 'ajax_sync_orphan_cleanup' ] );
         add_action( 'wp_ajax_isxs_diagnostic', [ $this, 'ajax_diagnostic' ] );
         add_action( self::WATCH_HOOK, [ __CLASS__, 'watch_server_folders' ] );
+        // Shrink first (priority 5), so the file that goes up is the small one.
+        add_filter( 'isxfm_file_written', [ __CLASS__, 'auto_compress_pdf' ], 5, 2 );
         add_filter( 'isxfm_file_written', [ __CLASS__, 'offload_server_file' ], 10, 2 );
         add_filter( 'isxfm_file_removed', [ __CLASS__, 'forget_server_file' ], 10, 2 );
         // Sites that already had folders and auto-offload on before this
@@ -117,7 +119,7 @@ class ISXM_Tools {
         $this->guard();
 
         $current = ISXM_Settings::all();
-        $bools   = [ 'offload_enabled', 'remove_local', 'persist_urls', 'use_prefix', 'use_year_month', 'use_object_version', 'deliver_enabled', 'force_https', 'assets_enabled', 'assets_force_https', 'source_use_year_month', 'use_type_folder', 'disable_thumbnails', 'letter_avatars' ];
+        $bools   = [ 'offload_enabled', 'remove_local', 'persist_urls', 'use_prefix', 'use_year_month', 'use_object_version', 'deliver_enabled', 'force_https', 'assets_enabled', 'assets_force_https', 'source_use_year_month', 'use_type_folder', 'disable_thumbnails', 'letter_avatars', 'pdf_auto' ];
 
         $settings = [];
         foreach ( $bools as $key ) {
@@ -552,6 +554,38 @@ class ISXM_Tools {
     public static function compress_pdf_file( $relative ) {
         $relative = ltrim( (string) $relative, '/' );
         $path     = ABSPATH . $relative;
+        $result   = self::shrink_pdf_local( $relative );
+        if ( is_wp_error( $result ) ) return $result;
+
+        $result['uploaded'] = false;
+        if ( $result['replaced'] ) {
+            $manifest = self::server_manifest();
+            if ( isset( $manifest[ $relative ] ) ) {
+                // Same key as before: the bucket copy is replaced. If this
+                // fails the manifest no longer matches, so the hourly watch
+                // uploads it later.
+                $put = ( new ISXM_Client() )->put_object( $relative, $path, 'application/pdf', (bool) ISXM_Settings::get( 'send_public_acl' ) );
+                if ( ! is_wp_error( $put ) ) {
+                    $manifest[ $relative ] = (int) @filemtime( $path );
+                    update_option( self::SERVER_MANIFEST, $manifest, false );
+                    $result['uploaded'] = true;
+                }
+            }
+            delete_transient( self::SERVER_STATS );
+        }
+        return $result;
+    }
+
+    /**
+     * The shrinking half of compress_pdf_file(), with no upload: original
+     * copied to the originals folder (when set), file replaced in place,
+     * remembered as done, bytes saved counted.
+     *
+     * @return array|WP_Error {replaced, before, after}
+     */
+    public static function shrink_pdf_local( $relative ) {
+        $relative = ltrim( (string) $relative, '/' );
+        $path     = ABSPATH . $relative;
         $dpi      = (int) ISXM_Settings::get( 'pdf_dpi' );
         $backup   = (string) ISXM_Settings::get( 'pdf_backup' );
         if ( ! is_file( $path ) ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-offload' ) );
@@ -569,24 +603,41 @@ class ISXM_Tools {
         $done[ $relative ] = [ (int) @filemtime( $path ), $dpi ];
         update_option( self::PDF_DONE, $done, false );
 
-        $result['uploaded'] = false;
         if ( $result['replaced'] ) {
             update_option( self::PDF_SAVED, (int) get_option( self::PDF_SAVED, 0 ) + $result['before'] - $result['after'], false );
-            $manifest = self::server_manifest();
-            if ( isset( $manifest[ $relative ] ) ) {
-                // Same key as before: the bucket copy is replaced. If this
-                // fails the manifest no longer matches, so the hourly watch
-                // uploads it later.
-                $put = ( new ISXM_Client() )->put_object( $relative, $path, 'application/pdf', (bool) ISXM_Settings::get( 'send_public_acl' ) );
-                if ( ! is_wp_error( $put ) ) {
-                    $manifest[ $relative ] = (int) @filemtime( $path );
-                    update_option( self::SERVER_MANIFEST, $manifest, false );
-                    $result['uploaded'] = true;
-                }
-            }
-            delete_transient( self::SERVER_STATS );
         }
         return $result;
+    }
+
+    /**
+     * "Shrink PDFs automatically": a PDF written through File Manager into
+     * one of the card's folders is shrunk before it goes up. Filter
+     * `isxfm_file_written`, priority 5 (before offload_server_file()).
+     *
+     * @return string[]
+     */
+    public static function auto_compress_pdf( $notes, $relative ) {
+        $notes    = (array) $notes;
+        $relative = ltrim( (string) $relative, '/' );
+        if ( ! ISXM_Settings::get( 'pdf_auto' ) || strtolower( substr( $relative, -4 ) ) !== '.pdf' ) return $notes;
+        $backup = (string) ISXM_Settings::get( 'pdf_backup' );
+        if ( $backup !== '' && strpos( $relative, $backup ) === 0 ) return $notes;
+        $inside = false;
+        foreach ( ISXM_Settings::pdf_folders() as $folder ) {
+            if ( strpos( $relative, $folder ) === 0 ) { $inside = true; break; }
+        }
+        if ( ! $inside ) return $notes;
+        if ( ISXM_Pdf::ghostscript() === '' && ! apply_filters( 'isxs_pdf_runner', null ) ) return $notes;
+
+        $result = self::shrink_pdf_local( $relative );
+        if ( is_wp_error( $result ) ) {
+            /* translators: %s: error. */
+            $notes[] = sprintf( __( 'not shrunk: %s', 'insightx-offload' ), $result->get_error_message() );
+        } elseif ( $result['replaced'] ) {
+            /* translators: 1: size before, 2: size after. */
+            $notes[] = sprintf( __( 'shrunk from %1$s to %2$s', 'insightx-offload' ), size_format( $result['before'], 1 ), size_format( $result['after'], 1 ) );
+        }
+        return $notes;
     }
 
     /** One batch of "Shrink PDFs". Cursor: the last path done. */

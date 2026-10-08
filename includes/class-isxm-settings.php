@@ -92,6 +92,7 @@ class ISXM_Settings {
             'offload_server_folders' => '',        // Server folders outside the Media Library uploaded as-is (relative to ABSPATH), comma-separated      // false = none of the picked folders is the uploads root: Migrate copies the extra folders only
             'pdf_folders'        => '',            // "Shrink PDFs": server folders to go through ("" = the Offload card's folders)
             'pdf_dpi'            => 150,           // 72 | 150 | 300 (ISXM_Pdf::PRESETS)
+            'pdf_auto'           => false,         // Shrink PDFs written through File Manager into those folders
             'pdf_backup'         => '',            // Folder the originals are copied into first; "" = no copy
         ];
     }

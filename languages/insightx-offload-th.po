@@ -2242,3 +2242,19 @@ msgstr "ไฟล์เล็กอยู่แล้ว ไม่ได้แ�
 #: includes/class-isxm-admin.php
 msgid "bucket copy replaced"
 msgstr "อัปทับใน bucket แล้ว"
+
+#: includes/class-isxm-tools.php
+msgid "Shrink automatically"
+msgstr "ย่ออัตโนมัติ"
+
+#: includes/class-isxm-tools.php
+msgid "PDFs uploaded, created or copied into the folders above through File Manager are shrunk before they go to storage. Needs Ghostscript"
+msgstr "PDF ที่อัปโหลด สร้าง หรือคัดลอกเข้าโฟลเดอร์ด้านบนผ่านหน้า จัดการไฟล์ จะถูกย่อก่อนขึ้น storage ต้องมี Ghostscript"
+
+#: includes/class-isxm-tools.php
+msgid "not shrunk: %s"
+msgstr "ย่อไม่ได้: %s"
+
+#: includes/class-isxm-tools.php
+msgid "shrunk from %1$s to %2$s"
+msgstr "ย่อจาก %1$s เหลือ %2$s"

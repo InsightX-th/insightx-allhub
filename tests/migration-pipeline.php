@@ -746,6 +746,41 @@ t( 'An originals folder inside an Offload folder is refused (it would go up)', i
 t( 'Site code is refused', is_wp_error( ISXM_Tools::check_pdf_backup( 'wp-content/plugins/x', '', '' ) ) );
 t( 'A folder elsewhere is fine; empty means no originals', ISXM_Tools::check_pdf_backup( 'pdf-originals', 'download/', 'download/' ) === 'pdf-originals/' && ISXM_Tools::check_pdf_backup( '', '', '' ) === '' );
 
+// Shrink automatically on File Manager writes (auto at priority 5, then offload at 10).
+$write = function ( $rel ) { return ISXM_Tools::offload_server_file( ISXM_Tools::auto_compress_pdf( [], $rel ), $rel ); };
+$set( [ 'pdf_backup' => '', 'pdf_auto' => false, 'offload_enabled' => true ] );
+@unlink( $fake_log );
+file_put_contents( $pdf_dir . 'auto.pdf', '%PDF-' . str_repeat( 'a', 995 ) );
+$write( 'download/PDF Spec/auto.pdf' );
+t( 'Shrink automatically off: a written PDF goes up as it is', filesize( $pdf_dir . 'auto.pdf' ) === 1000 );
+$set( [ 'pdf_auto' => true ] );
+@unlink( $fake_log );
+file_put_contents( $pdf_dir . 'auto2.pdf', '%PDF-' . str_repeat( 'b', 995 ) );
+$notes = $write( 'download/PDF Spec/auto2.pdf' );
+$sizes = []; foreach ( file( $fake_log ) as $line ) { $row = json_decode( $line, true ); if ( $row['method'] === 'PUT' ) $sizes[] = $row['size']; }
+t( 'On: shrunk first, then uploaded once — the small file', filesize( $pdf_dir . 'auto2.pdf' ) === 400 && $sizes === [ 400 ], json_encode( $sizes ) );
+t( '…and the toast says both', count( $notes ) === 2 && strpos( $notes[0], 'Uploaded to' ) === 0 && strpos( $notes[1], 'shrunk from' ) === 0, json_encode( $notes ) );
+wp_mkdir_p( ABSPATH . 'download/Elsewhere/' );
+file_put_contents( ABSPATH . 'download/Elsewhere/e.pdf', '%PDF-' . str_repeat( 'e', 995 ) );
+ISXM_Tools::auto_compress_pdf( [], 'download/Elsewhere/e.pdf' );
+t( 'A PDF outside the chosen folders is not shrunk', filesize( ABSPATH . 'download/Elsewhere/e.pdf' ) === 1000 );
+@unlink( ABSPATH . 'download/Elsewhere/e.pdf' ); @rmdir( ABSPATH . 'download/Elsewhere' );
+file_put_contents( $pdf_dir . 'a.txt', str_repeat( 't', 1000 ) );
+t( 'Other files are not touched', ISXM_Tools::auto_compress_pdf( [ 'x' ], 'download/PDF Spec/a.txt' ) === [ 'x' ] && filesize( $pdf_dir . 'a.txt' ) === 1000 );
+$set( [ 'pdf_backup' => 'download/PDF Spec/orig/' ] );
+wp_mkdir_p( $pdf_dir . 'orig/' );
+file_put_contents( $pdf_dir . 'orig/o.pdf', '%PDF-' . str_repeat( 'o', 995 ) );
+ISXM_Tools::auto_compress_pdf( [], 'download/PDF Spec/orig/o.pdf' );
+t( 'Files in the originals folder are never shrunk', filesize( $pdf_dir . 'orig/o.pdf' ) === 1000 );
+exec( 'rm -rf ' . escapeshellarg( $pdf_dir . 'orig' ) );
+$set( [ 'pdf_backup' => '' ] );
+@unlink( $fake_log );
+file_put_contents( $pdf_dir . 'broken2.pdf', '%PDF-' . str_repeat( 'z', 195 ) );
+$notes = $write( 'download/PDF Spec/broken2.pdf' );
+$puts = 0; foreach ( file( $fake_log ) as $line ) { if ( json_decode( $line, true )['method'] === 'PUT' ) $puts++; }
+t( 'Ghostscript failing: the file still goes up as it is, and the toast says why', $puts === 1 && filesize( $pdf_dir . 'broken2.pdf' ) === 200 && strpos( implode( ' ', $notes ), 'not shrunk:' ) !== false, json_encode( $notes ) );
+$set( [ 'pdf_auto' => false ] );
+
 unset( $GLOBALS['isxm_t']['filters']['isxs_pdf_runner'] );
 t( 'No Ghostscript: a run cannot start, and says to ask the host', ISXM_Pdf::ghostscript() !== '' || ( is_wp_error( ISXM_Tools::precheck_tool( 'compress_pdf' ) ) && ISXM_Tools::precheck_tool( 'compress_pdf' )->get_error_code() === 'isxs_no_ghostscript' ) );
 foreach ( glob( $pdf_dir . '*' ) as $f ) @unlink( $f ); @rmdir( $pdf_dir );

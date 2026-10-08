@@ -920,15 +920,18 @@ class ISXM_Admin {
         $saved   = (int) get_option( ISXM_Tools::PDF_SAVED, 0 );
         ob_start();
         ?>
-        <p class="isxs-gs-status" data-ok="<?php echo $version !== '' ? '1' : '0'; ?>">
-            <?php
-            if ( $version !== '' ) {
-                /* translators: %s: Ghostscript version. */
-                printf( esc_html__( 'Ghostscript %s found', 'insightx-offload' ), esc_html( $version ) );
-            } else {
-                esc_html_e( 'Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)', 'insightx-offload' );
-            }
-            ?>
+        <p class="isxs-gs-line">
+            <span class="isxs-conn-badge isxs-gs-status" data-state="<?php echo $version !== '' ? 'ok' : 'error'; ?>" data-ok="<?php echo $version !== '' ? '1' : '0'; ?>">
+                <span class="isxs-conn-dot"></span>
+                <span><?php
+                if ( $version !== '' ) {
+                    /* translators: %s: Ghostscript version. */
+                    printf( esc_html__( 'Ghostscript %s found', 'insightx-offload' ), esc_html( $version ) );
+                } else {
+                    esc_html_e( 'Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)', 'insightx-offload' );
+                }
+                ?></span>
+            </span>
         </p>
         <div class="isxs-field isxs-folder-field">
             <label for="isxs-pdf-folders-type"><?php esc_html_e( 'Folders to shrink', 'insightx-offload' ); ?></label>
@@ -950,6 +953,7 @@ class ISXM_Admin {
                 <?php endforeach; ?>
             </select>
         </div>
+        <?php $this->toggle( 'pdf_auto', $s['pdf_auto'], __( 'Shrink automatically', 'insightx-offload' ), __( 'PDFs uploaded, created or copied into the folders above through File Manager are shrunk before they go to storage. Needs Ghostscript', 'insightx-offload' ) ); ?>
         <div class="isxs-field isxs-folder-field isxs-folder-single">
             <label for="isxs-pdf-backup-type"><?php esc_html_e( 'Keep the originals in', 'insightx-offload' ); ?></label>
             <input type="hidden" id="isxs-pdf-backup" value="<?php echo esc_attr( $s['pdf_backup'] ); ?>">

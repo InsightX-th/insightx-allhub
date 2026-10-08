@@ -127,14 +127,15 @@
   border-radius: 999px;
   background: var(--isxs-accent-soft);
   border: 1px solid var(--isxs-accent-line);
-  color: var(--isxs-ink);
+  color: var(--isxs-accent);
   font-size: 12.5px;
+  font-weight: 600;
   word-break: break-all;
 }
 .isxs-chip-remove {
   border: 0;
   background: transparent;
-  color: var(--isxs-muted);
+  color: var(--isxs-accent);
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -143,8 +144,8 @@
   font-size: 14px;
 }
 .isxs-chip-remove:hover {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--isxs-ink);
+  background: var(--isxs-accent-line);
+  color: var(--isxs-accent-hover);
 }
 .isxs-field .isxs-folder-chips .isxs-folder-type {
   flex: 1;
@@ -174,41 +175,67 @@
   padding: 0;
 }
 .isxs-tree-children {
-  padding-left: 22px;
+  padding-left: 18px;
 }
 .isxs-tree-node {
   margin: 0;
 }
+/* Looks like the File Manager tree: small arrow, blue folder, soft hover. */
 .isxs-tree-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 0;
-  border-radius: 8px;
+  gap: 2px;
+  padding: 1px 4px 1px 0;
+  border-radius: 6px;
+  user-select: none;
 }
 .isxs-tree-row:hover {
-  background: var(--isxs-bg);
+  background: var(--isxs-accent-soft);
+}
+.isxs-tree-row:has(input:checked) {
+  background: var(--isxs-accent-soft);
 }
 .isxs-tree-toggle {
   border: 0;
   background: transparent;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 26px;
+  padding: 0;
   flex: none;
   cursor: pointer;
+  font-size: 10px;
   color: var(--isxs-muted);
 }
 .isxs-field .isxs-tree-row label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   margin: 0;
+  padding: 3px 4px;
+  font-size: 13px;
   font-weight: 400;
   cursor: pointer;
 }
+.isxs-tree-row input[type="checkbox"] {
+  margin: 0;
+}
+.isxs-tree-ico {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  fill: #cfe5ff;
+  stroke: var(--isxs-accent);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.isxs-tree-row:has(input:checked) .isxs-tree-name {
+  color: var(--isxs-accent);
+  font-weight: 600;
+}
 .isxs-tree-name {
   word-break: break-all;
+  color: var(--isxs-ink);
 }
 .isxs-folder-badge {
   font-size: 11px;
@@ -2622,17 +2649,13 @@
 .isxs-pdf-wrap {
   max-width: 50%;
 }
-.isxs-gs-status {
-  margin: 0 0 12px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  background: var(--isxs-ok-soft);
-  color: #067a56;
+.isxs-tool-body .isxs-gs-line {
+  margin: 14px 0 20px;
 }
-.isxs-gs-status[data-ok="0"] {
-  background: var(--isxs-warn-soft);
-  color: var(--isxs-warn);
+/* The "not found" text is long: let the badge wrap instead of overflowing. */
+.isxs-gs-status {
+  white-space: normal;
+  max-width: 100%;
 }
 .isxs-pdf-saved {
   font-weight: 600;
@@ -2641,4 +2664,56 @@
   .isxs-pdf-wrap {
     max-width: none;
   }
+}
+
+/* ---------- Checkboxes: one small rounded style on every InsightX page ---------- */
+.isxs-wrap input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #b8c4d6;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: none;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.isxs-wrap input[type="checkbox"]::before,
+.isxs-wrap input[type="checkbox"]:checked::before {
+  /* Overrides WordPress admin's own checkmark (an SVG with offsets). */
+  content: "";
+  float: none;
+  margin: 0;
+  width: 9px;
+  height: 9px;
+  transform: scale(0);
+  transition: transform 0.12s;
+  background: #fff;
+  clip-path: polygon(14% 44%, 0 59%, 40% 100%, 100% 22%, 86% 8%, 39% 70%);
+}
+.isxs-wrap input[type="checkbox"]:hover {
+  border-color: var(--isxs-accent);
+}
+.isxs-wrap input[type="checkbox"]:checked {
+  background: var(--isxs-accent);
+  border-color: var(--isxs-accent);
+}
+.isxs-wrap input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+.isxs-wrap input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--isxs-focus-ring);
+}
+.isxs-wrap input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

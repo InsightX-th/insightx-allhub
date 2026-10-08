@@ -1,243 +1,250 @@
 # InsightX Offload (`insightx-offload`)
 
-ปลั๊กอินจัดการและย้ายคลังไฟล์สื่อ (Media Library) ของ WordPress ไปยัง S3-Compatible Object Storage (เช่น **MinIO, Amazon S3, Cloudflare R2, DigitalOcean Spaces, Garage, Google Cloud Storage**) พร้อมระบบ URL Rewrite, ระบบย้ายค่าย Storage (Migrate), **Assets Pull** (เสิร์ฟ CSS/JS ผ่าน CDN), **Server-Side Bulk Job Engine** และ **WP-CLI Integration** — ทั้งหมดรองรับภาษาไทยสมบูรณ์
+ปลั๊กอิน WordPress สำหรับอัปโหลด Media Library และไฟล์ในโฟลเดอร์บนเซิร์ฟเวอร์ไปยัง S3-compatible storage พร้อมเสิร์ฟผ่าน Storage/CDN, ย้ายข้อมูลระหว่าง Storage, จัดการไฟล์ และย่อ PDF
 
----
+เอกสารนี้อ้างอิงโค้ดเวอร์ชัน **0.2.47** — ดูประวัติการเปลี่ยนแปลงทั้งหมดใน [CHANGELOG.md](CHANGELOG.md)
 
-## 📌 สารบัญ (Table of Contents)
+## สารบัญ
 
-1. [ฟีเจอร์เด่น (Features)](#-ฟีเจอร์เด่น-features)
-2. [คู่มือการใช้งานผ่าน Web Admin](#-คู่มือการใช้งานผ่าน-web-admin)
-   - [2.1 การตั้งค่าการเชื่อมต่อ (Connection)](#21-การตั้งค่าการเชื่อมต่อ-connection)
-   - [2.2 การตั้งค่าจัดเก็บและเสิร์ฟไฟล์ (Media & Delivery)](#22-การตั้งค่าจัดเก็บและเสิร์ฟไฟล์-media--delivery)
-   - [2.3 เครื่องมือประมวลผลงานเบื้องหลัง (Bulk Management Tools)](#23-เครื่องมือประมวลผลงานเบื้องหลัง-bulk-management-tools)
-   - [2.4 การย้ายคลังไฟล์ระหว่าง Storage (Migrate)](#24-การย้ายคลังไฟล์ระหว่าง-storage-migrate)
-   - [2.5 การเสิร์ฟไฟล์ CSS/JS ผ่าน CDN (Assets Pull)](#25-การเสิร์ฟไฟล์-cssjs-ผ่าน-cdn-assets-pull)
-3. [คู่มือการใช้งานผ่าน WP-CLI (`wp isxm`)](#-คู่มือการใช้งานผ่าน-wp-cli-wp-isxm)
-   - [3.1 ภาพรวมคำสั่ง CLI](#31-ภาพรวมคำสั่ง-cli)
-   - [3.2 รายละเอียดแต่ละคำสั่ง](#32-รายละเอียดแต่ละคำสั่ง)
-   - [3.3 การจัดการ Background Job ผ่าน CLI & System Cron](#33-การจัดการ-background-job-ผ่าน-cli--system-cron)
-4. [ความปลอดภัยและประสิทธิภาพ (Security & Performance)](#-ความปลอดภัยและประสิทธิภาพ-security--performance)
-5. [การรับอนุญาตใช้งาน (License)](#-การรับอนุญาตใช้งาน-license)
+- [สิ่งที่เพิ่มเข้ามาล่าสุด](#recent-updates)
+- [ฟีเจอร์หลัก](#features)
+- [การติดตั้ง](#installation)
+- [การตั้งค่าและใช้งาน](#usage)
+- [File Manager](#file-manager)
+- [รูปภาพและการย่อ PDF](#images-pdf)
+- [WP-CLI และงานเบื้องหลัง](#cli)
+- [ข้อควรรู้และการแก้ปัญหา](#troubleshooting)
+- [การทดสอบสำหรับผู้พัฒนา](#development)
+- [License](#license)
 
----
+<a id="recent-updates"></a>
+## สิ่งที่เพิ่มเข้ามาล่าสุด
 
-## 🚀 ฟีเจอร์เด่น (Features)
+| เวอร์ชัน | สิ่งที่เพิ่มหรือเปลี่ยน |
+| --- | --- |
+| **0.2.47** | ย่อ PDF ด้วย Ghostscript เลือก 72 / 150 / 300 dpi และโฟลเดอร์เก็บต้นฉบับได้ อัปโหลดทับ key เดิมสำหรับไฟล์ที่อยู่ใน bucket แล้ว พร้อมคำสั่งย่อ PDF ทีละไฟล์ใน File Manager |
+| **0.2.46** | การลบไฟล์ผ่าน File Manager ลบสำเนาบน Storage ที่ปลั๊กอินติดตามไว้ด้วย แสดง URL บน bucket และปุ่มตรวจว่ามีไฟล์จริง พร้อมเมนูคลิกขวาใน tree โฟลเดอร์ |
+| **0.2.45** | หน้า File Manager พร้อมสิทธิ์ตาม role/รายบุคคล และอัปโหลดไฟล์ที่เพิ่มนอก Media Library ไปยัง Storage ทันทีเมื่อเปิด Offload Media |
+| **0.2.44** | ตรวจโฟลเดอร์บนเซิร์ฟเวอร์ที่เลือกไว้ทุกชั่วโมง เพื่ออัปโหลดไฟล์ใหม่หรือไฟล์ที่เปลี่ยนแปลง |
+| **0.2.43** | รวม Media Library และโฟลเดอร์บนเซิร์ฟเวอร์ไว้ในการ์ด Offload media เดียว รวมตัวเลือกการลบไว้ในการ์ดเดียว |
+| **0.2.39–0.2.42** | แสดงสถานะ Offload รวมทุกแหล่ง เพิ่มการลบไฟล์ local ที่ตรวจว่ามีบน bucket แล้ว และปรับการอัปโหลดโฟลเดอร์ให้แก้ URL ตอนท้ายงาน |
+| **0.2.37–0.2.38** | รูปโปรไฟล์ตัวอักษร รองรับภาษาไทย และแท็บจัดการรูปภาพ |
+| **0.2.29–0.2.36** | Migrate โฟลเดอร์นอก Media Library, เลือกโฟลเดอร์จาก tree, Offload โฟลเดอร์บนเซิร์ฟเวอร์ และเติมขนาดรูปที่อัปโหลดไม่ครบ |
+
+<a id="features"></a>
+## ฟีเจอร์หลัก
 
 | ฟีเจอร์ | รายละเอียด |
 | --- | --- |
-| **Multi-Provider Support** | รองรับ S3-Compatible Storage 7 รูปแบบ: AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces, Garage Storage, Google Cloud Storage (GCS) และ Custom S3 |
-| **Offload Media** | อัปโหลดภาพและไฟล์สื่อขึ้น Object Storage อัตโนมัติทันทีที่มีการอัปโหลดผ่าน WordPress |
-| **Remove Local Media** | ลบไฟล์บนเว็บเซิร์ฟเวอร์หลักหลัง Offload สำเร็จ เพื่อประหยัดพื้นที่ดิสก์ |
-| **One-Pass DB URL Rewrite** | อัปเดต URL รูปในฐานข้อมูล (`post_content`, `postmeta`, `options`) แบบรวดเดียวตอนจบงาน ไม่โหลดสแกนทั้งตารางทุก batch เหมาะกับเว็บที่มีไฟล์ 80k+ |
-| **Deliver Offloaded Media** | เปลี่ยนแปลง URL การแสดงผลรูปภาพให้ชี้ไปยัง Storage หรือ CDN พร้อมตัวเลือก Force HTTPS |
-| **Assets Pull** | เสิร์ฟไฟล์ CSS และ JS ของธีมและปลั๊กอินผ่าน CDN โดยตรงโดยไม่ต้องอัปโหลดไฟล์ขึ้น Bucket |
-| **Server-Side Job Engine** | งาน Bulk ทั้งหมดรันฝั่งเซิร์ฟเวอร์ (Loopback / WP-Cron) ปิดแท็บเบราว์เซอร์ได้ งานไม่หลุด แสดงเวลาที่ใช้ไปแล้ว (Elapsed Time) และเวลาคงเหลือ (ETA) แบบ Real-time |
-| **Sync & Diagnostic** | สแกนเปรียบเทียบ Meta ใน DB กับไฟล์บน Bucket จริง เพื่อตรวจหาไฟล์ค้าง หรือ Orphan Objects พร้อมหน้าทดสอบการเชื่อมต่อแบบละเอียดยิบ |
-| **Full WP-CLI Support** | สั่งงาน ควบคุม และเช็กสถานะผ่าน Command Line ครบทุกฟังก์ชัน รองรับการตั้ง Crontab |
+| Storage หลายผู้ให้บริการ | Amazon S3, MinIO, Cloudflare R2, DigitalOcean Spaces, Garage, Google Cloud Storage ผ่าน S3-compatible API และ Custom S3 |
+| Offload Media | อัปโหลดสื่อใหม่อัตโนมัติ รวมไฟล์หลักและขนาดรูป พร้อมเครื่องมือเติมขนาดที่ขาด |
+| Offload โฟลเดอร์บนเซิร์ฟเวอร์ | เลือกโฟลเดอร์นอก Media Library เช่น `download/Specification/` อัปโหลดโดยใช้ path เดิม และตรวจไฟล์ใหม่/แก้ไขทุกชั่วโมง |
+| Delivery และ URL Rewrite | เสิร์ฟจาก Storage หรือ CDN, Force HTTPS และเลือกเขียน URL ถาวรลงฐานข้อมูลได้ |
+| จัดโครงสร้างไฟล์ | Prefix, ปี/เดือน, Object Version และโฟลเดอร์ตามประเภทเนื้อหา เช่น สินค้า บทความ หมวดหมู่ และแบรนด์ |
+| Bulk Jobs | Offload, retry, download, ลบสำเนา local/remote, migrate และจัดการ WooCommerce downloads ทำงานฝั่งเซิร์ฟเวอร์ มี progress, elapsed time และ ETA |
+| Migrate | คัดลอกจาก Storage ต้นทางไปปลายทาง รวมโฟลเดอร์ที่ไม่มี attachment ใน WordPress โดยไม่ลบต้นทาง |
+| File Manager | ดูและจัดการไฟล์ใต้โฟลเดอร์ WordPress พร้อมกำหนดสิทธิ์และโฟลเดอร์ที่เข้าถึงได้ |
+| รูปภาพและ PDF | ปิดการสร้าง thumbnail สำหรับไฟล์ใหม่, รูปโปรไฟล์ตัวอักษร และย่อ PDF ด้วย Ghostscript |
+| Media Library | คอลัมน์ Storage/Bucket, ตัวกรองสถานะ รวมรายการที่ขึ้นไม่ครบทุกขนาด และคำสั่ง Offload รายไฟล์/หลายไฟล์ |
+| Assets Pull | เปลี่ยน URL ของ CSS/JS ที่ enqueue ให้ผ่าน CDN ซึ่งดึงไฟล์จากเว็บต้นทาง |
+| Sync และ Diagnostics | เทียบข้อมูลติดตามกับ bucket เพื่อหาไฟล์หาย, metadata ค้าง และ orphan objects พร้อมทดสอบการเชื่อมต่อ |
+| WooCommerce | เครื่องมือจัดการไฟล์สินค้าดาวน์โหลด และลิงก์ดาวน์โหลดแบบ signed URL อายุสั้น |
+| WP-CLI | คำสั่งบำรุงรักษาและควบคุมงานชุดเดียวกับหน้า Admin รองรับ external cron |
+| ภาษาและอัปเดต | มีคำแปลภาษาไทย และตรวจอัปเดตจาก release assets ของ GitHub |
 
----
+<a id="installation"></a>
+## การติดตั้ง
 
-## 🖥️ คู่มือการใช้งานผ่าน Web Admin
+ข้อกำหนดที่ระบุในปลั๊กอิน: **WordPress 5.8+ และ PHP 7.4+** พร้อมบัญชีและ bucket ของ S3-compatible storage
 
-เข้าสู่หน้าการตั้งค่าได้ที่เมนู **InsightX Offload** หรือ **สื่อ → InsightX Offload** ในหน้าหลังบ้าน WordPress
+1. วางโฟลเดอร์ `insightx-offload` ใน `wp-content/plugins/` แล้วเปิดใช้งานปลั๊กอิน
+2. หากย้ายมาจาก **InsightX Storage** ให้ปิดปลั๊กอินเดิมก่อน ทั้งสองตัวใช้ options, postmeta, ledger และ cron identifiers ร่วมกัน ข้อมูลเดิมจึงใช้ต่อได้โดยไม่ต้อง Offload ใหม่
+3. ไปที่ **InsightX Offload → Connections** ตั้งค่าการเชื่อมต่อ แล้วเลือก provider ปลายทางในแท็บ **Media**
+4. เปิด **Offload Media** สำหรับไฟล์ใหม่ และใช้แท็บ **Tools** เพื่ออัปโหลดไฟล์เดิม
 
-### 2.1 การตั้งค่าการเชื่อมต่อ (Connection)
-1. ไปที่แท็บ **การเชื่อมต่อ (Connection)**
-2. เลือก Storage Provider ที่ต้องการใช้งาน (เช่น *MinIO*, *AWS S3*, *Cloudflare R2*)
-3. กรอกข้อมูลการเชื่อมต่อ:
-   - **Endpoint URL:** (เช่น `https://s3.example.com` หรือ MinIO Endpoint)
-   - **Bucket Name:** ชื่อ Bucket ที่สร้างไว้
-   - **Region:** เช่น `us-east-1` หรือ `auto`
-   - **Access Key ID** & **Secret Access Key**
-4. กดปุ่ม **บันทึกการตั้งค่า** ระบบจะทำการทดสอบการเชื่อมต่อ (Connection Test) โดยอัตโนมัติทันที
+การย่อ PDF ต้องมี **Ghostscript (`gs`)** และ PHP ต้องเรียก `exec()` ได้ ส่วน WP-CLI ใช้เฉพาะเมื่อต้องการสั่งงานผ่าน terminal
 
-### 2.2 การตั้งค่าจัดเก็บและเสิร์ฟไฟล์ (Media & Delivery)
-1. ไปที่แท็บ **สื่อ (Media)**
-2. **การตั้งค่าจัดเก็บไฟล์ (Storage Settings):**
-   - **Offload Media:** เปิดใช้งานเพื่อให้อัปโหลดไฟล์สื่อใหม่ขึ้น Storage อัตโนมัติ
-   - **Remove Local Media:** เปิดใช้งานเมื่อต้องการลบไฟล์สื่อออกจากเซิร์ฟเวอร์หลักหลังอัปโหลดสำเร็จ
-   - **Path Prefix / Year-Month / Object Version:** กำหนดโครงสร้างโฟลเดอร์สำหรับจัดเก็บไฟล์
-3. **การเสิร์ฟไฟล์ (Delivery Settings):**
-   - **Deliver Offloaded Media:** เปิดใช้งานเพื่อให้รูปภาพแสดงผลผ่าน URL ของ Storage หรือ CDN
-   - **CDN Domain:** ระบุ Domain CDN (ถ้ามี) เช่น `https://cdn.mysite.com`
-   - **Force HTTPS:** บังคับใช้งาน HTTPS สำหรับ URL สื่อทั้งหมด
+<a id="usage"></a>
+## การตั้งค่าและใช้งาน
 
-### 2.3 เครื่องมือประมวลผลงานเบื้องหลัง (Bulk Management Tools)
-ไปที่แท็บ **เครื่องมือ (Tools)** เพื่อประมวลผลไฟล์สื่อที่มีอยู่เดิมในคลัง:
-- **Offload media ที่เหลือ:** อัปโหลดไฟล์สื่อทั้งหมดที่ยังไม่อยู่บน Storage
-- **ลองใหม่เฉพาะที่ Offload ไม่ผ่าน:** ประมวลผลซ้ำเฉพาะไฟล์ที่เคยอัปโหลดล้มเหลว
-- **ดาวน์โหลดไฟล์กลับจาก bucket:** ดาวน์โหลดไฟล์ทั้งหมดจาก Storage กลับมายังเซิร์ฟเวอร์หลัก
-- **ลบไฟล์ทั้งหมดออกจาก bucket:** ลบไฟล์ทั้งหมดออกจาก Storage
-- **ตรวจสอบและอัปเดต WooCommerce Downloadable Products:** ปรับแต่งสิทธิ์และความปลอดภัยของไฟล์สินค้าดาวน์โหลดใน WooCommerce
+### 1. Connections — เชื่อมต่อ Storage
 
-> ⏱️ **ระบบแสดงผลเวลา (Time Tracking):**  
-> แต่ละ Card จะแสดง Progress Bar เปอร์เซ็นต์ความคืบหน้า เวลาที่ใช้ไปแล้ว (`ใช้เวลาไปแล้ว X นาที Y วินาที`) และเวลาคงเหลือโดยประมาณ (`ETA`) แบบ Real-time
+เลือก provider แล้วกรอก Endpoint, Bucket, Region, Access Key ID และ Secret Access Key จากนั้นบันทึกเพื่อทดสอบการเชื่อมต่อ แต่ละ provider มีค่าการเชื่อมต่อที่บันทึกแยกกัน
 
-### 2.4 การย้ายคลังไฟล์ระหว่าง Storage (Migrate)
-1. ไปที่แท็บ **ย้ายข้อมูล (Migrate)**
-2. ตั้งค่า **Source Storage** (ต้นทาง) และ **Destination Storage** (ปลายทาง)
-3. ระบบจะทำการย้ายไฟล์สื่อระหว่าง Storage และอัปเดต URL ในฐานข้อมูลโดยไม่ส่งผลกระทบต่อไฟล์ต้นทาง
+- ตั้งค่า Path-style และ Public ACL ให้เหมาะกับผู้ให้บริการ
+- การบันทึก connection ไม่ได้เปลี่ยน provider ปลายทางโดยอัตโนมัติ ต้องเลือกในแท็บ Media ด้วย
+- หากย้ายข้อมูลจากอีก Storage ให้ตั้งค่า connection ต้นทางไว้สำหรับแท็บ Migrate
 
-### 2.5 การเสิร์ฟไฟล์ CSS/JS ผ่าน CDN (Assets Pull)
-1. ไปที่แท็บ **ทรัพยากร (Assets Pull)**
-2. เปิดใช้งาน **Rewrite Asset URLs** และระบุ **CDN Domain**
-3. ระบบจะแปลง URL ของไฟล์ `.css` และ `.js` ในธีมและปลั๊กอินให้เสิร์ฟผ่าน CDN เพื่อเพิ่มความเร็วในการโหลดหน้าเว็บ
+### 2. Media — จัดเก็บและเสิร์ฟไฟล์
 
----
+- **Offload Media:** อัปโหลดสื่อใหม่ และเปิดการตรวจโฟลเดอร์บนเซิร์ฟเวอร์ที่เลือกไว้
+- **Remove Local Media:** ลบสำเนาสื่อ local หลัง Offload สำเร็จ ตามเงื่อนไขของปลั๊กอิน
+- **เขียน URL ถาวรลงฐานข้อมูล:** บันทึก URL ใหม่ในข้อมูลเว็บ งาน Bulk Offload รวบรวมการแก้ URL ไปทำตอนท้ายงาน
+- **Deliver Offloaded Media:** เปลี่ยน URL สื่อขณะแสดงผลให้ชี้ไป Storage/CDN
+- **CDN Domain / Force HTTPS:** กำหนดโดเมนเสิร์ฟสื่อและใช้ HTTPS
+- **โครงสร้าง path:** เลือก prefix, ปี/เดือน, object version หรือโฟลเดอร์ตามประเภทเนื้อหา การเปลี่ยนค่าไม่ได้ย้ายไฟล์ที่ Offload ไปแล้วโดยอัตโนมัติ
 
-## 💻 คู่มือการใช้งานผ่าน WP-CLI (`wp isxm`)
+### 3. Tools — Offload และจัดการไฟล์จำนวนมาก
 
-ปลั๊กอินรองรับการทำงานผ่าน WP-CLI เต็มรูปแบบ เหมาะสำหรับการรันงานขนาดใหญ่ (ระดับหลายหมื่นถึงหลายแสนรูป) หรือการตั้ง Cron Job บนเซิร์ฟเวอร์
+ในการ์ด **Offload media** เลือกโฟลเดอร์แล้วกดเริ่มครั้งเดียว:
 
-### 3.1 ภาพรวมคำสั่ง CLI
+- `wp-content/uploads/` แทน Media Library ทั้งหมด รวมการเติมขนาดรูปที่ยังขึ้นไม่ครบ
+- โฟลเดอร์อื่น เช่น `download/Specification/` อัปโหลดด้วย path เดิมและเก็บต้นฉบับบนเซิร์ฟเวอร์ไว้
+- หากขนาดรูปที่ metadata ระบุไม่มีไฟล์จริง ระบบพยายามสร้างจากต้นฉบับ local หรือดาวน์โหลดต้นฉบับจาก bucket มาใช้ชั่วคราว
+- ระบบจำไฟล์ในโฟลเดอร์ที่อัปโหลดแล้ว รอบถัดไปตรวจไฟล์ใหม่หรือไฟล์ที่แก้ไข และแก้ลิงก์ตอนท้ายงาน
 
-```bash
-wp isxm status              # ตรวจสอบสรุปสถานะการ Offload ทั้งหมด
-wp isxm offload             # อัปโหลดไฟล์สื่อขึ้น Storage
-wp isxm download            # ดาวน์โหลดไฟล์สื่อกลับจาก Storage
-wp isxm remove              # ลบไฟล์สื่อออกจาก Storage
-wp isxm sync                # สแกนและซิงค์ข้อมูล DB กับ Storage จริง
-wp isxm migrate             # ย้ายคลังไฟล์ระหว่าง Storage
-wp isxm connection <cmd>    # จัดการและทดสอบการเชื่อมต่อ Storage
-wp isxm backfill            # สร้าง/ซิงค์ Ledger ประวัติไฟล์ค้าง
-wp isxm job <subcommand>    # ตรวจสอบและควบคุม Server-Side Job Engine
-```
+เมื่อเปิด Offload Media ระบบใช้ WP-Cron ตรวจโฟลเดอร์ที่เลือกทุกชั่วโมง รวมไฟล์ที่เพิ่มผ่าน FTP โดยข้ามรอบเมื่อมีงานอื่นกำลังทำอยู่
 
-### 3.2 รายละเอียดแต่ละคำสั่ง
+เครื่องมืออื่นประกอบด้วย:
 
-#### 📌 1. `wp isxm status`
-แสดงสรุปจำนวนไฟล์สื่อทั้งหมด, จำนวนไฟล์ที่อยู่บน Storage, ไฟล์ที่ไม่ผ่าน และสถานะการเชื่อมต่อ
+- **Retry failed:** ลองใหม่เฉพาะรายการที่ Offload ล้มเหลว
+- **Download:** ดาวน์โหลดสื่อกลับจาก Storage
+- **ลบไฟล์:** เลือกลบสำเนาสื่อบนเซิร์ฟเวอร์ที่ตรวจแล้วว่ามีบน bucket หรือลบไฟล์บน bucket ที่ปลั๊กอินจัดการ
+- **WooCommerce downloads:** ตรวจและปรับการจัดการไฟล์สินค้าดาวน์โหลด
+- **Sync:** ตรวจความสอดคล้องระหว่างข้อมูลใน WordPress กับไฟล์จริงบน bucket
 
-```bash
-wp isxm status
-```
-*ตัวอย่าง Output:*
-```text
-Attachments: 17279 total, 0 on bucket (0%), 0 partial, 17279 pending, 16298 failed
-Retry just the failures with: wp isxm offload --failed-only
-```
+การลบสำเนา local ต้องเปิดการเขียน URL ถาวรหรือ Deliver Offloaded Media ไว้ เครื่องมือนี้ไม่ลบไฟล์ที่ไม่มี attachment, โฟลเดอร์ของปลั๊กอินอื่น หรือไฟล์ดาวน์โหลด WooCommerce
 
----
+งานผ่านระบบ Job ทำต่อบนเซิร์ฟเวอร์ได้เมื่อปิดแท็บ มีปุ่มหยุดพัก/ทำต่อ/ยกเลิก และแสดงความคืบหน้า ทั้งนี้ต้องมี runner ที่ทำงานได้ผ่าน loopback, WP-Cron หรือ external cron
 
-#### 📌 2. `wp isxm offload`
-ประมวลผลอัปโหลดไฟล์สื่อขึ้น Storage
+### 4. Migrate — ย้ายระหว่าง Storage
 
-```bash
-# อัปโหลดไฟล์สื่อทั้งหมดที่ยังไม่ได้ Offload
-wp isxm offload
+1. ตั้งค่า connection ต้นทางและปลายทาง แล้วเลือกในหน้าที่เกี่ยวข้อง
+2. ระบุ **Source Public URL** ให้ตรงกับ URL เดิมที่ใช้ในเว็บ หากเสิร์ฟผ่านโดเมนเฉพาะ/CDN
+3. เลือกโฟลเดอร์จาก bucket ต้นทางได้ทั้ง Media Library และโฟลเดอร์อื่น หรือย้ายเฉพาะโฟลเดอร์ที่ไม่มี attachment ก็ได้
+4. เริ่มงานเพื่อคัดลอกไฟล์และแก้ URL ไปปลายทาง ระบบไม่ลบไฟล์ต้นทาง
 
-# กำหนดขนาด Batch ในการประมวลผลแต่ละรอบ (ค่าเริ่มต้น: 50)
-wp isxm offload --batch=100
+งานแบบเลือกโฟลเดอร์นับไฟล์ก่อนเริ่ม เพื่อแสดงยอดรวมที่คงที่ ใช้ระบบ Job เมื่อต้องการหยุดและทำต่อจากจุดเดิม
 
-# ลองใหม่อีกครั้งเฉพาะรายการที่เคยล้มเหลว (Failed items)
-wp isxm offload --failed-only
-```
+### 5. Assets — เสิร์ฟ CSS/JS ผ่าน CDN
 
----
+เปิด Rewrite Asset URLs และกำหนด CDN Domain ที่ตั้ง origin เป็นเว็บไซต์ WordPress ไฟล์ธีม/ปลั๊กอินยังอยู่บนเซิร์ฟเวอร์ ไม่ได้ถูกอัปโหลดไป bucket และโดเมนนี้ตั้งแยกจาก CDN สำหรับ Media
 
-#### 📌 3. `wp isxm download`
-ดาวน์โหลดไฟล์สื่อจาก Storage กลับมายัง Local Server
+<a id="file-manager"></a>
+## File Manager
 
-```bash
-wp isxm download --batch=50
-```
+เปิด **InsightX Offload → จัดการไฟล์ (File Manager)** เพื่อดู tree โฟลเดอร์และรายการไฟล์บนเซิร์ฟเวอร์
 
----
+- ค้นหาในโฟลเดอร์ย่อย เรียงรายการ และดูตัวอย่าง/ข้อมูลไฟล์
+- อัปโหลดแบบลากวาง สร้างไฟล์หรือโฟลเดอร์ เปลี่ยนชื่อ ย้าย คัดลอก/ตัด/วาง ทำสำเนา ดาวน์โหลด ลบ และล้างโฟลเดอร์
+- คลิกขวาที่รายการหรือโฟลเดอร์ใน tree เพื่อเปิดเมนูการทำงาน
+- กำหนดสิทธิ์ตาม role หรือรายบุคคล พร้อมจำกัดโฟลเดอร์ที่เข้าถึงได้ กฎรายบุคคลใช้แทนกฎ role ของคนนั้น ผู้มี `manage_options` ได้สิทธิ์ทั้งหมด แต่ยังอยู่ภายใต้ข้อจำกัดด้านไฟล์ของระบบ
 
-#### 📌 4. `wp isxm remove`
-ลบไฟล์สื่อออกจาก Storage
+เมื่อเปิด Offload Media ไฟล์ที่เพิ่มผ่านหน้านี้นอก Media Library จะขึ้น Storage ปลายทางทันที และเพิ่มโฟลเดอร์เข้ารายการ Offload อัตโนมัติ หากอัปโหลดล้มเหลว รอบตรวจรายชั่วโมงจะลองใหม่
 
-```bash
-wp isxm remove --batch=50
-```
+**การลบมีผลถึง Storage:** การลบไฟล์/โฟลเดอร์หรือล้างโฟลเดอร์จะลบสำเนาที่ปลั๊กอินอัปโหลดและติดตามไว้ด้วย การเปลี่ยนชื่อหรือย้ายจะอัปโหลด path ใหม่และลบ key เก่า หน้าข้อมูลของไฟล์นอก Media Library ที่ขึ้นแล้วแสดง URL บน bucket และปุ่มตรวจไฟล์จริง
 
----
+File Manager ทำงานภายในโฟลเดอร์ WordPress เท่านั้น ส่วนโค้ดเว็บ เช่น `wp-admin`, `wp-includes`, plugins, themes และ `wp-config.php` เป็นแบบอ่านอย่างเดียว ห้ามสร้างไฟล์ที่รันได้ เช่น PHP และการเพิ่ม HTML/SVG ต้องมีสิทธิ์ `unfiltered_html`
 
-#### 📌 5. `wp isxm sync`
-สแกนเปรียบเทียบ metadata ใน DB กับไฟล์บน Bucket จริง
+<a id="images-pdf"></a>
+## รูปภาพและการย่อ PDF
+
+เปิดแท็บ **รูปภาพ/ไฟล์ (Images & Files)**
+
+### รูปภาพ
+
+- **ไม่สร้างรูปขนาดย่อ:** ใช้กับการอัปโหลดใหม่ ไม่ลบ thumbnail เดิม เมื่อไม่มีขนาดย่อย ธีมที่ขอ thumbnail อาจได้ภาพต้นฉบับแทน และไม่มีชุดขนาดสำหรับ `srcset`
+- **รูปโปรไฟล์แบบตัวอักษร:** แสดงวงกลมสีพร้อมตัวอักษรแรกของชื่อ รองรับภาษาไทย เสิร์ฟ SVG ผ่าน URL ของเว็บ ไม่โหลด Gravatar หรือสร้างไฟล์ภาพถาวร รูปเดิมยังอยู่และกลับมาเมื่อปิดสวิตช์
+
+### ย่อ PDF
+
+1. ตรวจสถานะ Ghostscript บนการ์ด **ย่อไฟล์ PDF (Shrink PDFs)**
+2. เลือกโฟลเดอร์ PDF บนเซิร์ฟเวอร์และความละเอียด **72, 150 หรือ 300 dpi** (ค่าเริ่มต้น 150)
+3. เลือกโฟลเดอร์เก็บต้นฉบับ เช่น `pdf-originals/` ให้อยู่นอกโฟลเดอร์ที่กำลังย่อและโฟลเดอร์ที่เลือก Offload ระบบคัดลอกต้นฉบับตาม path เดิมก่อนย่อ หากเว้นว่างจะไม่มีสำเนาสำหรับกู้คืน
+4. เริ่มงาน ระบบแทนที่ไฟล์ด้วยชื่อเดิมเฉพาะเมื่อได้ PDF ที่ลดขนาดอย่างน้อย **10%**
+5. ไฟล์ที่อยู่บน bucket แล้วจะถูกอัปโหลดทับ **key เดิม** เพื่อใช้ URL เดิมต่อ
+
+ผู้ดูแลระบบย่อ PDF ทีละไฟล์ได้จากเมนูคลิกขวาใน File Manager ฟีเจอร์นี้ประมวลผลไฟล์บนเซิร์ฟเวอร์ จึงต้องมีไฟล์ local ให้เข้าถึงได้
+
+<a id="cli"></a>
+## WP-CLI และงานเบื้องหลัง
+
+รันคำสั่งจากโฟลเดอร์ WordPress หรือกำหนด `--path=/path/to/wordpress` ดูตัวเลือกเพิ่มเติมได้ด้วย `wp help isxm` และ `wp help isxm job`
+
+### คำสั่งบำรุงรักษา
 
 ```bash
-# Dry-run สแกนดูผลลัพธ์โดยยังไม่แก้ไข DB หรือลบไฟล์
-wp isxm sync
-
-# ลบ metadata ค้างและลบ Orphan Objects ที่ไม่อยู่ใน DB ออกจาก Bucket
-wp isxm sync --apply --delete-orphans
+wp isxm status                       # สรุปสถานะ Media Library
+wp isxm offload                      # Offload Media Library ใน foreground
+wp isxm offload --batch=100           # ค่าเริ่มต้น 100 attachments ต่อ batch
+wp isxm offload --failed-only         # ลองใหม่เฉพาะรายการล้มเหลว
+wp isxm download --batch=50           # ดาวน์โหลดสื่อกลับ local
+wp isxm backfill --batch=500           # สร้าง/ซิงค์ข้อมูลใน ledger
+wp isxm migrate                      # Migrate ใน foreground
+wp isxm sync                         # ตรวจสอบแบบ dry-run
 ```
 
----
-
-#### 📌 6. `wp isxm connection`
-จัดการและทดสอบการเชื่อมต่อ Storage
+คำสั่งต่อไปนี้เปลี่ยนข้อมูลหรือลบไฟล์บน Storage:
 
 ```bash
-# ทดสอบการเชื่อมต่อ Storage ปัจจุบัน
-wp isxm connection test
-
-# ตั้งค่า Storage Connection ผ่าน CLI
-wp isxm connection set --provider=minio --endpoint="https://s3.example.com" --bucket="my-bucket" --access-key="KEY" --secret-key="SECRET"
+wp isxm sync --apply                  # แก้ metadata ที่ไม่ตรงกับ bucket
+wp isxm sync --apply --delete-orphans # แก้ metadata และลบ orphan objects
+wp isxm remove --batch=50             # ลบสื่อบน bucket ที่ปลั๊กอินติดตาม
 ```
 
----
+### จัดการ Connections
 
-### 3.3 การจัดการ Background Job ผ่าน CLI & System Cron
+provider slug ที่รองรับ: `aws`, `minio`, `garage`, `r2`, `spaces`, `gcs`, `custom` โดยต้องส่งเป็น positional argument
 
-เมื่อมีการสั่งงานผ่านหน้า Admin หรือผ่าน CLI ระบบ Job Engine จะบันทึกสถานะลงใน Database เพื่อให้ทนทานต่อการปิดแท็บเบราว์เซอร์ คุณสามารถใช้คำสั่งชุด `wp isxm job` เพื่อควบคุมและติดตามงานได้ดังนี้:
+```bash
+wp isxm connection list
+wp isxm connection get minio
+wp isxm connection set minio --endpoint="https://s3.example.com" --bucket="my-bucket" --region="us-east-1" --access-key="KEY" --secret-key="SECRET" --path-style=1
+wp isxm connection test minio
+```
 
-#### 📌 1. `wp isxm job list`
-แสดงตารางสถานะของ Job ทั้งหมดในระบบ:
+แทน `KEY` และ `SECRET` ด้วยข้อมูลของคุณ การตั้งค่า connection ผ่าน CLI ไม่ได้เปลี่ยน provider ปลายทางที่เลือกใน Media
+
+### ควบคุม Job ชุดเดียวกับหน้า Admin
+
+คำสั่งตรง เช่น `wp isxm offload` ทำงานใน foreground ส่วน `wp isxm job` ใช้สถานะงานเดียวกับหน้า Admin เหมาะกับการติดตาม หยุดพัก และทำต่อ รวมถึง Offload ตามโฟลเดอร์ที่เลือกในการ์ด
 
 ```bash
 wp isxm job list
-```
-*ตัวอย่าง Output:*
-```text
-+--------------+---------+----------+---------+--------+---------+---------------------+
-| tool         | state   | progress | percent | errors | pending | updated             |
-+--------------+---------+----------+---------+--------+---------+---------------------+
-| offload      | idle    |          |         |        |         |                     |
-| remove       | running | 526/527  | 99%     |        |         | 2026-08-18 10:35 UTC|
-| wc_downloads | idle    |          |         |        |         |                     |
-+--------------+---------+----------+---------+--------+---------+---------------------+
-```
-
-#### 📌 2. `wp isxm job start / pause / resume / cancel`
-สั่งการ Job แต่ละตัวผ่าน CLI:
-
-```bash
-# สั่งเริ่ม Job (เช่น offload, remove, download)
 wp isxm job start offload
-
-# สั่งหยุดพัก Job ชั่วคราว
 wp isxm job pause offload
-
-# สั่งรัน Job ต่อจากจุดเดิม
 wp isxm job resume offload --watch
-
-# สั่งยกเลิก Job
 wp isxm job cancel offload --yes
+
+# Migrate และแสดง progress ใน terminal จนงานหยุดหรือเสร็จ
+wp isxm job start migrate --watch
+
+# เริ่มงานโดยให้ CLI/external cron เป็น runner
+wp isxm job start offload --runner=cli
+wp isxm job run --once
 ```
 
-#### 📌 3. การตั้ง System Cron สำหรับ Background Runner (`wp isxm job run`)
-หากเซิร์ฟเวอร์ปิดกั้น Loopback HTTP Requests คุณสามารถตั้งค่า **Crontab** บนเซิร์ฟเวอร์เพื่อให้รัน Runner เบื้องหลังได้โดยอัตโนมัติ:
+หากใช้ external cron ให้ตั้งรันทุกนาที โดยเปลี่ยน path ให้ตรงกับเว็บไซต์:
 
-```bash
-# รัน Runner 1 รอบประมวลผล (เหมาะสำหรับใส่ใน Crontab)
+```cron
 * * * * * cd /path/to/wordpress && wp isxm job run --once > /dev/null 2>&1
 ```
 
----
+`job run` ประมวลผลงานที่เริ่มไว้แล้ว ไม่ได้สร้างงาน Offload ใหม่ทุกนาที และไม่ได้แทนการเรียก WP-Cron สำหรับตรวจโฟลเดอร์รายชั่วโมง
 
-## 🔒 ความปลอดภัยและประสิทธิภาพ (Security & Performance)
+<a id="troubleshooting"></a>
+## ข้อควรรู้และการแก้ปัญหา
 
-- **การเข้ารหัส Secret Key (AES-256-CBC):** Secret Key ทั้งหมดถูกเข้ารหัสอย่างปลอดภัยด้วย `AES-256-CBC` โดยใช้ Salt เฉพาะของแต่ละเว็บไซต์ (`wp_salt('auth')`) ก่อนเก็บบันทึกลงในฐานข้อมูล
-- **One-Pass DB URL Rewrite:** เมื่อสั่ง Offload คลังภาพขนาดใหญ่ ระบบจะรวบรวมรายการและทำการ Rewrite URL ลงใน `post_content` และ `postmeta` เพียงรอบเดียวเมื่อจบกระบวนการ เพื่อป้องกันความล่าช้าจากการ Update DB ทีละแถว
-- **Path Traversal Protection:** ตรวจสอบความปลอดภัยของชื่อไฟล์และพาทเพื่อป้องกันช่องโหว่ Path Traversal (`../`, backslash, control chars)
-- **Prepared Statements:** ทุกการ Query ฐานข้อมูลผ่าน `$wpdb->prepare()` และ `esc_like()` ตามมาตรฐานความปลอดภัยสูงสุดของ WordPress
+- **งานค้างเมื่อปิดแท็บ:** ตรวจว่า loopback/WP-Cron ทำงานได้ หรือใช้ `wp isxm job run --once` ผ่าน external cron ตรวจสถานะด้วย `wp isxm job list`
+- **ไฟล์ที่เพิ่มผ่าน FTP ยังไม่ขึ้น:** เปิด Offload Media และเลือกโฟลเดอร์นั้นในการ์ด Offload media รอบตรวจใช้ WP-Cron ทุกชั่วโมง จึงอาจช้ากว่ากำหนดเมื่อไม่มี request มาเรียก cron
+- **เชื่อมต่อได้แต่เปิด URL ไม่ได้:** ตรวจ CDN Domain, เส้นทางและสิทธิ์การอ่านไฟล์ การเชื่อมต่อ S3 สำเร็จไม่ได้หมายความว่า public URL เปิดได้
+- **ย่อ PDF ไม่ได้:** ตรวจว่าเซิร์ฟเวอร์มี `gs`, PHP เรียก `exec()` ได้ และมีสิทธิ์เขียนไฟล์/โฟลเดอร์นั้น
+- **ย่อ PDF แล้ว URL เดิมยังแสดงไฟล์เก่า:** เนื่องจากใช้ key เดิม CDN อาจยังเก็บไฟล์เก่า ต้อง purge cache ตามระบบ CDN ที่ใช้
+- **Secret Key:** ใช้ AES-256-GCM เมื่อ OpenSSL รองรับ โดยอาศัย `wp_salt('auth')` และอ่านข้อมูลเก่าแบบ AES-256-CBC ได้ มี fallback เป็น CBC หาก GCM ใช้ไม่ได้ จึงไม่ควรถือว่าทุกสภาพแวดล้อมเข้ารหัสสำเร็จเสมอ หากเปลี่ยน auth salt อาจต้องกรอก secret ใหม่
+- **การถอนการติดตั้ง:** ลบ settings, ข้อมูลติดตาม, ตาราง ledger/migration และ cron ของปลั๊กอิน แต่ไม่ได้ดาวน์โหลดไฟล์จาก bucket กลับให้ก่อน หากต้องการเลิกใช้ Storage ให้ดาวน์โหลดและตรวจ URL ให้เรียบร้อยก่อน
 
----
+<a id="development"></a>
+## การทดสอบสำหรับผู้พัฒนา
 
-## 📄 การรับอนุญาตใช้งาน (License)
+รันจากโฟลเดอร์ปลั๊กอิน:
 
-GPLv3 or later.  
-© 2026 **InsightX** — ผลงานพัฒนาขึ้นใหม่ตามมาตรฐานสากล สงวนลิขสิทธิ์ตามกฎหมาย
+```bash
+php tests/run.php
+```
+
+ชุดทดสอบใช้ WordPress stubs และ fake S3 บน localhost ไม่ต้องใช้ bucket จริง โดยต้องอนุญาตให้ PHP เปิด process และฟังพอร์ต localhost ได้
+
+<a id="license"></a>
+## License
+
+[GPLv3 or later](LICENSE) — © 2026 InsightX

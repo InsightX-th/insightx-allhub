@@ -330,7 +330,7 @@ class ISXM_Admin {
                                     </div>
                                 </div>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy media files to storage automatically after upload', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
                                     <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-offload' ) ); ?>
                                     <?php $this->toggle( 'use_prefix', $s['use_prefix'], 'Add Prefix to Bucket Path', __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>

@@ -54,6 +54,7 @@ class ISXM_Migration_Test_DB extends ISXM_Test_WPDB {
     public function get_col( $sql = "" ) {
         $this->queries++;
         $this->last_error = '';
+        $sql = preg_replace( "/LIKE ('(?:[^']|'')*')(?! ESCAPE)/", "LIKE $1 ESCAPE '\\\\'", $sql ); // as in get_results()
         return $this->db->query( $sql )->fetchAll( PDO::FETCH_COLUMN );
     }
     public function get_row( $sql, $output = 'OBJECT' ) {
@@ -93,9 +94,10 @@ function clean_post_cache( $id ) {
 }
 function wp_remote_post( $url, $args ) { return wp_remote_request( $url, $args ); }
 function admin_url( $path ) { return 'https://example.com/wp-admin/' . $path; }
-function wp_next_scheduled( $hook ) { return false; }
-function wp_schedule_event() { return true; }
-function wp_clear_scheduled_hook() {}
+// Recording cron stubs: tests can assert what got (un)scheduled.
+function wp_next_scheduled( $hook ) { return $GLOBALS['isxm_t']['cron'][ $hook ] ?? false; }
+function wp_schedule_event( $ts = 0, $recurrence = '', $hook = '' ) { if ( $hook !== '' ) $GLOBALS['isxm_t']['cron'][ $hook ] = $ts; return true; }
+function wp_clear_scheduled_hook( $hook = '' ) { unset( $GLOBALS['isxm_t']['cron'][ $hook ] ); }
 
 function migration_fixture( $count = 3, $persist = true ) {
     isxm_test_reset();

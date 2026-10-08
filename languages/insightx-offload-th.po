@@ -1607,3 +1607,7 @@ msgstr "ลบไฟล์"
 #: includes/class-isxm-admin.php
 msgid "What to delete"
 msgstr "ต้องการลบแบบไหน"
+
+#: includes/class-isxm-admin.php
+msgid "Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour"
+msgstr "คัดลอกไฟล์ขึ้น storage อัตโนมัติ: media ทันทีหลังอัปโหลด และไฟล์ใหม่ในโฟลเดอร์ที่เลือกไว้ในการ์ด Offload media ทุกชั่วโมง"

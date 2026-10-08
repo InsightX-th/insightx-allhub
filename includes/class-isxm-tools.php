@@ -77,6 +77,10 @@ class ISXM_Tools {
         add_action( 'wp_ajax_isxs_sync_apply', [ $this, 'ajax_sync_apply' ] );
         add_action( 'wp_ajax_isxs_sync_orphan_cleanup', [ $this, 'ajax_sync_orphan_cleanup' ] );
         add_action( 'wp_ajax_isxs_diagnostic', [ $this, 'ajax_diagnostic' ] );
+        add_action( self::WATCH_HOOK, [ __CLASS__, 'watch_server_folders' ] );
+        // Sites that already had folders and auto-offload on before this
+        // version get their schedule without having to save again.
+        add_action( 'admin_init', [ __CLASS__, 'sync_watch_schedule' ] );
     }
 
     /**
@@ -221,6 +225,7 @@ class ISXM_Tools {
         $destination_changed = ( $current['provider'] !== $settings['provider'] );
 
         ISXM_Settings::save( $settings );
+        self::sync_watch_schedule();
 
         wp_send_json_success( [
             'message'              => $folders_warning !== '' ? $folders_warning : ( $folders_notice !== '' ? $folders_notice : __( 'Settings saved', 'insightx-offload' ) ),
@@ -554,11 +559,7 @@ class ISXM_Tools {
         $parts   = explode( ':', $rest, 2 );
         $idx     = isset( $tables[ $parts[0] ] ) ? array_search( $parts[0], $keys, true ) : 0;
         $after   = (int) ( $parts[1] ?? 0 );
-        $probes  = [];
-        foreach ( ISXM_Settings::server_folders() as $folder ) {
-            $probes[] = '%' . $wpdb->esc_like( '/' . $folder ) . '%';
-            $probes[] = '%' . $wpdb->esc_like( str_replace( '/', '\/', '/' . $folder ) ) . '%'; // JSON-escaped twin
-        }
+        $probes  = self::server_link_probes();
         if ( ! $probes ) {
             return [ 'processed' => 0, 'cursor' => '', 'done' => true, 'errors' => [] ];
         }
@@ -609,6 +610,81 @@ class ISXM_Tools {
         }
         uksort( $map, function ( $a, $b ) { return strlen( $b ) - strlen( $a ); } );
         return $map;
+    }
+
+    /** Hourly check of the Offload card's server folders (with "Offload Media" on). */
+    const WATCH_HOOK = 'isxs_server_folders_watch';
+
+    /**
+     * Keep the hourly watch scheduled exactly while it has something to do:
+     * "Offload Media" on and at least one server folder chosen.
+     */
+    public static function sync_watch_schedule() {
+        $wanted    = ISXM_Settings::get( 'offload_enabled' ) && ISXM_Settings::server_folders();
+        $scheduled = wp_next_scheduled( self::WATCH_HOOK );
+        if ( $wanted && ! $scheduled ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::WATCH_HOOK );
+        } elseif ( ! $wanted && $scheduled ) {
+            wp_clear_scheduled_hook( self::WATCH_HOOK );
+        }
+    }
+
+    /**
+     * The hourly watch: files dropped into a chosen folder outside WordPress
+     * (FTP, file manager) fire no upload hook, so look for new or changed
+     * files — and for links to uploaded ones still pointing at this site —
+     * and start an "Upload server folders" run when there is something to
+     * do. Never queues behind or alongside another job.
+     *
+     * @return bool Whether a run was started.
+     */
+    public static function watch_server_folders() {
+        if ( ! ISXM_Settings::get( 'offload_enabled' ) || ! ISXM_Settings::server_folders() ) return false;
+        if ( ISXM_Job::running() ) return false;
+        if ( self::tool_total( 'offload_folders' ) === 0 && ! self::server_links_left() ) return false;
+        $result = ISXM_Background::start_job( 'offload_folders' );
+        return ! isset( $result['error'] );
+    }
+
+    /**
+     * LIKE patterns for links to the chosen folders on this site (with and
+     * without www., plain and JSON-escaped). Host-specific on purpose: a
+     * link already moved to the bucket keeps the same path, and a bare
+     * path pattern made every rewrite pass re-read all of those rows.
+     *
+     * @return string[]
+     */
+    public static function server_link_probes() {
+        global $wpdb;
+        $bare   = preg_replace( '#^(https?://)?(www\.)?#i', '', untrailingslashit( home_url( '/' ) ) );
+        $probes = [];
+        foreach ( ISXM_Settings::server_folders() as $folder ) {
+            foreach ( [ $bare, 'www.' . $bare ] as $host ) {
+                $plain    = '//' . $host . '/' . $folder;
+                $probes[] = '%' . $wpdb->esc_like( $plain ) . '%';
+                $probes[] = '%' . $wpdb->esc_like( str_replace( '/', '\/', $plain ) ) . '%';
+            }
+        }
+        return $probes;
+    }
+
+    /**
+     * Whether posts or postmeta still hold a link to an uploaded server
+     * file on this site. Looks at a handful of candidate rows only — a link
+     * to a file that was never uploaded must not trigger a run every hour.
+     */
+    public static function server_links_left() {
+        global $wpdb;
+        $probes = self::server_link_probes();
+        if ( ! $probes ) return false;
+        foreach ( [ [ $wpdb->posts, 'post_content' ], [ $wpdb->postmeta, 'meta_value' ] ] as $t ) {
+            $where = implode( ' OR ', array_fill( 0, count( $probes ), $t[1] . ' LIKE %s' ) );
+            $rows  = $wpdb->get_col( $wpdb->prepare( "SELECT {$t[1]} FROM {$t[0]} WHERE {$where} LIMIT 20", $probes ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- table/column names are WordPress core's
+            foreach ( (array) $rows as $value ) {
+                if ( self::server_url_map( (string) $value ) ) return true;
+            }
+        }
+        return false;
     }
 
     /** Server files already on the bucket: relative path => mtime when uploaded. */

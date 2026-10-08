@@ -1892,9 +1892,6 @@ msgstr "ทั้งเว็บ"
 msgid "Use this folder"
 msgstr "ใช้โฟลเดอร์นี้"
 
-#: includes/class-isxm-file-manager-admin.php
-msgid "No matching users (administrators always have full access)."
-msgstr "ไม่พบผู้ใช้ (ผู้ดูแลระบบมีสิทธิ์ครบเสมอ)"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "View"
@@ -1904,9 +1901,6 @@ msgstr "ดู"
 msgid "Role"
 msgstr "Role"
 
-#: includes/class-isxm-file-manager-admin.php
-msgid "User"
-msgstr "ผู้ใช้"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Files"
@@ -1928,21 +1922,12 @@ msgstr "ค้นหาไฟล์"
 msgid "Who may use File Manager"
 msgstr "ใครใช้ จัดการไฟล์ ได้บ้าง"
 
-#: includes/class-isxm-file-manager-admin.php
-msgid "Administrators can always do everything. A person listed under \"Per person\" uses their own row instead of their role's."
-msgstr "ผู้ดูแลระบบทำได้ทุกอย่างเสมอ คนที่อยู่ใน \"รายบุคคล\" จะใช้สิทธิ์ในแถวของตัวเองแทนสิทธิ์ของ role"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "By role"
 msgstr "ตาม role"
 
-#: includes/class-isxm-file-manager-admin.php
-msgid "Per person"
-msgstr "รายบุคคล"
 
-#: includes/class-isxm-file-manager-admin.php
-msgid "Find a user by name or email"
-msgstr "ค้นหาผู้ใช้ด้วยชื่อหรืออีเมล"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "You do not have permission to do this."
@@ -2266,3 +2251,7 @@ msgstr "บันทึกว่าขึ้นแล้ว"
 #: includes/class-isxm-file-manager.php
 msgid "This file or folder is private to the server (configuration, backups, logs) and is not available here."
 msgstr "ไฟล์หรือโฟลเดอร์นี้เป็นของเซิร์ฟเวอร์ (การตั้งค่า, backup, log) เปิดจากที่นี่ไม่ได้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Administrators can always do everything. Everyone else gets what their role allows."
+msgstr "ผู้ดูแลระบบทำได้ทุกอย่างเสมอ คนอื่นได้สิทธิ์ตาม role ของตัวเอง"

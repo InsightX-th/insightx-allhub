@@ -2389,8 +2389,7 @@
   margin: 4px 0 10px;
   font-size: 13px;
 }
-.isxs-fm-access-title + .isxs-fm-table-wrap,
-.isxs-fm-user-find {
+.isxs-fm-access-title + .isxs-fm-table-wrap {
   margin-bottom: 22px;
 }
 .isxs-fm-access {
@@ -2439,45 +2438,6 @@
 .isxs-fm-access .isxs-btn {
   padding: 4px 10px;
   font-size: 12px;
-}
-.isxs-fm-user-find {
-  position: relative;
-  max-width: 420px;
-}
-.isxs-fm-user-hits {
-  position: absolute;
-  z-index: 5;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  background: var(--isxs-card);
-  border: 1px solid var(--isxs-line);
-  border-radius: 10px;
-  box-shadow: var(--isxs-shadow-lg);
-}
-.isxs-fm-user-hits[hidden] {
-  display: none;
-}
-.isxs-fm-user-hits button {
-  display: block;
-  width: 100%;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.isxs-fm-user-hits button:hover {
-  background: var(--isxs-accent-soft);
-}
-.isxs-fm-user-hits .is-empty {
-  padding: 7px 10px;
-  color: var(--isxs-muted);
 }
 
 @media (max-width: 782px) {

@@ -869,41 +869,30 @@
   const initAccess = () => {
     const ACTIONS = Object.keys(t.actions);
     let config = cfg.access.config;
-    const users = {};
-    cfg.access.users.forEach((u) => { users[u.id] = u; });
 
-    const head = (first) =>
-      "<thead><tr><th>" + esc(first) + "</th>" + ACTIONS.map((a) => '<th class="is-center">' + esc(t.actions[a]) + "</th>").join("") +
-      "<th>" + esc(t.folder) + "</th><th></th></tr></thead>";
+    const head = () =>
+      "<thead><tr><th>" + esc(t.role) + "</th>" + ACTIONS.map((a) => '<th class="is-center">' + esc(t.actions[a]) + "</th>").join("") +
+      "<th>" + esc(t.folder) + "</th></tr></thead>";
 
-    const row = (kind, key, label, sub, rule, removable) => {
+    const row = (key, label, rule) => {
       rule = rule || { actions: [], root: "" };
-      return '<tr data-kind="' + kind + '" data-key="' + esc(key) + '"><td class="isxs-fm-who"><strong>' + esc(label) + "</strong>" +
-        (sub ? "<small>" + esc(sub) + "</small>" : "") + "</td>" +
+      return '<tr data-key="' + esc(key) + '"><td class="isxs-fm-who"><strong>' + esc(label) + "</strong></td>" +
         ACTIONS.map((a) => '<td class="is-center"><input type="checkbox" data-action="' + a + '"' + (rule.actions.includes(a) ? " checked" : "") +
           ' aria-label="' + esc(label + ": " + t.actions[a]) + '"></td>').join("") +
         '<td class="isxs-fm-root"><code>' + esc(rule.root ? "/" + rule.root : t.whole) + "</code>" +
-        '<button type="button" class="isxs-btn isxs-btn-ghost isxs-fm-pickroot" data-root="' + esc(rule.root) + '">' + esc(t.choose) + "</button></td>" +
-        "<td>" + (removable ? '<button type="button" class="isxs-btn isxs-btn-danger isxs-fm-remove">' + esc(t.remove) + "</button>" : "") + "</td></tr>";
+        '<button type="button" class="isxs-btn isxs-btn-ghost isxs-fm-pickroot" data-root="' + esc(rule.root) + '">' + esc(t.choose) + "</button></td></tr>";
     };
 
     const render = () => {
-      $("#isxs-fm-access-roles").html(head(t.role) + "<tbody>" +
-        cfg.access.roles.map((r) => row("roles", r.slug, r.name, "", config.roles[r.slug], false)).join("") + "</tbody>");
-      const ids = Object.keys(config.users);
-      $("#isxs-fm-access-users").html(ids.length
-        ? head(t.user) + "<tbody>" + ids.map((id) => {
-            const u = users[id] || { name: "#" + id, email: "" };
-            return row("users", id, u.name, u.email, config.users[id], true);
-          }).join("") + "</tbody>"
-        : "");
+      $("#isxs-fm-access-roles").html(head() + "<tbody>" +
+        cfg.access.roles.map((r) => row(r.slug, r.name, config.roles[r.slug])).join("") + "</tbody>");
     };
 
     const collect = () => {
-      const out = { roles: {}, users: {} };
-      $(".isxs-fm-access tbody tr").each(function () {
+      const out = { roles: {} };
+      $("#isxs-fm-access-roles tbody tr").each(function () {
         const $r = $(this);
-        out[$r.attr("data-kind")][$r.attr("data-key")] = {
+        out.roles[$r.attr("data-key")] = {
           actions: $r.find("[data-action]:checked").map(function () { return $(this).attr("data-action"); }).get(),
           root: $r.find(".isxs-fm-pickroot").attr("data-root") || "",
         };
@@ -915,13 +904,12 @@
       api("save_access", { config: JSON.stringify(collect()) })
         .then((d) => {
           config = d.config;
-          d.users.forEach((u) => { users[u.id] = u; });
           render();
           toast(t.saved, false);
         })
         .catch((e) => toast(e.message, true));
 
-    const $access = $(".isxs-fm-access");
+    const $access = $("#isxs-fm-access-roles");
     $access.on("change", "[data-action]", function () {
       // Nothing counts without "view": any other box ticks it too, and
       // unticking it clears the row.
@@ -933,41 +921,11 @@
       }
       save();
     });
-    $access.on("click", ".isxs-fm-remove", function () { $(this).closest("tr").remove(); save(); });
     $access.on("click", ".isxs-fm-pickroot", async function () {
       const $btn = $(this);
       const to = await pickFolder(t.chooseFolder, t.useFolder, "", $btn.attr("data-root").replace(/\/$/, ""));
       if (to === null || to === true) return;
       $btn.attr("data-root", to ? to + "/" : "");
-      save();
-    });
-
-    // Find a user, click to add their row.
-    let findTimer = null;
-    const $hits = $("#isxs-fm-user-hits");
-    $("#isxs-fm-user-q").on("input", function () {
-      clearTimeout(findTimer);
-      const q = this.value.trim();
-      if (q.length < 2) { $hits.prop("hidden", true); return; }
-      findTimer = setTimeout(() => {
-        api("users", { q })
-          .then((list) => {
-            $hits.empty().prop("hidden", false);
-            if (!list.length) { $hits.append($('<li class="is-empty">').text(t.noUsers)); return; }
-            list.forEach((u) => {
-              users[u.id] = u;
-              $hits.append($("<li>").append($('<button type="button">').attr("data-id", u.id).text(u.name + " · " + u.email)));
-            });
-          })
-          .catch((e) => toast(e.message, true));
-      }, 250);
-    });
-    $hits.on("click", "button[data-id]", function () {
-      const id = $(this).attr("data-id");
-      if (!config.users[id]) config.users[id] = { actions: ["view"], root: "" };
-      $hits.prop("hidden", true);
-      $("#isxs-fm-user-q").val("");
-      render();
       save();
     });
 

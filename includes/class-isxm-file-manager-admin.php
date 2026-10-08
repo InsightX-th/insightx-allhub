@@ -169,9 +169,7 @@ class ISXM_File_Manager_Admin {
                 'openOnBucket'  => __( 'Open the bucket copy', 'insightx-offload' ),
                 'healed'        => __( 'recorded as uploaded', 'insightx-offload' ),
                 'no'            => __( 'No', 'insightx-offload' ),
-                'user'          => __( 'User', 'insightx-offload' ),
                 'folder'        => __( 'Folder', 'insightx-offload' ),
-                'noUsers'       => __( 'No matching users (administrators always have full access).', 'insightx-offload' ),
                 'actions'       => [
                     'view'     => __( 'View', 'insightx-offload' ),
                     'upload'   => __( 'Upload', 'insightx-offload' ),
@@ -266,19 +264,13 @@ class ISXM_File_Manager_Admin {
                     <div class="isxs-card-head-title">
                         <div>
                             <h2><?php esc_html_e( 'Who may use File Manager', 'insightx-offload' ); ?></h2>
-                            <p class="isxs-card-sub"><?php esc_html_e( 'Administrators can always do everything. A person listed under "Per person" uses their own row instead of their role\'s.', 'insightx-offload' ); ?></p>
+                            <p class="isxs-card-sub"><?php esc_html_e( 'Administrators can always do everything. Everyone else gets what their role allows.', 'insightx-offload' ); ?></p>
                         </div>
                     </div>
                 </div>
                 <div class="isxs-card-body">
                     <h3 class="isxs-fm-access-title"><?php esc_html_e( 'By role', 'insightx-offload' ); ?></h3>
                     <div class="isxs-fm-table-wrap"><table class="isxs-fm-access" id="isxs-fm-access-roles"></table></div>
-                    <h3 class="isxs-fm-access-title"><?php esc_html_e( 'Per person', 'insightx-offload' ); ?></h3>
-                    <div class="isxs-fm-user-find">
-                        <input type="search" id="isxs-fm-user-q" class="isxs-fm-input" placeholder="<?php esc_attr_e( 'Find a user by name or email', 'insightx-offload' ); ?>" autocomplete="off">
-                        <ul class="isxs-fm-user-hits" id="isxs-fm-user-hits" hidden></ul>
-                    </div>
-                    <div class="isxs-fm-table-wrap"><table class="isxs-fm-access" id="isxs-fm-access-users"></table></div>
                 </div>
             </div>
             <?php endif; ?>
@@ -310,7 +302,7 @@ class ISXM_File_Manager_Admin {
     public function ajax() {
         check_ajax_referer( self::NONCE, 'nonce' );
         $op      = isset( $_POST['op'] ) ? sanitize_key( $_POST['op'] ) : '';
-        $allowed = in_array( $op, [ 'users', 'save_access', 'compress' ], true )
+        $allowed = in_array( $op, [ 'save_access', 'compress' ], true )
             ? current_user_can( 'manage_options' )
             : isset( self::OP_ACTION[ $op ] ) && ISXM_File_Manager_Access::can( self::OP_ACTION[ $op ] );
         if ( ! $allowed ) wp_send_json_error( [ 'code' => 'isxfm_denied', 'message' => __( 'You do not have permission to do this.', 'insightx-offload' ) ], 403 );
@@ -321,9 +313,6 @@ class ISXM_File_Manager_Admin {
         switch ( $op ) {
             case 'search':
                 $result = $fs->search( $path, isset( $_POST['q'] ) ? (string) wp_unslash( $_POST['q'] ) : '' );
-                break;
-            case 'users':
-                $result = $this->find_users( isset( $_POST['q'] ) ? sanitize_text_field( wp_unslash( $_POST['q'] ) ) : '' );
                 break;
             case 'save_access':
                 $raw    = json_decode( isset( $_POST['config'] ) ? (string) wp_unslash( $_POST['config'] ) : '', true );
@@ -433,29 +422,7 @@ class ISXM_File_Manager_Admin {
         foreach ( $this->role_slugs() as $slug ) {
             $roles[] = [ 'slug' => $slug, 'name' => translate_user_role( wp_roles()->roles[ $slug ]['name'] ) ];
         }
-        $users = [];
-        foreach ( array_keys( $config['users'] ) as $id ) {
-            $user = get_userdata( (int) $id );
-            if ( $user ) $users[] = $this->user_row( $user );
-        }
-        return [ 'roles' => $roles, 'config' => $config, 'users' => $users ];
-    }
-
-    private function user_row( WP_User $user ) {
-        return [ 'id' => (int) $user->ID, 'name' => $user->display_name, 'email' => $user->user_email ];
-    }
-
-    /** Up to ten non-administrators matching a name, login or email. */
-    private function find_users( $q ) {
-        if ( strlen( $q ) < 2 ) return [];
-        $found = get_users( [
-            'search'         => '*' . $q . '*',
-            'search_columns' => [ 'user_login', 'user_email', 'display_name' ],
-            'role__not_in'   => [ 'administrator' ],
-            'number'         => 10,
-            'orderby'        => 'display_name',
-        ] );
-        return array_map( [ $this, 'user_row' ], $found );
+        return [ 'roles' => $roles, 'config' => $config ];
     }
 
     /** ?path= from "Open in new tab" when it is a folder this user may see; else their folder or download/. */

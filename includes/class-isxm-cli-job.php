@@ -139,7 +139,7 @@ class ISXM_CLI_Job {
         }
 
         WP_CLI::success( sprintf(
-            $resume ? __( 'Resumed "%s"', 'insightx-offload' ) : __( 'Started "%s"', 'insightx-offload' ),
+            $resume ? __( 'Resumed "%s"', 'insightx-allhub' ) : __( 'Started "%s"', 'insightx-allhub' ),
             ISXM_Tools::tool_label( $tool )
         ) );
 
@@ -151,7 +151,7 @@ class ISXM_CLI_Job {
         if ( $runner === 'cli' ) { WP_CLI::log( 'Run `wp isxm job run` or configure external cron.' ); return; }
         if ( ! ISXM_Background::loopback_available() ) {
             WP_CLI::warning(
-                __( 'This site cannot make loopback requests to itself — the job will not advance in the background. Run `wp isxm job run` (or add it to cron) to drive it to completion', 'insightx-offload' )
+                __( 'This site cannot make loopback requests to itself — the job will not advance in the background. Run `wp isxm job run` (or add it to cron) to drive it to completion', 'insightx-allhub' )
             );
         }
     }
@@ -178,11 +178,11 @@ class ISXM_CLI_Job {
         $this->assert_tool( $tool );
 
         if ( ! ISXM_Background::pause_job( $tool ) ) {
-            WP_CLI::warning( sprintf( __( '"%s" is not running', 'insightx-offload' ), ISXM_Tools::tool_label( $tool ) ) );
+            WP_CLI::warning( sprintf( __( '"%s" is not running', 'insightx-allhub' ), ISXM_Tools::tool_label( $tool ) ) );
             return;
         }
         WP_CLI::success( sprintf(
-            __( 'Stop requested for "%s" — the batch in progress finishes first, then it stops (run `wp isxm job list` to check the status)', 'insightx-offload' ),
+            __( 'Stop requested for "%s" — the batch in progress finishes first, then it stops (run `wp isxm job list` to check the status)', 'insightx-allhub' ),
             ISXM_Tools::tool_label( $tool )
         ) );
     }
@@ -212,7 +212,7 @@ class ISXM_CLI_Job {
         $job = ISXM_Job::get( $tool );
         if ( ! $job || ! $job->is_resumable() ) {
             WP_CLI::error( sprintf(
-                __( '"%s" has no checkpoint to resume — use `wp isxm job start %s` to start over', 'insightx-offload' ),
+                __( '"%s" has no checkpoint to resume — use `wp isxm job start %s` to start over', 'insightx-allhub' ),
                 ISXM_Tools::tool_label( $tool ),
                 $tool
             ) );
@@ -247,20 +247,20 @@ class ISXM_CLI_Job {
 
         $job = ISXM_Job::get( $tool );
         if ( ! $job ) {
-            WP_CLI::warning( sprintf( __( '"%s" has no record', 'insightx-offload' ), ISXM_Tools::tool_label( $tool ) ) );
+            WP_CLI::warning( sprintf( __( '"%s" has no record', 'insightx-allhub' ), ISXM_Tools::tool_label( $tool ) ) );
             return;
         }
 
         if ( $job->processed > 0 ) {
             WP_CLI::confirm( sprintf(
-                __( 'Cancel "%s"? %s items processed so far — that work stays intact, but the checkpoint will be deleted', 'insightx-offload' ),
+                __( 'Cancel "%s"? %s items processed so far — that work stays intact, but the checkpoint will be deleted', 'insightx-allhub' ),
                 ISXM_Tools::tool_label( $tool ),
                 number_format_i18n( $job->processed )
             ), $assoc_args );
         }
 
         ISXM_Background::cancel_job( $tool );
-        WP_CLI::success( sprintf( __( 'Cancelled "%s"', 'insightx-offload' ), ISXM_Tools::tool_label( $tool ) ) );
+        WP_CLI::success( sprintf( __( 'Cancelled "%s"', 'insightx-allhub' ), ISXM_Tools::tool_label( $tool ) ) );
     }
 
     /**
@@ -293,11 +293,11 @@ class ISXM_CLI_Job {
     public function run( $args, $assoc_args ) {
         $job = ISXM_Job::running();
         if ( ! $job ) {
-            WP_CLI::success( __( 'No job is running — nothing to do', 'insightx-offload' ) );
+            WP_CLI::success( __( 'No job is running — nothing to do', 'insightx-allhub' ) );
             return;
         }
 
-        WP_CLI::log( sprintf( __( 'Driving job "%s"…', 'insightx-offload' ), ISXM_Tools::tool_label( $job->tool ) ) );
+        WP_CLI::log( sprintf( __( 'Driving job "%s"…', 'insightx-allhub' ), ISXM_Tools::tool_label( $job->tool ) ) );
 
         if ( ! empty( $assoc_args['once'] ) ) {
             ISXM_Background::run( true );
@@ -327,10 +327,10 @@ class ISXM_CLI_Job {
      *     wp isxm job reset --yes
      */
     public function reset( $args, $assoc_args ) {
-        WP_CLI::confirm( __( 'Delete the records of every job? (work already done is not touched)', 'insightx-offload' ), $assoc_args );
+        WP_CLI::confirm( __( 'Delete the records of every job? (work already done is not touched)', 'insightx-allhub' ), $assoc_args );
 
         $dropped = ISXM_Background::reset_jobs();
-        WP_CLI::success( sprintf( __( 'Deleted %d records', 'insightx-offload' ), $dropped ) );
+        WP_CLI::success( sprintf( __( 'Deleted %d records', 'insightx-allhub' ), $dropped ) );
     }
 
     /* ---------------------------------------------------------------------
@@ -369,10 +369,10 @@ class ISXM_CLI_Job {
             $p    = $job->to_payload();
             $line = $p['total'] > 0
                 ? sprintf( '  %s%%  %s/%s', $p['percent'], number_format_i18n( $p['processed'] ), number_format_i18n( $p['total'] ) )
-                : sprintf( __( '  %s items', 'insightx-offload' ), number_format_i18n( $p['processed'] ) );
+                : sprintf( __( '  %s items', 'insightx-allhub' ), number_format_i18n( $p['processed'] ) );
             $line .= '  stage=' . ( $job->activity['stage'] ?? $job->phase ) . ' cursor=' . wp_json_encode( $job->migration['rewrite'] ?? [ 'after' => $job->migration['after'] ?? 0 ] );
             if ( $p['error_count'] > 0 ) {
-                $line .= sprintf( __( '  (%s failed)', 'insightx-offload' ), number_format_i18n( $p['error_count'] ) );
+                $line .= sprintf( __( '  (%s failed)', 'insightx-allhub' ), number_format_i18n( $p['error_count'] ) );
             }
             // Only print when something actually moved — a lock-contended
             // slice can return without having processed anything.
@@ -401,42 +401,42 @@ class ISXM_CLI_Job {
     private function report( $tool ) {
         $job = ISXM_Job::get( $tool );
         if ( ! $job ) {
-            WP_CLI::success( __( 'The job was cancelled', 'insightx-offload' ) );
+            WP_CLI::success( __( 'The job was cancelled', 'insightx-allhub' ) );
             return;
         }
 
         $p       = $job->to_payload();
         $summary = sprintf(
-            __( '%s — %s items processed%s', 'insightx-offload' ),
+            __( '%s — %s items processed%s', 'insightx-allhub' ),
             ISXM_Tools::tool_label( $tool ),
             number_format_i18n( $p['processed'] ),
-            $p['error_count'] > 0 ? sprintf( __( ', %s failed', 'insightx-offload' ), number_format_i18n( $p['error_count'] ) ) : ''
+            $p['error_count'] > 0 ? sprintf( __( ', %s failed', 'insightx-allhub' ), number_format_i18n( $p['error_count'] ) ) : ''
         );
 
         switch ( $job->state ) {
             case ISXM_Job::STATE_DONE:
-                WP_CLI::success( __( 'Done: ', 'insightx-offload' ) . $summary );
+                WP_CLI::success( __( 'Done: ', 'insightx-allhub' ) . $summary );
                 break;
             case ISXM_Job::STATE_PAUSED:
-                WP_CLI::log( __( 'Paused: ', 'insightx-offload' ) . $summary );
-                WP_CLI::log( sprintf( __( 'Resume with: wp isxm job resume %s', 'insightx-offload' ), $tool ) );
+                WP_CLI::log( __( 'Paused: ', 'insightx-allhub' ) . $summary );
+                WP_CLI::log( sprintf( __( 'Resume with: wp isxm job resume %s', 'insightx-allhub' ), $tool ) );
                 break;
             case ISXM_Job::STATE_ERROR:
-                WP_CLI::warning( __( 'Stopped on error: ', 'insightx-offload' ) . $summary );
+                WP_CLI::warning( __( 'Stopped on error: ', 'insightx-allhub' ) . $summary );
                 if ( $job->message !== '' ) {
                     WP_CLI::log( '  ' . $job->message );
                 }
-                WP_CLI::log( sprintf( __( 'Fix it, then resume with: wp isxm job resume %s', 'insightx-offload' ), $tool ) );
+                WP_CLI::log( sprintf( __( 'Fix it, then resume with: wp isxm job resume %s', 'insightx-allhub' ), $tool ) );
                 break;
             default:
-                WP_CLI::log( __( 'Still running: ', 'insightx-offload' ) . $summary );
+                WP_CLI::log( __( 'Still running: ', 'insightx-allhub' ) . $summary );
         }
 
         // The per-item failures are the actionable part of a run that
         // "finished" with errors, so show a sample rather than making the
         // operator go find them in wp-admin.
         if ( $p['error_count'] > 0 && ! empty( $p['errors'] ) ) {
-            WP_CLI::log( __( 'Sample failures:', 'insightx-offload' ) );
+            WP_CLI::log( __( 'Sample failures:', 'insightx-allhub' ) );
             foreach ( array_slice( $p['errors'], -5 ) as $err ) {
                 WP_CLI::log( '  ' . $err );
             }
@@ -449,7 +449,7 @@ class ISXM_CLI_Job {
     private function assert_tool( $tool ) {
         if ( ! ISXM_Tools::is_known_tool( $tool ) ) {
             WP_CLI::error( sprintf(
-                __( 'Unknown tool "%s" — choose from: %s', 'insightx-offload' ),
+                __( 'Unknown tool "%s" — choose from: %s', 'insightx-allhub' ),
                 $tool,
                 implode( ', ', array_keys( ISXM_Tools::tools() ) )
             ) );

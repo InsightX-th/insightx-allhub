@@ -68,7 +68,7 @@ class ISX_Admin {
 	private static $driving_synchronously = false;
 
 	public static function boot() {
-		// After InsightX Offload's own items (Offload 10, File Manager 20).
+		// After InsightX AllHub's own items (Offload 10, File Manager 20).
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ), 30 );
 		add_filter( 'parent_file', array( __CLASS__, 'parent_file' ) );
 		add_filter( 'submenu_file', array( __CLASS__, 'submenu_file' ) );
@@ -172,12 +172,12 @@ class ISX_Admin {
 	}
 
 	/**
-	 * One "Backup" item under InsightX Offload (it opens Export); the other
+	 * One "Backup" item under InsightX AllHub (it opens Export); the other
 	 * screens stay registered — so their URLs and redirects keep working —
 	 * but are reached through the tabs instead of seven more menu items.
 	 */
 	public static function menu() {
-		$parent = defined( 'ISXM_PLUGIN_DIR' ) ? 'insightx-offload' : 'tools.php';
+		$parent = defined( 'ISXM_PLUGIN_DIR' ) ? 'insightx-allhub' : 'tools.php';
 		foreach ( self::screens() as $slug => $screen ) {
 			// The other screens hang off options.php: registered (so they open,
 			// with their own capability) but in no menu. Removing them from the
@@ -191,9 +191,9 @@ class ISX_Admin {
 		return isset( self::screens()[ $page ] ) ? $page : '';
 	}
 
-	/** Keep InsightX Offload → Backup highlighted on every Backup tab. */
+	/** Keep InsightX AllHub → Backup highlighted on every Backup tab. */
 	public static function parent_file( $file ) {
-		return self::on_backup_screen() !== '' && defined( 'ISXM_PLUGIN_DIR' ) ? 'insightx-offload' : $file;
+		return self::on_backup_screen() !== '' && defined( 'ISXM_PLUGIN_DIR' ) ? 'insightx-allhub' : $file;
 	}
 
 	public static function submenu_file( $file ) {
@@ -202,7 +202,7 @@ class ISX_Admin {
 
 	/**
 	 * Header + tab bar at the top of every Backup screen, matching the
-	 * InsightX Offload pages around it: what this is, where backups go, how
+	 * InsightX AllHub pages around it: what this is, where backups go, how
 	 * many there are and whether a schedule is on.
 	 */
 	public static function tabs() {

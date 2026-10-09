@@ -106,7 +106,7 @@ class ISXM_Tools {
      */
     private function guard() {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( [ 'message' => __( 'Permission denied', 'insightx-offload' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Permission denied', 'insightx-allhub' ) ], 403 );
         }
         check_ajax_referer( self::NONCE_ACTION, 'nonce' );
     }
@@ -197,16 +197,16 @@ class ISXM_Tools {
             $settings['offload_media_library']  = $split['media'];
             $settings['offload_server_folders'] = $split['folders'];
             if ( $split['inside_uploads'] ) {
-                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'Folders inside %1$s were removed — the Media Library chip already covers them: %2$s', 'insightx-offload' ), ISXM_Settings::uploads_relative(), implode( ', ', $split['inside_uploads'] ) ) );
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'Folders inside %1$s were removed — the Media Library chip already covers them: %2$s', 'insightx-allhub' ), ISXM_Settings::uploads_relative(), implode( ', ', $split['inside_uploads'] ) ) );
             }
             if ( $split['rejected'] ) {
-                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-offload' ), implode( ', ', $split['rejected'] ) ) );
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-allhub' ), implode( ', ', $split['rejected'] ) ) );
             }
         } elseif ( isset( $_POST['offload_server_folders'] ) ) {
             $server = self::sanitize_server_folders( wp_unslash( (string) $_POST['offload_server_folders'] ) );
             $settings['offload_server_folders'] = $server['value'];
             if ( $server['rejected'] ) {
-                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-offload' ), implode( ', ', $server['rejected'] ) ) );
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These server folders cannot be uploaded and were removed: %s', 'insightx-allhub' ), implode( ', ', $server['rejected'] ) ) );
             }
         } else {
             $settings['offload_server_folders'] = $current['offload_server_folders'];
@@ -220,7 +220,7 @@ class ISXM_Tools {
             $pdf = self::sanitize_server_folders( wp_unslash( (string) $_POST['pdf_folders'] ) );
             $settings['pdf_folders'] = $pdf['value'];
             if ( $pdf['rejected'] ) {
-                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These folders cannot be used and were removed: %s', 'insightx-offload' ), implode( ', ', $pdf['rejected'] ) ) );
+                $folders_warning = trim( $folders_warning . ' ' . sprintf( __( 'These folders cannot be used and were removed: %s', 'insightx-allhub' ), implode( ', ', $pdf['rejected'] ) ) );
             }
         }
         if ( isset( $_POST['pdf_backup'] ) ) {
@@ -252,7 +252,7 @@ class ISXM_Tools {
         self::sync_watch_schedule();
 
         wp_send_json_success( [
-            'message'              => $folders_warning !== '' ? $folders_warning : ( $folders_notice !== '' ? $folders_notice : __( 'Settings saved', 'insightx-offload' ) ),
+            'message'              => $folders_warning !== '' ? $folders_warning : ( $folders_notice !== '' ? $folders_notice : __( 'Settings saved', 'insightx-allhub' ) ),
             'warning'              => $folders_warning !== '',
             // The picker's "Media Library" badge: none when no ticked folder is the uploads root.
             'source_prefix'        => ISXM_Settings::get( 'source_media' ) ? ISXM_Settings::get( 'source_prefix' ) : '',
@@ -385,9 +385,9 @@ class ISXM_Tools {
         } elseif ( $failed ) {
             // Can't tell — keep the previous root if it is still ticked.
             $out['media']   = in_array( $previous, $folders, true );
-            $out['warning'] = __( 'Could not read the source bucket to find the Media Library folder — the previous setting is kept. Check the source connection.', 'insightx-offload' );
+            $out['warning'] = __( 'Could not read the source bucket to find the Media Library folder — the previous setting is kept. Check the source connection.', 'insightx-allhub' );
         } elseif ( $folders ) {
-            $out['notice'] = __( 'No Media Library folder selected — Migrate will copy only the selected folders, keeping their paths.', 'insightx-offload' );
+            $out['notice'] = __( 'No Media Library folder selected — Migrate will copy only the selected folders, keeping their paths.', 'insightx-allhub' );
         }
         $root   = $out['media'] ? $out['prefix'] : '';
         $extras = array_values( array_diff( $folders, [ $root ] ) );
@@ -507,17 +507,17 @@ class ISXM_Tools {
         if ( $value === '' ) return '';
         $folder = self::sanitize_prefix( $value );
         if ( $folder === '' || preg_match( '#(^|/)\.#', $folder ) || self::server_path_blocked( $folder ) ) {
-            return new WP_Error( 'isxs_pdf_backup', __( 'That folder cannot hold the original PDFs', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_pdf_backup', __( 'That folder cannot hold the original PDFs', 'insightx-allhub' ) );
         }
         $pdf = trim( (string) $pdf_folders ) === '' ? ISXM_Settings::server_folders() : preg_split( '/\s*,\s*/', trim( (string) $pdf_folders ) );
         foreach ( $pdf as $f ) {
             if ( $f !== '' && strpos( $folder, trailingslashit( $f ) ) === 0 ) {
-                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder being shrunk', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder being shrunk', 'insightx-allhub' ) );
             }
         }
         foreach ( preg_split( '/\s*,\s*/', trim( (string) $offload_folders ) ) as $f ) {
             if ( $f !== '' && strpos( $folder, trailingslashit( $f ) ) === 0 ) {
-                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder on the Offload media card (the originals would go up to the bucket)', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_pdf_backup', __( 'The originals folder cannot be inside a folder on the Offload media card (the originals would go up to the bucket)', 'insightx-allhub' ) );
             }
         }
         return $folder;
@@ -587,11 +587,11 @@ class ISXM_Tools {
         $path     = ABSPATH . $relative;
         $dpi      = (int) ISXM_Settings::get( 'pdf_dpi' );
         $backup   = (string) ISXM_Settings::get( 'pdf_backup' );
-        if ( ! is_file( $path ) ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-offload' ) );
+        if ( ! is_file( $path ) ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-allhub' ) );
         if ( $backup !== '' ) {
             $copy = ABSPATH . $backup . $relative;
             if ( ! file_exists( $copy ) && ( ! wp_mkdir_p( dirname( $copy ) ) || ! @copy( $path, $copy ) ) ) {
-                return new WP_Error( 'isxs_pdf_backup_failed', __( 'Could not copy the original to the originals folder — the file was not shrunk', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_pdf_backup_failed', __( 'Could not copy the original to the originals folder — the file was not shrunk', 'insightx-allhub' ) );
             }
         }
         $result = ISXM_Pdf::compress( $path, $dpi, apply_filters( 'isxs_pdf_runner', null ) );
@@ -634,10 +634,10 @@ class ISXM_Tools {
         $result = self::shrink_pdf_local( $relative );
         if ( is_wp_error( $result ) ) {
             /* translators: %s: error. */
-            $notes[] = sprintf( __( 'not shrunk: %s', 'insightx-offload' ), $result->get_error_message() );
+            $notes[] = sprintf( __( 'not shrunk: %s', 'insightx-allhub' ), $result->get_error_message() );
         } elseif ( $result['replaced'] ) {
             /* translators: 1: size before, 2: size after. */
-            $notes[] = sprintf( __( 'shrunk from %1$s to %2$s', 'insightx-offload' ), size_format( $result['before'], 1 ), size_format( $result['after'], 1 ) );
+            $notes[] = sprintf( __( 'shrunk from %1$s to %2$s', 'insightx-allhub' ), size_format( $result['before'], 1 ), size_format( $result['after'], 1 ) );
         }
         return $notes;
     }
@@ -699,7 +699,7 @@ class ISXM_Tools {
         if ( ! $chosen && $added === '' && strpos( $relative, '/' ) !== false ) return $notes;
         if ( $added !== '' ) {
             /* translators: %s: folder, e.g. download/. */
-            $notes[] = sprintf( __( 'added %s to the Offload media card', 'insightx-offload' ), $added );
+            $notes[] = sprintf( __( 'added %s to the Offload media card', 'insightx-allhub' ), $added );
         }
 
         $type   = wp_check_filetype( wp_basename( $relative ) );
@@ -707,12 +707,12 @@ class ISXM_Tools {
         $result = $client->put_object( $relative, ABSPATH . $relative, $type['type'] ?: 'application/octet-stream', (bool) ISXM_Settings::get( 'send_public_acl' ) );
         if ( is_wp_error( $result ) ) {
             /* translators: 1: destination, e.g. "Cloudflare R2 · bucket shop", 2: storage error. */
-            array_unshift( $notes, sprintf( __( 'Not on %1$s yet: %2$s (retried on the next hourly check)', 'insightx-offload' ), self::destination_label(), $result->get_error_message() ) );
+            array_unshift( $notes, sprintf( __( 'Not on %1$s yet: %2$s (retried on the next hourly check)', 'insightx-allhub' ), self::destination_label(), $result->get_error_message() ) );
             return $notes;
         }
         self::manifest_merge( [ $relative => (int) @filemtime( ABSPATH . $relative ) ] );
         /* translators: %s: destination, e.g. "Cloudflare R2 · bucket shop". */
-        array_unshift( $notes, sprintf( __( 'Uploaded to %s', 'insightx-offload' ), self::destination_label() ) );
+        array_unshift( $notes, sprintf( __( 'Uploaded to %s', 'insightx-allhub' ), self::destination_label() ) );
         return $notes;
     }
 
@@ -731,12 +731,12 @@ class ISXM_Tools {
         $done = ( new ISXM_Client() )->delete_object( $relative );
         if ( is_wp_error( $done ) ) {
             /* translators: 1: destination, 2: storage error. */
-            $notes[] = sprintf( __( 'still on %1$s: %2$s', 'insightx-offload' ), self::destination_label(), $done->get_error_message() );
+            $notes[] = sprintf( __( 'still on %1$s: %2$s', 'insightx-allhub' ), self::destination_label(), $done->get_error_message() );
             return $notes;
         }
         self::manifest_merge( [], [ $relative ] );
         /* translators: %s: destination. */
-        $note = sprintf( __( 'removed from %s', 'insightx-offload' ), self::destination_label() );
+        $note = sprintf( __( 'removed from %s', 'insightx-allhub' ), self::destination_label() );
         if ( ! in_array( $note, $notes, true ) ) $notes[] = $note;
         return $notes;
     }
@@ -748,7 +748,7 @@ class ISXM_Tools {
         $label     = $providers[ $slug ]['label'] ?? $providers['custom']['label'];
         $bucket    = (string) ( ISXM_Connections::get( $slug )['bucket'] ?? '' );
         /* translators: 1: provider name, 2: bucket name. */
-        return $bucket === '' ? $label : sprintf( __( '%1$s · bucket %2$s', 'insightx-offload' ), $label, $bucket );
+        return $bucket === '' ? $label : sprintf( __( '%1$s · bucket %2$s', 'insightx-allhub' ), $label, $bucket );
     }
 
     /**
@@ -1107,7 +1107,7 @@ class ISXM_Tools {
             $base = trailingslashit( (string) realpath( ABSPATH . $prefix ) );
         }
         if ( $base === '' || $base === '/' ) {
-            wp_send_json_error( [ 'message' => __( 'This folder cannot be browsed', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'This folder cannot be browsed', 'insightx-allhub' ) ] );
         }
         $folders = [];
         foreach ( (array) scandir( $base ) as $name ) {
@@ -1142,7 +1142,7 @@ class ISXM_Tools {
         $providers = ISXM_Connections::providers();
         $provider  = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( $_POST['provider'] ) ) : '';
         if ( ! array_key_exists( $provider, $providers ) ) {
-            wp_send_json_error( [ 'message' => __( 'Invalid provider', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Invalid provider', 'insightx-allhub' ) ] );
         }
 
         $current = ISXM_Connections::get( $provider );
@@ -1168,7 +1168,7 @@ class ISXM_Tools {
         ISXM_Connections::save_one( $provider, $config );
 
         $connected = false;
-        $message   = __( 'Saved — some fields are still missing', 'insightx-offload' );
+        $message   = __( 'Saved — some fields are still missing', 'insightx-allhub' );
 
         if ( ISXM_Connections::is_configured( $provider ) ) {
             $client = new ISXM_Client( ISXM_Connections::get( $provider ) );
@@ -1178,7 +1178,7 @@ class ISXM_Tools {
                 ISXM_Connections::save_status( $provider, 'error', $message );
             } else {
                 $connected = true;
-                $message   = __( 'Connected to the bucket successfully', 'insightx-offload' );
+                $message   = __( 'Connected to the bucket successfully', 'insightx-allhub' );
                 ISXM_Connections::save_status( $provider, 'ok', $message );
             }
         }
@@ -1245,12 +1245,12 @@ class ISXM_Tools {
         $this->guard();
 
         if ( ! ISXM_Settings::is_configured() ) {
-            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured — save the settings first', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured — save the settings first', 'insightx-allhub' ) ] );
         }
 
         $run_id = isset( $_POST['run_id'] ) ? sanitize_key( wp_unslash( $_POST['run_id'] ) ) : '';
         if ( $run_id === '' ) {
-            wp_send_json_error( [ 'message' => __( 'run_id is missing — please try again', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'run_id is missing — please try again', 'insightx-allhub' ) ] );
         }
         if ( function_exists( 'set_time_limit' ) ) {
             @set_time_limit( self::MAX_REQUEST_SECONDS );
@@ -1277,7 +1277,7 @@ class ISXM_Tools {
         if ( $state['bucket'] !== ISXM_Settings::get( 'bucket' ) || $state['endpoint'] !== ISXM_Settings::get( 'endpoint' ) ) {
             ISXM_Sync::delete_state( $run_id );
             ISXM_Sync::cleanup_run_files( $run_id );
-            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since the scan started — run the check again', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since the scan started — run the check again', 'insightx-allhub' ) ] );
         }
 
         $processed = 0;
@@ -1368,7 +1368,7 @@ class ISXM_Tools {
         // show the user.
         $e = ISXM_Sync::load_or_build_expected( $run_id );
         if ( $e === null ) {
-            $errors[] = __( 'The scan did not complete — please try again', 'insightx-offload' );
+            $errors[] = __( 'The scan did not complete — please try again', 'insightx-allhub' );
             ISXM_Sync::delete_state( $run_id );
             return [ 'processed' => $processed, 'errors' => $errors ];
         }
@@ -1472,20 +1472,20 @@ class ISXM_Tools {
         $this->guard();
 
         if ( ! ISXM_Settings::is_configured() ) {
-            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured', 'insightx-allhub' ) ] );
         }
 
         $run_id = isset( $_POST['run_id'] ) ? sanitize_key( wp_unslash( $_POST['run_id'] ) ) : '';
         if ( $run_id === '' ) {
-            wp_send_json_error( [ 'message' => __( 'run_id is missing — sync with the bucket first', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'run_id is missing — sync with the bucket first', 'insightx-allhub' ) ] );
         }
         $result = ISXM_Sync::get_result( $run_id );
         if ( ! is_array( $result ) || empty( $result['stale_ids'] ) ) {
-            wp_send_json_error( [ 'message' => __( 'No check results to clean up — click “Sync with bucket” first', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'No check results to clean up — click “Sync with bucket” first', 'insightx-allhub' ) ] );
         }
         if ( $result['bucket'] !== ISXM_Settings::get( 'bucket' ) || $result['endpoint'] !== ISXM_Settings::get( 'endpoint' ) ) {
             ISXM_Sync::delete_result( $run_id );
-            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since the check — run the check again before cleaning up', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since the check — run the check again before cleaning up', 'insightx-allhub' ) ] );
         }
 
         $out = ISXM_Sync::cleanup_stale( $result['stale_ids'] );
@@ -1520,7 +1520,7 @@ class ISXM_Tools {
         $this->guard();
 
         if ( ! ISXM_Settings::is_configured() ) {
-            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured', 'insightx-allhub' ) ] );
         }
 
         $blocked = ISXM_Sync::orphan_cleanup_blocked();
@@ -1530,7 +1530,7 @@ class ISXM_Tools {
 
         $run_id = isset( $_POST['run_id'] ) ? sanitize_key( wp_unslash( $_POST['run_id'] ) ) : '';
         if ( $run_id === '' ) {
-            wp_send_json_error( [ 'message' => __( 'run_id is missing — please try again', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'run_id is missing — please try again', 'insightx-allhub' ) ] );
         }
         if ( function_exists( 'set_time_limit' ) ) {
             @set_time_limit( self::MAX_REQUEST_SECONDS );
@@ -1555,7 +1555,7 @@ class ISXM_Tools {
         if ( $state['bucket'] !== ISXM_Settings::get( 'bucket' ) || $state['endpoint'] !== ISXM_Settings::get( 'endpoint' ) ) {
             delete_transient( ISXM_Sync::ORPHAN_STATE_TRANSIENT_PREFIX . $run_id );
             ISXM_Sync::cleanup_run_files( $run_id );
-            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since it started — please try again', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'The destination (bucket) changed since it started — please try again', 'insightx-allhub' ) ] );
         }
 
         $processed = 0;
@@ -1579,7 +1579,7 @@ class ISXM_Tools {
                 if ( $e === null ) {
                     $e = ISXM_Sync::load_or_build_expected( $run_id );
                     if ( $e === null ) {
-                        $errors[] = __( 'The scan did not complete — please try again', 'insightx-offload' );
+                        $errors[] = __( 'The scan did not complete — please try again', 'insightx-allhub' );
                         break;
                     }
                     $blocked = ISXM_Sync::orphan_map_blocked( $e );
@@ -1602,7 +1602,7 @@ class ISXM_Tools {
                     if ( ! is_wp_error( $result ) ) {
                         $state['deleted']++;
                     } else {
-                        $errors[] = sprintf( __( 'Could not delete %s: %s', 'insightx-offload' ), $key, $result->get_error_message() );
+                        $errors[] = sprintf( __( 'Could not delete %s: %s', 'insightx-allhub' ), $key, $result->get_error_message() );
                     }
                 }
                 $state['scanned'] += count( $page['keys'] );
@@ -1887,22 +1887,22 @@ class ISXM_Tools {
      */
     public static function tools() {
         return [
-            'offload'      => __( 'Upload remaining files to the cloud', 'insightx-offload' ),
-            'retry_failed' => __( 'Retry only the failed items', 'insightx-offload' ),
+            'offload'      => __( 'Upload remaining files to the cloud', 'insightx-allhub' ),
+            'retry_failed' => __( 'Retry only the failed items', 'insightx-allhub' ),
             // Internal since 0.2.36 (Offload's second pass does it): kept so a
             // run started from the old card can still finish or resume.
-            'complete_partial' => __( 'Upload missing sizes', 'insightx-offload' ),
-            'offload_folders' => __( 'Upload server folders', 'insightx-offload' ),
-            'compress_pdf' => __( 'Shrink PDFs', 'insightx-offload' ),
-            'download'     => __( 'Download files back from the bucket', 'insightx-offload' ),
-            'clean_local'  => __( 'Delete server copies already in the bucket', 'insightx-offload' ),
-            'remove'       => __( 'Remove files from the bucket', 'insightx-offload' ),
-            'migrate'      => __( 'Move files from the source bucket', 'insightx-offload' ),
-            'wc_downloads' => __( 'Check WooCommerce product files', 'insightx-offload' ),
+            'complete_partial' => __( 'Upload missing sizes', 'insightx-allhub' ),
+            'offload_folders' => __( 'Upload server folders', 'insightx-allhub' ),
+            'compress_pdf' => __( 'Shrink PDFs', 'insightx-allhub' ),
+            'download'     => __( 'Download files back from the bucket', 'insightx-allhub' ),
+            'clean_local'  => __( 'Delete server copies already in the bucket', 'insightx-allhub' ),
+            'remove'       => __( 'Remove files from the bucket', 'insightx-allhub' ),
+            'migrate'      => __( 'Move files from the source bucket', 'insightx-allhub' ),
+            'wc_downloads' => __( 'Check WooCommerce product files', 'insightx-allhub' ),
             // Internal: has no card in the UI. Runs once per site to copy
             // legacy `_isxs_offload` postmeta into the ISXM_Items ledger,
             // and is started automatically (see maybe_start_backfill()).
-            'backfill'     => __( 'Move file tracking data to the new table', 'insightx-offload' ),
+            'backfill'     => __( 'Move file tracking data to the new table', 'insightx-allhub' ),
         ];
     }
 
@@ -1983,7 +1983,7 @@ class ISXM_Tools {
      */
     public static function precheck_tool( $tool ) {
         if ( ! self::is_known_tool( $tool ) ) {
-            return new WP_Error( 'isxs_unknown_tool', __( 'Unknown tool', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_unknown_tool', __( 'Unknown tool', 'insightx-allhub' ) );
         }
         // Pure database work — it must be able to run on a site whose
         // storage settings are incomplete, or an install that never
@@ -1992,12 +1992,12 @@ class ISXM_Tools {
             return true;
         }
         if ( ! ISXM_Settings::is_configured() ) {
-            return new WP_Error( 'isxs_not_configured', __( 'The destination storage is not fully configured — set it up in the “Connections” tab first', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_not_configured', __( 'The destination storage is not fully configured — set it up in the “Connections” tab first', 'insightx-allhub' ) );
         }
         if ( $tool === 'migrate' ) {
             $s = ISXM_Settings::all();
             if ( $s['source_bucket'] === '' || $s['source_access_key'] === '' || $s['source_secret_key'] === '' ) {
-                return new WP_Error( 'isxs_no_source', __( 'The source bucket is not fully configured — set it up in the “Connections” tab first', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_no_source', __( 'The source bucket is not fully configured — set it up in the “Connections” tab first', 'insightx-allhub' ) );
             }
             // Same bucket AND same prefix is a bucket-to-itself copy: every
             // object would be read and written back over itself. Same bucket
@@ -2007,30 +2007,30 @@ class ISXM_Tools {
                 && $s['source_endpoint'] === $s['endpoint']
                 && $s['source_prefix'] === ISXM_Settings::key_prefix()
             ) {
-                return new WP_Error( 'isxs_same_bucket', __( 'Source and destination point at the same bucket and prefix — choose a different source provider (or change the prefix) first', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_same_bucket', __( 'Source and destination point at the same bucket and prefix — choose a different source provider (or change the prefix) first', 'insightx-allhub' ) );
             }
         }
         if ( $tool === 'offload' && ! ISXM_Settings::get( 'offload_media_library' ) && ! ISXM_Settings::server_folders() ) {
-            return new WP_Error( 'isxs_offload_nothing', __( 'Choose at least one folder to offload first', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_offload_nothing', __( 'Choose at least one folder to offload first', 'insightx-allhub' ) );
         }
         if ( $tool === 'clean_local' && ! ISXM_Settings::get( 'persist_urls' ) && ! ISXM_Settings::get( 'deliver_enabled' ) ) {
             // Same rule as Remove Local Media: with neither on, pages still
             // point at the server copies.
-            return new WP_Error( 'isxs_clean_local_unsafe', __( 'Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_clean_local_unsafe', __( 'Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies', 'insightx-allhub' ) );
         }
         if ( $tool === 'compress_pdf' ) {
             if ( ISXM_Pdf::ghostscript() === '' && ! apply_filters( 'isxs_pdf_runner', null ) ) {
-                return new WP_Error( 'isxs_no_ghostscript', __( 'Ghostscript (gs) is not installed on this server — ask your host to install it', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_no_ghostscript', __( 'Ghostscript (gs) is not installed on this server — ask your host to install it', 'insightx-allhub' ) );
             }
             if ( ! ISXM_Settings::pdf_folders() ) {
-                return new WP_Error( 'isxs_no_pdf_folders', __( 'Choose at least one folder first', 'insightx-offload' ) );
+                return new WP_Error( 'isxs_no_pdf_folders', __( 'Choose at least one folder first', 'insightx-allhub' ) );
             }
         }
         if ( $tool === 'offload_folders' && ! ISXM_Settings::server_folders() ) {
-            return new WP_Error( 'isxs_no_server_folders', __( 'Choose at least one server folder first', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_no_server_folders', __( 'Choose at least one server folder first', 'insightx-allhub' ) );
         }
         if ( $tool === 'wc_downloads' && ! class_exists( 'WC_Product' ) ) {
-            return new WP_Error( 'isxs_no_woocommerce', __( 'WooCommerce not found on this site', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_no_woocommerce', __( 'WooCommerce not found on this site', 'insightx-allhub' ) );
         }
 
         // is_configured() only proves the fields are filled in — it never
@@ -2181,7 +2181,7 @@ class ISXM_Tools {
                 case 'backfill':
                     return $instance->batch_backfill( $cursor );
             }
-            return new WP_Error( 'isxs_unknown_tool', __( 'Unknown tool', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_unknown_tool', __( 'Unknown tool', 'insightx-allhub' ) );
         } finally {
             $instance->set_progress_job( null );
             ISXM_Client::set_deadline( 0 );
@@ -3386,12 +3386,12 @@ class ISXM_Tools {
         $this->guard();
 
         if ( ! ISXM_Settings::is_configured() ) {
-            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured — save the settings first', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Storage is not fully configured — save the settings first', 'insightx-allhub' ) ] );
         }
 
         $id = isset( $_POST['attachment_id'] ) ? (int) $_POST['attachment_id'] : 0;
         if ( ! $id || get_post_type( $id ) !== 'attachment' ) {
-            wp_send_json_error( [ 'message' => __( 'Media file not found', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Media file not found', 'insightx-allhub' ) ] );
         }
 
         $pairs = call_user_func( $this->offload_one_callback(), $id );
@@ -3409,8 +3409,8 @@ class ISXM_Tools {
         wp_send_json_success( [
             'status'  => $status['status'],
             'message' => $status['status'] === 'partial'
-                ? __( 'In the cloud, but not all sizes uploaded', 'insightx-offload' )
-                : __( 'In the cloud', 'insightx-offload' ),
+                ? __( 'In the cloud, but not all sizes uploaded', 'insightx-allhub' )
+                : __( 'In the cloud', 'insightx-allhub' ),
         ] );
     }
 
@@ -3463,7 +3463,7 @@ class ISXM_Tools {
         }
         ISXM_Offload::delete_local_files( $verified );
         return $missing
-            ? new WP_Error( 'isxs_not_in_bucket', sprintf( __( 'Kept on the server, not found in the bucket: %s', 'insightx-offload' ), implode( ', ', $missing ) ) )
+            ? new WP_Error( 'isxs_not_in_bucket', sprintf( __( 'Kept on the server, not found in the bucket: %s', 'insightx-allhub' ), implode( ', ', $missing ) ) )
             : true;
     }
 
@@ -3584,7 +3584,7 @@ class ISXM_Tools {
             // on the same page instead of claiming it finished.
             $message = ! empty( $result['errors'] )
                 ? $result['errors'][0]
-                : __( 'Could not list files in the source bucket', 'insightx-offload' );
+                : __( 'Could not list files in the source bucket', 'insightx-allhub' );
             return new WP_Error( 'isxs_source_unreachable', $message );
         }
 
@@ -3689,13 +3689,13 @@ class ISXM_Tools {
         $stats = self::get_stats( true );
 
         $lines = [
-            '=== InsightX Offload Diagnostic ===',
+            '=== InsightX AllHub Diagnostic ===',
             'Generated: ' . gmdate( 'Y-m-d H:i:s' ) . ' UTC',
             '',
             'Site URL: ' . site_url(),
             'WordPress: ' . $wp_version,
             'PHP: ' . PHP_VERSION,
-            'Plugin: InsightX Offload v' . ISXM_PLUGIN_VERSION,
+            'Plugin: InsightX AllHub v' . ISXM_PLUGIN_VERSION,
             'OpenSSL: ' . ( function_exists( 'openssl_encrypt' ) ? 'available' : 'MISSING' ),
             '',
             '--- Settings ---',

@@ -1,6 +1,6 @@
 <?php
 /**
- * Backup bundled in InsightX Offload: loads on its own, stands aside when the
+ * Backup bundled in InsightX AllHub: loads on its own, stands aside when the
  * old standalone plugin is active, and treats all of Offload as "itself".
  * Each case runs in a fresh PHP process (constants cannot be undefined).
  */
@@ -43,8 +43,8 @@ $out = $run( '$loaded = require ISXM_PLUGIN_DIR . "modules/backup/load.php";
 echo json_encode( [ "loaded" => $loaded, "file" => ISX_FILE, "root" => ISX_PLUGIN_ROOT, "admin" => class_exists( "ISX_Admin", false ), "cron" => in_array( "isx_scheduled_backup", $GLOBALS["hooks"], true ), "path" => ISX_PATH ] );' );
 $r = json_decode( $out, true );
 t( 'Loads on its own (old plugin absent)', is_array( $r ) && $r['loaded'] === true && $r['admin'] === true, $out );
-t( 'ISX_FILE is InsightX Offload\'s plugin file (import keeps it active)', is_array( $r ) && $r['file'] === $root . 'insightx-offload.php', $out );
-t( 'All of InsightX Offload is protected from import/clean and storage', is_array( $r ) && $r['root'] === rtrim( $root, '/' ), $out );
+t( 'ISX_FILE is InsightX AllHub\'s plugin file (import keeps it active)', is_array( $r ) && $r['file'] === $root . 'insightx-allhub.php', $out );
+t( 'All of InsightX AllHub is protected from import/clean and storage', is_array( $r ) && $r['root'] === rtrim( $root, '/' ), $out );
 t( 'Views and assets still come from the module folder', is_array( $r ) && $r['path'] === $root . 'modules/backup/', $out );
 t( 'The scheduled-backup hook is registered on every request', is_array( $r ) && $r['cron'] === true, $out );
 

@@ -349,7 +349,7 @@ class ISX_Files {
 	 */
 	private static function permanent_protected() {
 		return array(
-			untrailingslashit( ISX_PLUGIN_ROOT ), // all of InsightX Offload, which carries this module
+			untrailingslashit( ISX_PLUGIN_ROOT ), // all of InsightX AllHub, which carries this module
 			untrailingslashit( ISX_STORAGE_PATH ),
 			untrailingslashit( WP_CONTENT_DIR ) . '/upgrade',
 		);

@@ -20,7 +20,7 @@ class ISXM_WC_Downloads {
      * @return string
      */
     private static function public_acl_warning() {
-        return __( 'ACL was set but the file is still publicly accessible — this storage may not support object ACLs (e.g. MinIO, Cloudflare R2); disable public access in the bucket policy yourself', 'insightx-offload' );
+        return __( 'ACL was set but the file is still publicly accessible — this storage may not support object ACLs (e.g. MinIO, Cloudflare R2); disable public access in the bucket policy yourself', 'insightx-allhub' );
     }
 
     /**
@@ -86,7 +86,7 @@ class ISXM_WC_Downloads {
     public static function process_product( $product_id ) {
         $product = wc_get_product( $product_id );
         if ( ! $product ) {
-            return new WP_Error( 'isxs_wc_no_product', __( 'Product not found', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_wc_no_product', __( 'Product not found', 'insightx-allhub' ) );
         }
 
         $downloads = $product->get_downloads();
@@ -122,13 +122,13 @@ class ISXM_WC_Downloads {
 
             $attachment_id = attachment_url_to_postid( $url );
             if ( ! $attachment_id ) {
-                $notes[] = $download->get_name() . __( ': not a media attachment of this site — skipped', 'insightx-offload' );
+                $notes[] = $download->get_name() . __( ': not a media attachment of this site — skipped', 'insightx-allhub' );
                 continue;
             }
 
             $info = ISXM_Offload::get_record( $attachment_id );
             if ( ! is_array( $info ) || empty( $info['files'] ) || $info['bucket'] !== $current_bucket || ( $info['endpoint'] ?? '' ) !== ISXM_Settings::get( 'endpoint' ) ) {
-                $notes[] = $download->get_name() . __( ': not yet offloaded to the current bucket — offload it first, then run this tool', 'insightx-offload' );
+                $notes[] = $download->get_name() . __( ': not yet offloaded to the current bucket — offload it first, then run this tool', 'insightx-allhub' );
                 continue;
             }
 
@@ -170,7 +170,7 @@ class ISXM_WC_Downloads {
                 $product->set_downloads( $downloads );
                 $product->save();
             } catch ( \Exception $e ) {
-                $notes[] = __( 'Could not update the download file URL: ', 'insightx-offload' ) . wp_strip_all_tags( $e->getMessage() );
+                $notes[] = __( 'Could not update the download file URL: ', 'insightx-allhub' ) . wp_strip_all_tags( $e->getMessage() );
             }
         }
 

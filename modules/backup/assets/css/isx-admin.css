@@ -23,7 +23,7 @@
     0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
-/* Same width and spacing as the other InsightX Offload pages (.isxs-wrap). */
+/* Same width and spacing as the other InsightX AllHub pages (.isxs-wrap). */
 .wrap.isx-wrap {
   margin: 20px 20px 20px 0;
   max-width: 100%;
@@ -1437,7 +1437,7 @@ table.isx-backups-table tbody td.isx-b-actions {
   }
 }
 
-/* Tabs: the Backup screens inside InsightX Offload (same look as its File Manager tabs). */
+/* Tabs: the Backup screens inside InsightX AllHub (same look as its File Manager tabs). */
 .isx-tabs {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1481,7 +1481,7 @@ table.isx-backups-table tbody td.isx-b-actions {
   text-align: center;
 }
 
-/* Header on every Backup screen — same as the InsightX Offload pages. */
+/* Header on every Backup screen — same as the InsightX AllHub pages. */
 .isx-hero {
   display: flex;
   align-items: center;

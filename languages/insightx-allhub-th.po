@@ -1,25 +1,25 @@
-# Thai translation for InsightX Offload.
-# This file is distributed under the same license as the InsightX Offload plugin.
+# Thai translation for InsightX AllHub.
+# This file is distributed under the same license as the InsightX AllHub plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: InsightX Offload\n"
+"Project-Id-Version: InsightX AllHub\n"
 "Language: th\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Domain: insightx-offload\n"
+"X-Domain: insightx-allhub\n"
 
 #: header
 msgid "Offload WordPress media and server folders to S3-compatible storage, with CDN delivery, provider migration, File Manager, automatic PDF compression and background jobs — by InsightX"
 msgstr "จัดเก็บสื่อ WordPress และโฟลเดอร์บนเซิร์ฟเวอร์บน S3-compatible storage พร้อมเสิร์ฟผ่าน CDN ย้ายผู้ให้บริการ จัดการไฟล์ ย่อ PDF อัตโนมัติ และงานเบื้องหลัง — โดย InsightX"
 
-#: insightx-offload.php:154
-msgid "InsightX Storage is still active — both plugins share the same data (options / postmeta / ledger table) and must never run together. Please <strong>deactivate InsightX Storage</strong> first, then re-activate InsightX Offload. All existing data is picked up immediately, nothing needs to be offloaded again."
-msgstr "ตรวจพบว่า InsightX Storage ยังเปิดอยู่ — ทั้งสองปลั๊กอินใช้ข้อมูลชุดเดียวกัน (options / postmeta / ตาราง ledger) ห้ามรันพร้อมกัน กรุณา <strong>ปิด (Deactivate) InsightX Storage</strong> ก่อน แล้วเปิด InsightX Offload ใหม่ ข้อมูลทั้งหมดจะอ่านต่อได้ทันที ไม่ต้อง offload ใหม่"
+#: insightx-allhub.php:154
+msgid "InsightX Storage is still active — both plugins share the same data (options / postmeta / ledger table) and must never run together. Please <strong>deactivate InsightX Storage</strong> first, then re-activate InsightX AllHub. All existing data is picked up immediately, nothing needs to be offloaded again."
+msgstr "ตรวจพบว่า InsightX Storage ยังเปิดอยู่ — ทั้งสองปลั๊กอินใช้ข้อมูลชุดเดียวกัน (options / postmeta / ตาราง ledger) ห้ามรันพร้อมกัน กรุณา <strong>ปิด (Deactivate) InsightX Storage</strong> ก่อน แล้วเปิด InsightX AllHub ใหม่ ข้อมูลทั้งหมดจะอ่านต่อได้ทันที ไม่ต้อง offload ใหม่"
 
 #: includes/class-isxm-admin.php:26 includes/class-isxm-admin.php:27 includes/class-isxm-admin.php:193
-msgid "InsightX Offload"
+msgid "InsightX AllHub"
 msgstr ""
 
 #: includes/class-isxm-admin.php:73
@@ -2286,8 +2286,8 @@ msgid "Renaming"
 msgstr "กำลังเปลี่ยนชื่อ"
 
 #: modules/backup/load.php
-msgid "Backup is now part of InsightX Offload (menu InsightX Offload → Backup). Deactivate and delete the separate InsightX Backup plugin — your backups, schedule and settings carry over."
-msgstr "ระบบสำรองข้อมูลรวมอยู่ใน InsightX Offload แล้ว (เมนู InsightX Offload → สำรองข้อมูล) ปิดและลบปลั๊กอิน InsightX Backup ตัวเดิมได้เลย ไฟล์สำรอง ตารางเวลา และการตั้งค่าเดิมใช้ต่อได้ทั้งหมด"
+msgid "Backup is now part of InsightX AllHub (menu InsightX AllHub → Backup). Deactivate and delete the separate InsightX Backup plugin — your backups, schedule and settings carry over."
+msgstr "ระบบสำรองข้อมูลรวมอยู่ใน InsightX AllHub แล้ว (เมนู InsightX AllHub → สำรองข้อมูล) ปิดและลบปลั๊กอิน InsightX Backup ตัวเดิมได้เลย ไฟล์สำรอง ตารางเวลา และการตั้งค่าเดิมใช้ต่อได้ทั้งหมด"
 
 
 #: includes/class-isxm-admin.php
@@ -2376,3 +2376,6 @@ msgstr "ตัวอย่าง URL ของไฟล์"
 
 msgid "User Guide"
 msgstr "คู่มือการใช้งาน"
+
+msgid "InsightX Offload is now InsightX AllHub. Deactivate and delete InsightX Offload — AllHub starts on the next page load with all your settings, offloaded files and backups."
+msgstr "InsightX Offload เปลี่ยนชื่อเป็น InsightX AllHub แล้ว ปิดและลบ InsightX Offload ได้เลย AllHub จะเริ่มทำงานตอนโหลดหน้าถัดไป พร้อมการตั้งค่า ไฟล์ที่ offload แล้ว และข้อมูลสำรองเดิมทั้งหมด"

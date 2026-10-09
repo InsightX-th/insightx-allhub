@@ -71,9 +71,9 @@ class ISXM_Pdf {
      */
     public static function compress( $path, $dpi = 150, $runner = null ) {
         $gs = $runner ? 'gs' : self::ghostscript();
-        if ( $gs === '' ) return new WP_Error( 'isxs_no_ghostscript', __( 'Ghostscript (gs) is not installed on this server — ask your host to install it', 'insightx-offload' ) );
+        if ( $gs === '' ) return new WP_Error( 'isxs_no_ghostscript', __( 'Ghostscript (gs) is not installed on this server — ask your host to install it', 'insightx-allhub' ) );
         $before = (int) @filesize( $path );
-        if ( $before <= 0 ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-offload' ) );
+        if ( $before <= 0 ) return new WP_Error( 'isxs_pdf_missing', __( 'File not found', 'insightx-allhub' ) );
         // Hidden name next to the original (same disk, so rename() works);
         // the folder scans skip dot-files, so a half-written one never goes up.
         $tmp    = dirname( $path ) . '/.isxs-' . md5( $path ) . '.pdf';
@@ -84,7 +84,7 @@ class ISXM_Pdf {
         $head  = $after > 0 ? (string) @file_get_contents( $tmp, false, null, 0, 5 ) : '';
         if ( $code !== 0 || $head !== '%PDF-' ) {
             @unlink( $tmp );
-            return new WP_Error( 'isxs_pdf_failed', __( 'Ghostscript could not process this PDF', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_pdf_failed', __( 'Ghostscript could not process this PDF', 'insightx-allhub' ) );
         }
         if ( $after > $before * ( 1 - self::MIN_SAVING ) ) {
             @unlink( $tmp );
@@ -92,7 +92,7 @@ class ISXM_Pdf {
         }
         if ( ! @rename( $tmp, $path ) ) {
             @unlink( $tmp );
-            return new WP_Error( 'isxs_pdf_failed', __( 'Could not replace the file — check folder permissions', 'insightx-offload' ) );
+            return new WP_Error( 'isxs_pdf_failed', __( 'Could not replace the file — check folder permissions', 'insightx-allhub' ) );
         }
         @chmod( $path, 0644 );
         clearstatcache( true, $path );

@@ -1,5 +1,5 @@
 /**
- * InsightX Offload — admin UI behaviour.
+ * InsightX AllHub — admin UI behaviour.
  * Tabs, toggle switches, live URL preview, AJAX save/test, and the client
  * for the server-side bulk jobs (start/pause/resume/cancel + polling).
  */

@@ -2,7 +2,7 @@
 /**
  * Copyright (C) 2026 InsightX. GPLv3 or later. Original work by InsightX.
  *
- * ISXM_Admin — Admin page for InsightX Offload (top-level menu).
+ * ISXM_Admin — Admin page for InsightX AllHub (top-level menu).
  *
  * Single-page app-style UI: sidebar navigation (Media / Connections /
  * Assets / Tools / Migrate / Support), card layout, toggle switches,
@@ -14,8 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class ISXM_Admin {
 
-    const PAGE_SLUG = 'insightx-offload';
-    const GUIDE_SLUG = 'insightx-offload-guide';
+    const PAGE_SLUG = 'insightx-allhub';
+    const GUIDE_SLUG = 'insightx-allhub-guide';
 
     private $guide_hook = '';
 
@@ -28,8 +28,8 @@ class ISXM_Admin {
 
     public function register_menu() {
         add_menu_page(
-            __( 'InsightX Offload', 'insightx-offload' ),
-            __( 'InsightX Offload', 'insightx-offload' ),
+            __( 'InsightX AllHub', 'insightx-allhub' ),
+            __( 'InsightX AllHub', 'insightx-allhub' ),
             'manage_options',
             self::PAGE_SLUG,
             [ $this, 'render_page' ],
@@ -37,12 +37,12 @@ class ISXM_Admin {
             77 // Right after InsightX Backup (76) — keeps the InsightX tools together.
         );
         // Same slug as the parent: renames the first sub-item (WordPress
-        // would repeat "InsightX Offload") now that File Manager sits under it.
-        add_submenu_page( self::PAGE_SLUG, __( 'InsightX Offload', 'insightx-offload' ), __( 'Offload', 'insightx-offload' ), 'manage_options', self::PAGE_SLUG, [ $this, 'render_page' ] );
+        // would repeat "InsightX AllHub") now that File Manager sits under it.
+        add_submenu_page( self::PAGE_SLUG, __( 'InsightX AllHub', 'insightx-allhub' ), __( 'Offload', 'insightx-allhub' ), 'manage_options', self::PAGE_SLUG, [ $this, 'render_page' ] );
     }
 
     public function register_guide_menu() {
-        $this->guide_hook = add_submenu_page( self::PAGE_SLUG, __( 'User Guide', 'insightx-offload' ), __( 'User Guide', 'insightx-offload' ), 'manage_options', self::GUIDE_SLUG, [ $this, 'render_guide_page' ] );
+        $this->guide_hook = add_submenu_page( self::PAGE_SLUG, __( 'User Guide', 'insightx-allhub' ), __( 'User Guide', 'insightx-allhub' ), 'manage_options', self::GUIDE_SLUG, [ $this, 'render_guide_page' ] );
     }
 
     public function enqueue_assets( $hook ) {
@@ -91,108 +91,108 @@ class ISXM_Admin {
             // BCP 47 tag for the date/time formatting in admin.js.
             'locale'     => str_replace( '_', '-', get_user_locale() ),
             'i18n'       => [
-                'saving'        => __( 'Saving…', 'insightx-offload' ),
-                'saved'         => __( 'Saved ✓', 'insightx-offload' ),
-                'save'          => __( 'Save Settings', 'insightx-offload' ),
-                'connSave'      => __( 'Save', 'insightx-offload' ),
-                'testing'       => __( 'Testing…', 'insightx-offload' ),
-                'confirmCleanLocal' => __( "Delete the server copies of media already in the bucket?\n\nOnly files confirmed in the bucket are deleted; pages keep loading them from the bucket. Keep a backup first", 'insightx-offload' ),
-                'confirmRemove' => __( "Remove all files from the bucket?\n\nFiles missing from the server will be downloaded back before removal, but always keep a backup first", 'insightx-offload' ),
-                'working'       => __( 'Working…', 'insightx-offload' ),
-                'done'          => __( 'Done ✓', 'insightx-offload' ),
-                'error'         => __( 'An error occurred', 'insightx-offload' ),
-                'stop'          => __( 'Stop', 'insightx-offload' ),
-                'stopping'      => __( 'Stopping…', 'insightx-offload' ),
-                'stopped'       => __( 'Stopped', 'insightx-offload' ),
-                'cancel'        => __( 'Cancel', 'insightx-offload' ),
-                'cancelling'    => __( 'Cancelling…', 'insightx-offload' ),
+                'saving'        => __( 'Saving…', 'insightx-allhub' ),
+                'saved'         => __( 'Saved ✓', 'insightx-allhub' ),
+                'save'          => __( 'Save Settings', 'insightx-allhub' ),
+                'connSave'      => __( 'Save', 'insightx-allhub' ),
+                'testing'       => __( 'Testing…', 'insightx-allhub' ),
+                'confirmCleanLocal' => __( "Delete the server copies of media already in the bucket?\n\nOnly files confirmed in the bucket are deleted; pages keep loading them from the bucket. Keep a backup first", 'insightx-allhub' ),
+                'confirmRemove' => __( "Remove all files from the bucket?\n\nFiles missing from the server will be downloaded back before removal, but always keep a backup first", 'insightx-allhub' ),
+                'working'       => __( 'Working…', 'insightx-allhub' ),
+                'done'          => __( 'Done ✓', 'insightx-allhub' ),
+                'error'         => __( 'An error occurred', 'insightx-allhub' ),
+                'stop'          => __( 'Stop', 'insightx-allhub' ),
+                'stopping'      => __( 'Stopping…', 'insightx-allhub' ),
+                'stopped'       => __( 'Stopped', 'insightx-allhub' ),
+                'cancel'        => __( 'Cancel', 'insightx-allhub' ),
+                'cancelling'    => __( 'Cancelling…', 'insightx-allhub' ),
                 // Cancel throws the resume cursor away, so it asks first —
                 // "Stop" is the one that is always safe.
-                'confirmCancel' => __( "Cancel this job?\n\nWork already done stays intact, but the saved checkpoint is deleted — the next run will scan from the beginning", 'insightx-offload' ),
+                'confirmCancel' => __( "Cancel this job?\n\nWork already done stays intact, but the saved checkpoint is deleted — the next run will scan from the beginning", 'insightx-allhub' ),
                 // A run whose driver went quiet (loopback killed, PHP fatal,
                 // server restart). Nothing is lost — the cursor is in the
                 // database and the healthcheck picks it back up.
-                'stalled'       => __( 'Stalled — waiting for a worker', 'insightx-offload' ),
-                'workerWaiting' => __( 'Stalled — waiting for the current worker lease', 'insightx-offload' ),
-                'restartSent'   => __( 'Stalled — restart request sent', 'insightx-offload' ),
-                'resume'        => __( 'Resume', 'insightx-offload' ),
-                'connecting'    => __( 'Connecting…', 'insightx-offload' ),
-                'retrying'      => __( 'Connection hiccup — retrying', 'insightx-offload' ),
-                'connectionLost' => __( 'The connection dropped several times in a row — paused here. All work so far is saved; click "Resume" to continue from the same point', 'insightx-offload' ),
+                'stalled'       => __( 'Stalled — waiting for a worker', 'insightx-allhub' ),
+                'workerWaiting' => __( 'Stalled — waiting for the current worker lease', 'insightx-allhub' ),
+                'restartSent'   => __( 'Stalled — restart request sent', 'insightx-allhub' ),
+                'resume'        => __( 'Resume', 'insightx-allhub' ),
+                'connecting'    => __( 'Connecting…', 'insightx-allhub' ),
+                'retrying'      => __( 'Connection hiccup — retrying', 'insightx-allhub' ),
+                'connectionLost' => __( 'The connection dropped several times in a row — paused here. All work so far is saved; click "Resume" to continue from the same point', 'insightx-allhub' ),
                 // Bulk tools now run server-side; these cover the states
                 // only the job records can be in.
-                'counting'      => __( 'Counting files in the source bucket…', 'insightx-offload' ),
+                'counting'      => __( 'Counting files in the source bucket…', 'insightx-allhub' ),
                 // The final one-pass DB URL rewrite at the end of an offload
                 // run — uploads are all done, the bar sits near 100% while
                 // this phase rewrites stored URLs table by table.
-                'indexing'      => __( 'Building attachment index…', 'insightx-offload' ),
-                'finalizing'    => __( 'Finalizing migration…', 'insightx-offload' ),
-                'copyingExtras' => __( 'Copying extra folders… %s files', 'insightx-offload' ),
-                'folderLoading' => __( 'Loading folders…', 'insightx-offload' ),
-                'folderEmpty'   => __( 'No sub-folders here', 'insightx-offload' ),
-                'folderMore'    => __( 'Showing the first folders only — type deeper paths by hand', 'insightx-offload' ),
-                'folderMedia'   => __( 'Media Library', 'insightx-offload' ),
-                'folderOpen'    => __( 'Open', 'insightx-offload' ),
-                'folderRemove'  => __( 'Remove', 'insightx-offload' ),
+                'indexing'      => __( 'Building attachment index…', 'insightx-allhub' ),
+                'finalizing'    => __( 'Finalizing migration…', 'insightx-allhub' ),
+                'copyingExtras' => __( 'Copying extra folders… %s files', 'insightx-allhub' ),
+                'folderLoading' => __( 'Loading folders…', 'insightx-allhub' ),
+                'folderEmpty'   => __( 'No sub-folders here', 'insightx-allhub' ),
+                'folderMore'    => __( 'Showing the first folders only — type deeper paths by hand', 'insightx-allhub' ),
+                'folderMedia'   => __( 'Media Library', 'insightx-allhub' ),
+                'folderOpen'    => __( 'Open', 'insightx-allhub' ),
+                'folderRemove'  => __( 'Remove', 'insightx-allhub' ),
                 /* translators: 1: rows done, 2: rows in total */
-                'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-offload' ),
+                'finalizeGuid'    => __( 'updating GUIDs %1$s/%2$s', 'insightx-allhub' ),
                 /* translators: 1: files checked, 2: files in total */
-                'finalizeCleanup' => __( 'removing local copies %1$s/%2$s', 'insightx-offload' ),
-                'rewriting'     => __( 'Writing URLs to the database…', 'insightx-offload' ),
-                'keepTabOpen'   => __( 'This site cannot call itself — keep this page open until the job finishes', 'insightx-offload' ),
-                'sessionExpired' => __( 'Session expired or logged out — refresh this page and try again (all work so far is saved)', 'insightx-offload' ),
-                'connNotConfigured' => __( 'This provider is not configured yet — set it up in the “Connections” tab', 'insightx-offload' ),
-                'connOk'            => __( 'Connected successfully', 'insightx-offload' ),
-                'connFailed'        => __( 'Connection failed', 'insightx-offload' ),
-                'connUntested'      => __( 'Connection not tested yet', 'insightx-offload' ),
-                'noBucket'          => __( '%s · (no bucket set)', 'insightx-offload' ),
-                'sampleProduct'     => __( 'product-name', 'insightx-offload' ),
-                'sampleTheme'       => __( 'theme-name', 'insightx-offload' ),
-                'items'             => __( '%s items', 'insightx-offload' ),
-                'elapsedParen'      => __( '%1$s (elapsed %2$s)', 'insightx-offload' ),
-                'elapsed'           => __( 'Elapsed %s', 'insightx-offload' ),
-                'eta'               => __( 'About %1$s left · done around %2$s', 'insightx-offload' ),
-                'doneIn'            => __( 'Done — took %s in total', 'insightx-offload' ),
-                'pausedAfter'       => __( 'Paused — %s elapsed', 'insightx-offload' ),
-                'cancelledAfter'    => __( 'Cancelled — after %s', 'insightx-offload' ),
-                'andMore'           => __( '…and %s more', 'insightx-offload' ),
-                'failedCount'       => __( '%s failed — ', 'insightx-offload' ),
-                'viewInMedia'       => __( 'View them on the Media page', 'insightx-offload' ),
-                'checkedToday'      => __( 'Last checked today', 'insightx-offload' ),
-                'checkedDaysAgo'    => __( 'Last checked %s days ago', 'insightx-offload' ),
-                'neverChecked'      => __( 'Never checked against the real bucket', 'insightx-offload' ),
-                'allMatch'          => __( 'Everything matches', 'insightx-offload' ),
-                'mismatch'          => __( 'Mismatches found', 'insightx-offload' ),
-                'staleCheck'        => __( ' — a while ago, check again', 'insightx-offload' ),
-                'otherJobRunning'   => __( 'Another job is running — stop it before starting a new one', 'insightx-offload' ),
-                'timeAt'            => __( '%s', 'insightx-offload' ),
-                'tomorrowAt'        => __( 'tomorrow %s', 'insightx-offload' ),
-                'dateAt'            => __( '%1$s %2$s', 'insightx-offload' ),
-                'zeroSec'           => __( '0 sec', 'insightx-offload' ),
-                'hrMin'             => __( '%1$s hr %2$s min', 'insightx-offload' ),
-                'minSec'            => __( '%1$s min %2$s sec', 'insightx-offload' ),
-                'sec'               => __( '%s sec', 'insightx-offload' ),
-                'staleFound'        => __( '%s items with stale meta', 'insightx-offload' ),
-                'dataLossOf'        => __( 'of which %s are missing everywhere (see the red badge on the Media page)', 'insightx-offload' ),
-                'dataLoss'          => __( '%s items missing everywhere (see the red badge on the Media page)', 'insightx-offload' ),
-                'partialFound'      => __( '%s items with missing sizes', 'insightx-offload' ),
-                'orphanFound'       => __( '%s objects with no matching media', 'insightx-offload' ),
-                'outsideFound'      => __( '%s objects outside the prefix (left alone)', 'insightx-offload' ),
-                'clearStaleN'       => __( 'Clear stale meta (%s)', 'insightx-offload' ),
-                'clearStale'        => __( 'Clear stale meta', 'insightx-offload' ),
-                'deleteOrphansN'    => __( 'Delete orphan objects (%s)', 'insightx-offload' ),
-                'deleteOrphans'     => __( 'Delete orphan objects', 'insightx-offload' ),
-                'syncRun'           => __( 'Sync with bucket', 'insightx-offload' ),
-                'syncFailed'        => __( 'Sync failed', 'insightx-offload' ),
-                'syncing'           => __( 'Syncing…', 'insightx-offload' ),
-                'syncChecking'      => __( 'Checking against the bucket…', 'insightx-offload' ),
-                'syncScanning'      => __( 'Syncing with the real bucket…', 'insightx-offload' ),
-                'clearing'          => __( 'Clearing…', 'insightx-offload' ),
-                'staleCleared'      => __( 'Cleared stale meta for %s items — click “Start Offload” to upload them again', 'insightx-offload' ),
-                'confirmOrphans'    => __( "Delete all orphan objects from the bucket?\n\nEvery object under the current prefix that no media on THIS site uses will be deleted — including files another site keeps under the same prefix in this bucket (e.g. a staging copy). Objects outside the prefix are left alone. Always keep a backup first", 'insightx-offload' ),
-                'deleting'          => __( 'Deleting…', 'insightx-offload' ),
-                'orphanListing'     => __( 'Listing and deleting orphans…', 'insightx-offload' ),
-                'orphansDeleted'    => __( 'Deleted %s orphan objects — the bucket is clean', 'insightx-offload' ),
+                'finalizeCleanup' => __( 'removing local copies %1$s/%2$s', 'insightx-allhub' ),
+                'rewriting'     => __( 'Writing URLs to the database…', 'insightx-allhub' ),
+                'keepTabOpen'   => __( 'This site cannot call itself — keep this page open until the job finishes', 'insightx-allhub' ),
+                'sessionExpired' => __( 'Session expired or logged out — refresh this page and try again (all work so far is saved)', 'insightx-allhub' ),
+                'connNotConfigured' => __( 'This provider is not configured yet — set it up in the “Connections” tab', 'insightx-allhub' ),
+                'connOk'            => __( 'Connected successfully', 'insightx-allhub' ),
+                'connFailed'        => __( 'Connection failed', 'insightx-allhub' ),
+                'connUntested'      => __( 'Connection not tested yet', 'insightx-allhub' ),
+                'noBucket'          => __( '%s · (no bucket set)', 'insightx-allhub' ),
+                'sampleProduct'     => __( 'product-name', 'insightx-allhub' ),
+                'sampleTheme'       => __( 'theme-name', 'insightx-allhub' ),
+                'items'             => __( '%s items', 'insightx-allhub' ),
+                'elapsedParen'      => __( '%1$s (elapsed %2$s)', 'insightx-allhub' ),
+                'elapsed'           => __( 'Elapsed %s', 'insightx-allhub' ),
+                'eta'               => __( 'About %1$s left · done around %2$s', 'insightx-allhub' ),
+                'doneIn'            => __( 'Done — took %s in total', 'insightx-allhub' ),
+                'pausedAfter'       => __( 'Paused — %s elapsed', 'insightx-allhub' ),
+                'cancelledAfter'    => __( 'Cancelled — after %s', 'insightx-allhub' ),
+                'andMore'           => __( '…and %s more', 'insightx-allhub' ),
+                'failedCount'       => __( '%s failed — ', 'insightx-allhub' ),
+                'viewInMedia'       => __( 'View them on the Media page', 'insightx-allhub' ),
+                'checkedToday'      => __( 'Last checked today', 'insightx-allhub' ),
+                'checkedDaysAgo'    => __( 'Last checked %s days ago', 'insightx-allhub' ),
+                'neverChecked'      => __( 'Never checked against the real bucket', 'insightx-allhub' ),
+                'allMatch'          => __( 'Everything matches', 'insightx-allhub' ),
+                'mismatch'          => __( 'Mismatches found', 'insightx-allhub' ),
+                'staleCheck'        => __( ' — a while ago, check again', 'insightx-allhub' ),
+                'otherJobRunning'   => __( 'Another job is running — stop it before starting a new one', 'insightx-allhub' ),
+                'timeAt'            => __( '%s', 'insightx-allhub' ),
+                'tomorrowAt'        => __( 'tomorrow %s', 'insightx-allhub' ),
+                'dateAt'            => __( '%1$s %2$s', 'insightx-allhub' ),
+                'zeroSec'           => __( '0 sec', 'insightx-allhub' ),
+                'hrMin'             => __( '%1$s hr %2$s min', 'insightx-allhub' ),
+                'minSec'            => __( '%1$s min %2$s sec', 'insightx-allhub' ),
+                'sec'               => __( '%s sec', 'insightx-allhub' ),
+                'staleFound'        => __( '%s items with stale meta', 'insightx-allhub' ),
+                'dataLossOf'        => __( 'of which %s are missing everywhere (see the red badge on the Media page)', 'insightx-allhub' ),
+                'dataLoss'          => __( '%s items missing everywhere (see the red badge on the Media page)', 'insightx-allhub' ),
+                'partialFound'      => __( '%s items with missing sizes', 'insightx-allhub' ),
+                'orphanFound'       => __( '%s objects with no matching media', 'insightx-allhub' ),
+                'outsideFound'      => __( '%s objects outside the prefix (left alone)', 'insightx-allhub' ),
+                'clearStaleN'       => __( 'Clear stale meta (%s)', 'insightx-allhub' ),
+                'clearStale'        => __( 'Clear stale meta', 'insightx-allhub' ),
+                'deleteOrphansN'    => __( 'Delete orphan objects (%s)', 'insightx-allhub' ),
+                'deleteOrphans'     => __( 'Delete orphan objects', 'insightx-allhub' ),
+                'syncRun'           => __( 'Sync with bucket', 'insightx-allhub' ),
+                'syncFailed'        => __( 'Sync failed', 'insightx-allhub' ),
+                'syncing'           => __( 'Syncing…', 'insightx-allhub' ),
+                'syncChecking'      => __( 'Checking against the bucket…', 'insightx-allhub' ),
+                'syncScanning'      => __( 'Syncing with the real bucket…', 'insightx-allhub' ),
+                'clearing'          => __( 'Clearing…', 'insightx-allhub' ),
+                'staleCleared'      => __( 'Cleared stale meta for %s items — click “Start Offload” to upload them again', 'insightx-allhub' ),
+                'confirmOrphans'    => __( "Delete all orphan objects from the bucket?\n\nEvery object under the current prefix that no media on THIS site uses will be deleted — including files another site keeps under the same prefix in this bucket (e.g. a staging copy). Objects outside the prefix are left alone. Always keep a backup first", 'insightx-allhub' ),
+                'deleting'          => __( 'Deleting…', 'insightx-allhub' ),
+                'orphanListing'     => __( 'Listing and deleting orphans…', 'insightx-allhub' ),
+                'orphansDeleted'    => __( 'Deleted %s orphan objects — the bucket is clean', 'insightx-allhub' ),
             ],
         ] );
     }
@@ -223,7 +223,7 @@ class ISXM_Admin {
 
         $isxm_delivery_alert = '';
         if ( $s['deliver_enabled'] && ! $isxm_pok ) {
-            $isxm_delivery_alert = __( 'Media delivery cannot be tested until storage connects successfully — see the "File Storage Settings" section on the left', 'insightx-offload' );
+            $isxm_delivery_alert = __( 'Media delivery cannot be tested until storage connects successfully — see the "File Storage Settings" section on the left', 'insightx-allhub' );
         }
         ?>
         <div class="isxs-wrap" id="isxs-app">
@@ -235,8 +235,8 @@ class ISXM_Admin {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A7 7 0 1 0 5 15.7"/><path d="M12 12v9"/><path d="m8.5 17.5 3.5 3.5 3.5-3.5"/></svg>
                         </div>
                         <div>
-                            <h1><?php esc_html_e( 'InsightX Offload', 'insightx-offload' ); ?></h1>
-                            <p class="isxs-tagline"><?php esc_html_e( 'Media and server folders on cloud storage, with CDN delivery, File Manager and PDF compression', 'insightx-offload' ); ?></p>
+                            <h1><?php esc_html_e( 'InsightX AllHub', 'insightx-allhub' ); ?></h1>
+                            <p class="isxs-tagline"><?php esc_html_e( 'Media and server folders on cloud storage, with CDN delivery, File Manager and PDF compression', 'insightx-allhub' ); ?></p>
                         </div>
                     </div>
 
@@ -249,15 +249,15 @@ class ISXM_Admin {
                         </button>
                         <div class="isxs-status-panel" id="isxs-status-panel" hidden>
                             <div class="isxs-status-panel-head">
-                                <strong><?php esc_html_e( 'Offload Status', 'insightx-offload' ); ?></strong>
+                                <strong><?php esc_html_e( 'Offload Status', 'insightx-allhub' ); ?></strong>
                                 <button type="button" class="isxs-status-refresh">
                                     <svg class="isxs-status-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-                                    <?php esc_html_e( 'Refresh', 'insightx-offload' ); ?>
+                                    <?php esc_html_e( 'Refresh', 'insightx-allhub' ); ?>
                                 </button>
                             </div>
                             <table class="isxs-status-table">
                                 <thead>
-                                    <tr><th><?php esc_html_e( 'Source', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Offloaded', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
+                                    <tr><th><?php esc_html_e( 'Source', 'insightx-allhub' ); ?></th><th class="is-num"><?php esc_html_e( 'Offloaded', 'insightx-allhub' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-allhub' ); ?></th></tr>
                                 </thead>
                                 <tbody id="isxs-status-rows">
                                     <tr>
@@ -268,25 +268,25 @@ class ISXM_Admin {
                                 </tbody>
                             </table>
                             <div class="isxs-status-action">
-                                <button type="button" class="isxs-btn isxs-btn-primary isxs-status-offload-btn"><?php printf( esc_html__( 'Offload Remaining %s items', 'insightx-offload' ), '<span id="isxs-status-remaining-num">0</span>' ); ?></button>
+                                <button type="button" class="isxs-btn isxs-btn-primary isxs-status-offload-btn"><?php printf( esc_html__( 'Offload Remaining %s items', 'insightx-allhub' ), '<span id="isxs-status-remaining-num">0</span>' ); ?></button>
                             </div>
-                            <div class="isxs-status-foot"><?php printf( esc_html__( 'Total %1$s items · %2$s on the bucket', 'insightx-offload' ), '<span id="isxs-status-total">0</span>', '<span id="isxs-status-onbucket">0</span>' ); ?></div>
+                            <div class="isxs-status-foot"><?php printf( esc_html__( 'Total %1$s items · %2$s on the bucket', 'insightx-allhub' ), '<span id="isxs-status-total">0</span>', '<span id="isxs-status-onbucket">0</span>' ); ?></div>
                         </div>
                     </div>
 
                     <div class="isxs-status-wrap">
                         <button type="button" class="isxs-status-widget isxs-migrate-widget" aria-expanded="false">
-                            <span class="isxs-status-text"><strong id="isxs-migrate-percent">0%</strong> <?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></span>
+                            <span class="isxs-status-text"><strong id="isxs-migrate-percent">0%</strong> <?php esc_html_e( 'Migrated', 'insightx-allhub' ); ?></span>
                             <span class="isxs-status-bar"><span class="isxs-status-bar-fill" id="isxs-migrate-fill"></span></span>
                             <span class="isxs-status-chev" aria-hidden="true">▾</span>
                         </button>
                         <div class="isxs-status-panel" id="isxs-migrate-panel" hidden>
                             <div class="isxs-status-panel-head">
-                                <strong><?php esc_html_e( 'Migrate Status', 'insightx-offload' ); ?></strong>
+                                <strong><?php esc_html_e( 'Migrate Status', 'insightx-allhub' ); ?></strong>
                             </div>
                             <table class="isxs-status-table">
                                 <thead>
-                                    <tr><th class="is-num"><?php esc_html_e( 'Migrated', 'insightx-offload' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-offload' ); ?></th></tr>
+                                    <tr><th class="is-num"><?php esc_html_e( 'Migrated', 'insightx-allhub' ); ?></th><th class="is-num"><?php esc_html_e( 'Remaining', 'insightx-allhub' ); ?></th></tr>
                                 </thead>
                                 <tbody>
                                     <tr>
@@ -296,22 +296,22 @@ class ISXM_Admin {
                                 </tbody>
                             </table>
                             <div class="isxs-status-action">
-                                <button type="button" class="isxs-btn isxs-btn-primary isxs-migrate-open-btn"><?php esc_html_e( 'Open Migrate', 'insightx-offload' ); ?></button>
+                                <button type="button" class="isxs-btn isxs-btn-primary isxs-migrate-open-btn"><?php esc_html_e( 'Open Migrate', 'insightx-allhub' ); ?></button>
                             </div>
-                            <div class="isxs-status-foot" id="isxs-migrate-state" data-empty="<?php esc_attr_e( 'No migration yet', 'insightx-offload' ); ?>"><?php esc_html_e( 'No migration yet', 'insightx-offload' ); ?></div>
+                            <div class="isxs-status-foot" id="isxs-migrate-state" data-empty="<?php esc_attr_e( 'No migration yet', 'insightx-allhub' ); ?>"><?php esc_html_e( 'No migration yet', 'insightx-allhub' ); ?></div>
                         </div>
                     </div>
                     </div>
                 </div>
 
                 <nav class="isxs-nav" role="tablist">
-                    <button type="button" class="isxs-nav-item is-active" data-tab="media" role="tab"><?php esc_html_e( 'Media', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="images" role="tab"><?php esc_html_e( 'Images & Files', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="assets" role="tab"><?php esc_html_e( 'Assets', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="tools" role="tab"><?php esc_html_e( 'Tools', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="migrate" role="tab"><?php esc_html_e( 'Migrate', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="connections" role="tab"><?php esc_html_e( 'Connections', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-nav-item" data-tab="support" role="tab"><?php esc_html_e( 'Support', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-nav-item is-active" data-tab="media" role="tab"><?php esc_html_e( 'Media', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="images" role="tab"><?php esc_html_e( 'Images & Files', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="assets" role="tab"><?php esc_html_e( 'Assets', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="tools" role="tab"><?php esc_html_e( 'Tools', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="migrate" role="tab"><?php esc_html_e( 'Migrate', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="connections" role="tab"><?php esc_html_e( 'Connections', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-nav-item" data-tab="support" role="tab"><?php esc_html_e( 'Support', 'insightx-allhub' ); ?></button>
                 </nav>
             </header>
 
@@ -328,7 +328,7 @@ class ISXM_Admin {
                                     <div class="isxs-card-head-title" id="isxs-storage-head-title">
                                         <span class="isxs-provider-icon is-logo" id="isxs-storage-head-logo"><?php echo $this->provider_logo_svg( $s['provider'] ); ?></span>
                                         <div>
-                                            <h2><?php esc_html_e( 'File Storage Settings', 'insightx-offload' ); ?></h2>
+                                            <h2><?php esc_html_e( 'File Storage Settings', 'insightx-allhub' ); ?></h2>
                                             <p class="isxs-card-sub" id="isxs-storage-head-sub"><?php echo esc_html( $isxm_pmeta['label'] ); ?><?php echo $isxm_pconn['bucket'] !== '' ? ' · ' . esc_html( $isxm_pconn['bucket'] ) : ''; ?><?php echo $isxm_pconn['region'] !== '' ? ' · ' . esc_html( $isxm_pconn['region'] ) : ''; ?></p>
                                         </div>
                                     </div>
@@ -342,7 +342,7 @@ class ISXM_Admin {
                                                 </span>
                                                 <svg class="isxs-picker-caret" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4.5 6l3.5 3.5L11.5 6l1 1-4.5 4.5L3.5 7z"/></svg>
                                             </button>
-                                            <ul class="isxs-picker-menu" id="isxs-dest-provider-menu" role="listbox" aria-label="<?php esc_attr_e( 'Choose a storage provider', 'insightx-offload' ); ?>" hidden>
+                                            <ul class="isxs-picker-menu" id="isxs-dest-provider-menu" role="listbox" aria-label="<?php esc_attr_e( 'Choose a storage provider', 'insightx-allhub' ); ?>" hidden>
                                                 <?php foreach ( $isxm_providers as $isxm_slug => $isxm_meta ) :
                                                     $isxm_sel_verified = ISXM_Connections::is_configured( $isxm_slug ) && ISXM_Connections::status( $isxm_slug )['state'] === 'ok';
                                                     ?>
@@ -357,15 +357,15 @@ class ISXM_Admin {
                                     </div>
                                 </div>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], __( 'Offload Media', 'insightx-offload' ), __( 'Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'remove_local', $s['remove_local'], __( 'Remove Local Media', 'insightx-offload' ), __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'use_prefix', $s['use_prefix'], __( 'Add Prefix to Bucket Path', 'insightx-offload' ), __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], __( 'Offload Media', 'insightx-allhub' ), __( 'Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour', 'insightx-allhub' ) ); ?>
+                                    <?php $this->toggle( 'remove_local', $s['remove_local'], __( 'Remove Local Media', 'insightx-allhub' ), __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-allhub' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-allhub' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-allhub' ) ); ?>
+                                    <?php $this->toggle( 'use_prefix', $s['use_prefix'], __( 'Add Prefix to Bucket Path', 'insightx-allhub' ), __( 'Group this site\'s files under a prefix in the bucket', 'insightx-allhub' ) ); ?>
                                     <div class="isxs-field isxs-indent" id="isxs-prefix-field">
                                         <input type="text" id="isxs-prefix" value="<?php echo esc_attr( $s['prefix'] ); ?>" placeholder="wp-content/uploads/">
                                     </div>
-                                    <?php $this->toggle( 'use_year_month', $s['use_year_month'], __( 'Add Year & Month to Bucket Path', 'insightx-offload' ), __( 'Add the upload year/month to the path for extra organization', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'use_object_version', $s['use_object_version'], __( 'Add Object Version to Bucket Path', 'insightx-offload' ), __( 'Add a version number to the path so the CDN always serves the latest file', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_year_month', $s['use_year_month'], __( 'Add Year & Month to Bucket Path', 'insightx-allhub' ), __( 'Add the upload year/month to the path for extra organization', 'insightx-allhub' ) ); ?>
+                                    <?php $this->toggle( 'use_object_version', $s['use_object_version'], __( 'Add Object Version to Bucket Path', 'insightx-allhub' ), __( 'Add a version number to the path so the CDN always serves the latest file', 'insightx-allhub' ) ); ?>
                                 </div>
                             </div>
 
@@ -374,13 +374,13 @@ class ISXM_Admin {
                                 <div class="isxs-card-head">
                                     <div class="isxs-card-head-title">
                                         <div>
-                                            <h2><?php esc_html_e( 'Folder Structure', 'insightx-offload' ); ?></h2>
-                                            <p class="isxs-card-sub"><?php esc_html_e( 'Group files in the bucket by content type', 'insightx-offload' ); ?></p>
+                                            <h2><?php esc_html_e( 'Folder Structure', 'insightx-allhub' ); ?></h2>
+                                            <p class="isxs-card-sub"><?php esc_html_e( 'Group files in the bucket by content type', 'insightx-allhub' ); ?></p>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'use_type_folder', $s['use_type_folder'], __( 'Folders by content type', 'insightx-offload' ), __( 'Bucket folder name for each content type. Changes apply to new uploads only', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_type_folder', $s['use_type_folder'], __( 'Folders by content type', 'insightx-allhub' ), __( 'Bucket folder name for each content type. Changes apply to new uploads only', 'insightx-allhub' ) ); ?>
                                     <div class="isxs-grid-2 isxs-indent" id="isxs-typefolder-fields">
                                         <?php foreach ( ISXM_Settings::type_folder_fields() as $isxm_folder_key => $isxm_folder_meta ) :
                                             $isxm_folder_id = 'isxs-' . str_replace( '_', '-', $isxm_folder_key );
@@ -391,9 +391,9 @@ class ISXM_Admin {
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
-                                    <p class="isxs-hint isxs-indent"><?php echo wp_kses( __( 'Matching files skip Year & Month and Object Version, giving short paths such as <code>products/product-name/file.jpg</code>. For the shortest paths, also turn off Prefix under “File Storage Settings”', 'insightx-offload' ), [ 'code' => [] ] ); ?></p>
-                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Files not linked to a product, post or category keep Year & Month and Object Version', 'insightx-offload' ); ?></p>
-                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Caution: without Year & Month and Object Version, two files with the same name under the same product overwrite each other', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php echo wp_kses( __( 'Matching files skip Year & Month and Object Version, giving short paths such as <code>products/product-name/file.jpg</code>. For the shortest paths, also turn off Prefix under “File Storage Settings”', 'insightx-allhub' ), [ 'code' => [] ] ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Files not linked to a product, post or category keep Year & Month and Object Version', 'insightx-allhub' ); ?></p>
+                                    <p class="isxs-hint isxs-indent"><?php esc_html_e( 'Caution: without Year & Month and Object Version, two files with the same name under the same product overwrite each other', 'insightx-allhub' ); ?></p>
                                 </div>
                             </div>
 
@@ -403,8 +403,8 @@ class ISXM_Admin {
                                     <div class="isxs-card-head-title" id="isxs-delivery-head-title">
                                         <span class="isxs-provider-icon is-logo" id="isxs-delivery-head-logo"><?php echo $this->provider_logo_svg( $s['provider'] ); ?></span>
                                         <div>
-                                            <h2><?php esc_html_e( 'Delivery', 'insightx-offload' ); ?></h2>
-                                            <p class="isxs-card-sub" id="isxs-delivery-head-sub"><?php echo esc_html( $isxm_pmeta['label'] ); ?> · <?php echo esc_html( $isxm_pconn['bucket'] !== '' ? $isxm_pconn['bucket'] : __( '(no bucket set)', 'insightx-offload' ) ); ?></p>
+                                            <h2><?php esc_html_e( 'Delivery', 'insightx-allhub' ); ?></h2>
+                                            <p class="isxs-card-sub" id="isxs-delivery-head-sub"><?php echo esc_html( $isxm_pmeta['label'] ); ?> · <?php echo esc_html( $isxm_pconn['bucket'] !== '' ? $isxm_pconn['bucket'] : __( '(no bucket set)', 'insightx-allhub' ) ); ?></p>
                                         </div>
                                     </div>
                                 </div>
@@ -412,12 +412,12 @@ class ISXM_Admin {
                                     <div class="isxs-alert isxs-alert-warn isxs-delivery-alert"><?php echo esc_html( $isxm_delivery_alert ); ?></div>
                                 <?php endif; ?>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'deliver_enabled', $s['deliver_enabled'], __( 'Deliver Offloaded Media', 'insightx-offload' ), __( 'Rewrite URLs of offloaded media to point at storage/CDN', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'force_https', $s['force_https'], __( 'Force HTTPS', 'insightx-offload' ), __( 'Always use https for every rewritten URL', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'deliver_enabled', $s['deliver_enabled'], __( 'Deliver Offloaded Media', 'insightx-allhub' ), __( 'Rewrite URLs of offloaded media to point at storage/CDN', 'insightx-allhub' ) ); ?>
+                                    <?php $this->toggle( 'force_https', $s['force_https'], __( 'Force HTTPS', 'insightx-allhub' ), __( 'Always use https for every rewritten URL', 'insightx-allhub' ) ); ?>
                                     <div class="isxs-field">
-                                        <label for="isxs-cdn-domain"><?php esc_html_e( 'Custom Delivery Domain (CDN)', 'insightx-offload' ); ?></label>
+                                        <label for="isxs-cdn-domain"><?php esc_html_e( 'Custom Delivery Domain (CDN)', 'insightx-allhub' ); ?></label>
                                         <input type="text" id="isxs-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['cdn_domain'] ); ?>">
-                                        <p class="isxs-hint"><?php esc_html_e( 'Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL', 'insightx-offload' ); ?></p>
+                                        <p class="isxs-hint"><?php esc_html_e( 'Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL', 'insightx-allhub' ); ?></p>
                                     </div>
                                 </div>
                             </div>
@@ -436,14 +436,14 @@ class ISXM_Admin {
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
                                     </span>
                                     <div>
-                                        <h2><?php esc_html_e( 'Images', 'insightx-offload' ); ?></h2>
-                                        <p class="isxs-card-sub"><?php esc_html_e( 'Image sizes and profile pictures', 'insightx-offload' ); ?></p>
+                                        <h2><?php esc_html_e( 'Images', 'insightx-allhub' ); ?></h2>
+                                        <p class="isxs-card-sub"><?php esc_html_e( 'Image sizes and profile pictures', 'insightx-allhub' ); ?></p>
                                     </div>
                                 </div>
                             </div>
                             <div class="isxs-card-body">
-                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-offload' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-offload' ), 'warn' ); ?>
-                                    <?php $this->toggle( 'letter_avatars', $s['letter_avatars'], __( 'Letter avatars', 'insightx-offload' ), __( 'Show every profile picture as a coloured circle with the person\'s first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'disable_thumbnails', $s['disable_thumbnails'], __( 'Disable intermediate image sizes', 'insightx-allhub' ), __( 'Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only', 'insightx-allhub' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'letter_avatars', $s['letter_avatars'], __( 'Letter avatars', 'insightx-allhub' ), __( 'Show every profile picture as a coloured circle with the person\'s first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off', 'insightx-allhub' ) ); ?>
                             </div>
                         </div>
                         <div class="isxs-pdf-wrap">
@@ -460,20 +460,20 @@ class ISXM_Admin {
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>
                                     </span>
                                     <div>
-                                        <h2><?php esc_html_e( 'Assets Pull', 'insightx-offload' ); ?></h2>
-                                        <p class="isxs-card-sub"><?php esc_html_e( 'Serve theme and plugin CSS / JS through a CDN', 'insightx-offload' ); ?></p>
+                                        <h2><?php esc_html_e( 'Assets Pull', 'insightx-allhub' ); ?></h2>
+                                        <p class="isxs-card-sub"><?php esc_html_e( 'Serve theme and plugin CSS / JS through a CDN', 'insightx-allhub' ); ?></p>
                                     </div>
                                 </div>
                             </div>
                             <div class="isxs-card-body">
-                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], __( 'Rewrite Asset URLs', 'insightx-offload' ), __( 'Serve theme and plugin CSS/JS files from the CDN domain', 'insightx-offload' ) ); ?>
-                                <?php $this->toggle( 'assets_force_https', $s['assets_force_https'], __( 'Force HTTPS', 'insightx-offload' ), __( 'Always use https for every rewritten asset URL', 'insightx-offload' ) ); ?>
+                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], __( 'Rewrite Asset URLs', 'insightx-allhub' ), __( 'Serve theme and plugin CSS/JS files from the CDN domain', 'insightx-allhub' ) ); ?>
+                                <?php $this->toggle( 'assets_force_https', $s['assets_force_https'], __( 'Force HTTPS', 'insightx-allhub' ), __( 'Always use https for every rewritten asset URL', 'insightx-allhub' ) ); ?>
                                 <div class="isxs-field">
-                                    <label for="isxs-assets-cdn-domain"><?php esc_html_e( 'CDN Domain (Assets)', 'insightx-offload' ); ?></label>
+                                    <label for="isxs-assets-cdn-domain"><?php esc_html_e( 'CDN Domain (Assets)', 'insightx-allhub' ); ?></label>
                                     <input type="text" id="isxs-assets-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['assets_cdn_domain'] ); ?>">
-                                    <p class="isxs-hint"><?php esc_html_e( 'Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site', 'insightx-allhub' ); ?></p>
                                 </div>
-                                <p class="isxs-hint"><?php esc_html_e( 'Sample asset URLs after rewrite (live preview):', 'insightx-offload' ); ?></p>
+                                <p class="isxs-hint"><?php esc_html_e( 'Sample asset URLs after rewrite (live preview):', 'insightx-allhub' ); ?></p>
                                 <div class="isxs-url-preview" data-url-preview="assets">
                                     <span class="isxs-url-part" data-part="ascheme"><em>Scheme</em><code>https://</code></span>
                                     <span class="isxs-url-part" data-part="adomain"><em>Domain</em><code>—</code></span>
@@ -494,7 +494,7 @@ class ISXM_Admin {
                             ob_start();
                             ?>
                             <div class="isxs-field isxs-folder-field">
-                                <label for="isxs-offload-folders-type"><?php esc_html_e( 'Folders to offload', 'insightx-offload' ); ?></label>
+                                <label for="isxs-offload-folders-type"><?php esc_html_e( 'Folders to offload', 'insightx-allhub' ); ?></label>
                                 <input type="hidden" id="isxs-offload-folders" value="<?php echo esc_attr( ISXM_Settings::offload_folders() ); ?>">
                                 <?php $this->folder_picker_markup( 'isxs-offload-folders-type' ); ?>
                             </div>
@@ -502,9 +502,9 @@ class ISXM_Admin {
                             $offload_fields = ob_get_clean();
                             $this->tool_card(
                                 'offload',
-                                __( 'Offload media', 'insightx-offload' ),
-                                sprintf( __( 'Choose the folders to offload. %s is the whole Media Library (new files and missing image sizes); other folders go up under their own path and keep their server copies. Runs on the server, so you can close this tab', 'insightx-offload' ), ISXM_Settings::uploads_relative() ),
-                                __( 'Start Offload', 'insightx-offload' ),
+                                __( 'Offload media', 'insightx-allhub' ),
+                                sprintf( __( 'Choose the folders to offload. %s is the whole Media Library (new files and missing image sizes); other folders go up under their own path and keep their server copies. Runs on the server, so you can close this tab', 'insightx-allhub' ), ISXM_Settings::uploads_relative() ),
+                                __( 'Start Offload', 'insightx-allhub' ),
                                 '',
                                 false,
                                 $offload_fields
@@ -514,22 +514,22 @@ class ISXM_Admin {
                             // the card is also toggled live from JS after a run.
                             $this->tool_card(
                                 'retry_failed',
-                                __( 'Retry failed offloads', 'insightx-offload' ),
-                                __( 'Upload again only the files that failed last time. Review them with the “Offload failed” filter on the Media page', 'insightx-offload' ),
-                                __( 'Retry', 'insightx-offload' ),
+                                __( 'Retry failed offloads', 'insightx-allhub' ),
+                                __( 'Upload again only the files that failed last time. Review them with the “Offload failed” filter on the Media page', 'insightx-allhub' ),
+                                __( 'Retry', 'insightx-allhub' ),
                                 '',
                                 empty( $stats['failed'] )
                             );
                             // One Delete card; the dropdown picks which copy goes —
                             // the server's (clean_local) or the bucket's (remove).
                             $delete_modes = [
-                                'clean_local' => [ __( 'Delete server copies already in the bucket', 'insightx-offload' ), __( 'Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins\' folders are not touched', 'insightx-offload' ), __( 'Delete Server Copies', 'insightx-offload' ) ],
-                                'remove'      => [ __( 'Remove all files from the bucket', 'insightx-offload' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-offload' ), __( 'Remove from Bucket', 'insightx-offload' ) ],
+                                'clean_local' => [ __( 'Delete server copies already in the bucket', 'insightx-allhub' ), __( 'Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins\' folders are not touched', 'insightx-allhub' ), __( 'Delete Server Copies', 'insightx-allhub' ) ],
+                                'remove'      => [ __( 'Remove all files from the bucket', 'insightx-allhub' ), __( 'Delete all media files from the bucket. Files missing from the server are downloaded first', 'insightx-allhub' ), __( 'Remove from Bucket', 'insightx-allhub' ) ],
                             ];
                             ob_start();
                             ?>
                             <div class="isxs-field">
-                                <label for="isxs-delete-mode"><?php esc_html_e( 'What to delete', 'insightx-offload' ); ?></label>
+                                <label for="isxs-delete-mode"><?php esc_html_e( 'What to delete', 'insightx-allhub' ); ?></label>
                                 <select id="isxs-delete-mode" class="isxs-select">
                                     <?php foreach ( $delete_modes as $mode => $texts ) : ?>
                                         <option value="<?php echo esc_attr( $mode ); ?>" data-desc="<?php echo esc_attr( $texts[1] ); ?>" data-button="<?php echo esc_attr( $texts[2] ); ?>"><?php echo esc_html( $texts[0] ); ?></option>
@@ -538,10 +538,10 @@ class ISXM_Admin {
                             </div>
                             <?php
                             $delete_fields = ob_get_clean();
-                            $this->tool_card( 'clean_local', __( 'Delete files', 'insightx-offload' ), $delete_modes['clean_local'][1], $delete_modes['clean_local'][2], 'danger', false, $delete_fields );
-                            $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-offload' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-offload' ), __( 'Download Files', 'insightx-offload' ) );
+                            $this->tool_card( 'clean_local', __( 'Delete files', 'insightx-allhub' ), $delete_modes['clean_local'][1], $delete_modes['clean_local'][2], 'danger', false, $delete_fields );
+                            $this->tool_card( 'download', __( 'Download files back from the bucket', 'insightx-allhub' ), __( 'Download files back to the server, for example after “Remove Local Media” has deleted them', 'insightx-allhub' ), __( 'Download Files', 'insightx-allhub' ) );
                             if ( class_exists( 'WC_Product' ) ) {
-                                $this->tool_card( 'wc_downloads', __( 'Check and update WooCommerce downloadable products', 'insightx-offload' ), __( 'Make downloadable product files private in the bucket and update their URLs', 'insightx-offload' ), __( 'Check and Update', 'insightx-offload' ) );
+                                $this->tool_card( 'wc_downloads', __( 'Check and update WooCommerce downloadable products', 'insightx-allhub' ), __( 'Make downloadable product files private in the bucket and update their URLs', 'insightx-allhub' ), __( 'Check and Update', 'insightx-allhub' ) );
                             }
                             ?>
                         </div>
@@ -553,19 +553,19 @@ class ISXM_Admin {
                         <div class="isxs-migrate-content">
 
                         <div class="isxs-card">
-                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Choose Providers to Migrate', 'insightx-offload' ); ?></h2></div>
+                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Choose Providers to Migrate', 'insightx-allhub' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php echo wp_kses( __( 'Choose the provider to copy from (left) and to (right), from the connections set up in the “Connections” tab. Files are <strong>copied only — the source is never modified</strong>', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
+                                <p class="isxs-hint"><?php echo wp_kses( __( 'Choose the provider to copy from (left) and to (right), from the connections set up in the “Connections” tab. Files are <strong>copied only — the source is never modified</strong>', 'insightx-allhub' ), [ 'strong' => [] ] ); ?></p>
                                 <div class="isxs-migrate-columns">
                                     <div class="isxs-migrate-col">
-                                        <h3><span class="isxs-migrate-col-dot isxs-migrate-col-dot-from"></span><?php esc_html_e( 'From (Source)', 'insightx-offload' ); ?></h3>
+                                        <h3><span class="isxs-migrate-col-dot isxs-migrate-col-dot-from"></span><?php esc_html_e( 'From (Source)', 'insightx-allhub' ); ?></h3>
                                         <?php $this->provider_grid( 'isxs-source-provider', 'isxs-source-provider-card', $s['source_provider'] ); ?>
                                     </div>
                                     <div class="isxs-migrate-arrow" aria-hidden="true">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
                                     </div>
                                     <div class="isxs-migrate-col">
-                                        <h3><span class="isxs-migrate-col-dot isxs-migrate-col-dot-to"></span><?php esc_html_e( 'To (Destination)', 'insightx-offload' ); ?></h3>
+                                        <h3><span class="isxs-migrate-col-dot isxs-migrate-col-dot-to"></span><?php esc_html_e( 'To (Destination)', 'insightx-allhub' ); ?></h3>
                                         <?php $this->provider_grid( 'isxs-provider-migrate-mirror', 'isxs-dest-provider-card', $s['provider'] ); ?>
                                     </div>
                                 </div>
@@ -573,36 +573,36 @@ class ISXM_Admin {
                         </div>
 
                         <div class="isxs-card">
-                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Source Path Structure', 'insightx-offload' ); ?></h2></div>
+                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Source Path Structure', 'insightx-allhub' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php esc_html_e( 'Choose the folders on the source bucket to migrate', 'insightx-offload' ); ?></p>
+                                <p class="isxs-hint"><?php esc_html_e( 'Choose the folders on the source bucket to migrate', 'insightx-allhub' ); ?></p>
                                 <div class="isxs-field isxs-folder-field">
-                                    <label for="isxs-source-folders-type"><?php esc_html_e( 'Folders to migrate', 'insightx-offload' ); ?></label>
+                                    <label for="isxs-source-folders-type"><?php esc_html_e( 'Folders to migrate', 'insightx-allhub' ); ?></label>
                                     <input type="hidden" id="isxs-source-folders" value="<?php echo esc_attr( ISXM_Settings::source_folders() ); ?>">
                                     <?php $this->folder_picker_markup( 'isxs-source-folders-type' ); ?>
-                                    <p class="isxs-hint"><?php esc_html_e( 'Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated', 'insightx-offload' ); ?></p>
+                                    <p class="isxs-hint"><?php esc_html_e( 'Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated', 'insightx-allhub' ); ?></p>
                                 </div>
-                                <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-offload' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-offload' ) ); ?>
+                                <?php $this->toggle( 'source_use_year_month', $s['source_use_year_month'], __( 'Year & Month in path', 'insightx-allhub' ), __( 'e.g. wp-content/uploads/2025/08/file.jpg', 'insightx-allhub' ) ); ?>
                             </div>
                         </div>
 
                         <div class="isxs-card">
-                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Replace URLs in the Database', 'insightx-offload' ); ?></h2></div>
+                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Replace URLs in the Database', 'insightx-allhub' ); ?></h2></div>
                             <div class="isxs-card-body">
-                                <p class="isxs-hint"><?php echo wp_kses( __( 'The URL your existing media is <strong>served from today</strong>. After migrating, it is replaced with the destination URL throughout the database', 'insightx-offload' ), [ 'strong' => [] ] ); ?></p>
+                                <p class="isxs-hint"><?php echo wp_kses( __( 'The URL your existing media is <strong>served from today</strong>. After migrating, it is replaced with the destination URL throughout the database', 'insightx-allhub' ), [ 'strong' => [] ] ); ?></p>
                                 <div class="isxs-field">
-                                    <label for="isxs-source-public-url"><?php esc_html_e( 'Source Public URL (current)', 'insightx-offload' ); ?></label>
-                                    <input type="url" id="isxs-source-public-url" placeholder="<?php esc_attr_e( 'Leave empty to infer it from the Endpoint/Bucket above', 'insightx-offload' ); ?>" value="<?php echo esc_attr( $s['source_public_base_url'] ); ?>">
-                                    <p class="isxs-hint"><?php esc_html_e( 'For example https://old-bucket.s3.ap-southeast-1.amazonaws.com or your current CDN domain. Leave empty if media still uses this site\'s URLs (wp-content/uploads)', 'insightx-offload' ); ?></p>
+                                    <label for="isxs-source-public-url"><?php esc_html_e( 'Source Public URL (current)', 'insightx-allhub' ); ?></label>
+                                    <input type="url" id="isxs-source-public-url" placeholder="<?php esc_attr_e( 'Leave empty to infer it from the Endpoint/Bucket above', 'insightx-allhub' ); ?>" value="<?php echo esc_attr( $s['source_public_base_url'] ); ?>">
+                                    <p class="isxs-hint"><?php esc_html_e( 'For example https://old-bucket.s3.ap-southeast-1.amazonaws.com or your current CDN domain. Leave empty if media still uses this site\'s URLs (wp-content/uploads)', 'insightx-allhub' ); ?></p>
                                 </div>
                             </div>
                         </div>
 
                         <?php $this->tool_card(
                             'migrate',
-                            __( 'Migrate from Source to Destination', 'insightx-offload' ),
-                            __( 'Copy files from the source bucket to the destination and update database URLs at the end. The source is never modified', 'insightx-offload' ),
-                            __( 'Start Migration', 'insightx-offload' ),
+                            __( 'Migrate from Source to Destination', 'insightx-allhub' ),
+                            __( 'Copy files from the source bucket to the destination and update database URLs at the end. The source is never modified', 'insightx-allhub' ),
+                            __( 'Start Migration', 'insightx-allhub' ),
                             '',
                             false
                         ); ?>
@@ -629,7 +629,7 @@ class ISXM_Admin {
                     <section class="isxs-tab" data-tab-panel="support">
 
                         <div class="isxs-card">
-                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Diagnostics', 'insightx-offload' ); ?></h2></div>
+                            <div class="isxs-card-head"><h2><?php esc_html_e( 'Diagnostics', 'insightx-allhub' ); ?></h2></div>
                             <div class="isxs-card-body">
                                 <pre class="isxs-diagnostic"><?php echo esc_html( ISXM_Tools::diagnostic_text() ); ?></pre>
                             </div>
@@ -695,35 +695,35 @@ class ISXM_Admin {
             <div class="isxs-card-body">
                 <div class="isxs-grid-2">
                     <div class="isxs-field">
-                        <label><?php esc_html_e( 'Endpoint URL', 'insightx-offload' ); ?></label>
+                        <label><?php esc_html_e( 'Endpoint URL', 'insightx-allhub' ); ?></label>
                         <input type="url" class="isxs-conn-endpoint" placeholder="<?php echo esc_attr( $meta['endpoint_placeholder'] ); ?>" value="<?php echo esc_attr( $config['endpoint'] ); ?>" <?php disabled( $meta['endpoint_locked'] ); ?>>
                         <p class="isxs-hint"><?php echo esc_html( $meta['endpoint_hint'] ); ?></p>
                     </div>
                     <div class="isxs-field">
-                        <label><?php esc_html_e( 'Region', 'insightx-offload' ); ?></label>
+                        <label><?php esc_html_e( 'Region', 'insightx-allhub' ); ?></label>
                         <input type="text" class="isxs-conn-region" placeholder="<?php echo esc_attr( $meta['region_default'] ); ?>" value="<?php echo esc_attr( $config['region'] ); ?>">
                         <p class="isxs-hint"><?php echo esc_html( $meta['region_hint'] ); ?></p>
                     </div>
                     <div class="isxs-field">
-                        <label><?php esc_html_e( 'Bucket', 'insightx-offload' ); ?></label>
+                        <label><?php esc_html_e( 'Bucket', 'insightx-allhub' ); ?></label>
                         <input type="text" class="isxs-conn-bucket" placeholder="<?php echo esc_attr( $meta['bucket_placeholder'] ); ?>" value="<?php echo esc_attr( $config['bucket'] ); ?>">
                     </div>
                     <div class="isxs-field">
-                        <label><?php esc_html_e( 'Access Key', 'insightx-offload' ); ?></label>
+                        <label><?php esc_html_e( 'Access Key', 'insightx-allhub' ); ?></label>
                         <input type="text" class="isxs-conn-access-key" autocomplete="off" placeholder="<?php echo esc_attr( $meta['access_key_placeholder'] ); ?>" value="<?php echo esc_attr( $config['access_key'] ); ?>">
                     </div>
                     <div class="isxs-field isxs-col-span">
-                        <label><?php esc_html_e( 'Secret Key', 'insightx-offload' ); ?></label>
+                        <label><?php esc_html_e( 'Secret Key', 'insightx-allhub' ); ?></label>
                         <input type="password" class="isxs-conn-secret-key" autocomplete="new-password" data-has-secret="<?php echo $has_secret ? '1' : '0'; ?>" value="<?php echo $has_secret ? esc_attr( str_repeat( '•', 16 ) ) : ''; ?>" placeholder="<?php echo esc_attr( $meta['secret_key_placeholder'] ); ?>">
-                        <p class="isxs-hint"><?php esc_html_e( '🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key', 'insightx-offload' ); ?></p>
+                        <p class="isxs-hint"><?php esc_html_e( '🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key', 'insightx-allhub' ); ?></p>
                     </div>
                 </div>
                 <div class="isxs-toggle-row">
-                    <?php $this->toggle( 'path_style', $config['path_style'], __( 'Path-style URL', 'insightx-offload' ), __( 'Required for Minio/Garage — off for AWS S3 (virtual-hosted)', 'insightx-offload' ) ); ?>
-                    <?php $this->toggle( 'send_public_acl', $config['send_public_acl'], __( 'Send ACL public-read', 'insightx-offload' ), __( 'Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy', 'insightx-offload' ) ); ?>
+                    <?php $this->toggle( 'path_style', $config['path_style'], __( 'Path-style URL', 'insightx-allhub' ), __( 'Required for Minio/Garage — off for AWS S3 (virtual-hosted)', 'insightx-allhub' ) ); ?>
+                    <?php $this->toggle( 'send_public_acl', $config['send_public_acl'], __( 'Send ACL public-read', 'insightx-allhub' ), __( 'Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy', 'insightx-allhub' ) ); ?>
                 </div>
                 <div class="isxs-card-foot">
-                    <button type="button" class="isxs-btn isxs-btn-primary isxs-conn-save-btn"><?php esc_html_e( 'Save', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-btn isxs-btn-primary isxs-conn-save-btn"><?php esc_html_e( 'Save', 'insightx-allhub' ); ?></button>
                 </div>
             </div>
         </div>
@@ -738,15 +738,15 @@ class ISXM_Admin {
      */
     private function conn_badge_text( $configured, $status ) {
         if ( ! $configured ) {
-            return __( 'Not configured', 'insightx-offload' );
+            return __( 'Not configured', 'insightx-allhub' );
         }
         if ( $status['state'] === 'ok' ) {
-            return __( 'Connected successfully', 'insightx-offload' );
+            return __( 'Connected successfully', 'insightx-allhub' );
         }
         if ( $status['state'] === 'error' ) {
-            return $status['message'] !== '' ? $status['message'] : __( 'Connection failed', 'insightx-offload' );
+            return $status['message'] !== '' ? $status['message'] : __( 'Connection failed', 'insightx-allhub' );
         }
-        return __( 'Connection not tested yet', 'insightx-offload' );
+        return __( 'Connection not tested yet', 'insightx-allhub' );
     }
 
     /**
@@ -761,7 +761,7 @@ class ISXM_Admin {
         $configured = ISXM_Connections::is_configured( $slug );
         $status     = ISXM_Connections::status( $slug );
         $state      = $configured ? $status['state'] : 'unknown';
-        $text       = $configured ? $this->conn_badge_text( true, $status ) : __( 'Not configured — go to the “Connections” tab', 'insightx-offload' );
+        $text       = $configured ? $this->conn_badge_text( true, $status ) : __( 'Not configured — go to the “Connections” tab', 'insightx-allhub' );
         ?>
         <span class="isxs-conn-badge" data-state="<?php echo esc_attr( $state ); ?>" id="<?php echo esc_attr( $badge_id ); ?>">
             <span class="isxs-conn-dot"></span>
@@ -799,7 +799,7 @@ class ISXM_Admin {
                 // 401, etc.) shouldn't be pickable as a live destination/source.
                 $verified     = $configured && ISXM_Connections::status( $key )['state'] === 'ok';
                 $card_classes = trim( $card_class . ( $active ? ' is-active' : '' ) . ( $verified ? '' : ' is-unconfigured' ) );
-                $title        = $verified ? '' : ( $configured ? __( 'This provider has not connected successfully yet — check it in the “Connections” tab first', 'insightx-offload' ) : __( 'This provider is not configured yet — set it up in the “Connections” tab first', 'insightx-offload' ) );
+                $title        = $verified ? '' : ( $configured ? __( 'This provider has not connected successfully yet — check it in the “Connections” tab first', 'insightx-allhub' ) : __( 'This provider is not configured yet — set it up in the “Connections” tab first', 'insightx-allhub' ) );
                 ?>
                 <button type="button" class="<?php echo esc_attr( $card_classes ); ?>" data-provider="<?php echo esc_attr( $key ); ?>" <?php disabled( ! $verified ); ?> title="<?php echo esc_attr( $title ); ?>">
                     <?php if ( 'logo' === $meta[1] ) : ?>
@@ -861,9 +861,9 @@ class ISXM_Admin {
     private function url_preview_card() {
         ?>
         <div class="isxs-card">
-            <div class="isxs-card-head"><h2><?php esc_html_e( 'URL Preview', 'insightx-offload' ); ?></h2></div>
+            <div class="isxs-card-head"><h2><?php esc_html_e( 'URL Preview', 'insightx-allhub' ); ?></h2></div>
             <div class="isxs-card-body">
-                <p class="isxs-hint"><?php esc_html_e( 'Media URL structure with the current settings (live preview):', 'insightx-offload' ); ?></p>
+                <p class="isxs-hint"><?php esc_html_e( 'Media URL structure with the current settings (live preview):', 'insightx-allhub' ); ?></p>
                 <div class="isxs-url-preview" data-url-preview>
                     <span class="isxs-url-part" data-part="scheme"><em>Scheme</em><code>https://</code></span>
                     <span class="isxs-url-part" data-part="domain"><em>Domain</em><code>—</code></span>
@@ -887,8 +887,8 @@ class ISXM_Admin {
     private function folder_picker_markup( $type_id ) {
         ?>
         <div class="isxs-folder-chips">
-            <input type="text" class="isxs-folder-type" id="<?php echo esc_attr( $type_id ); ?>" placeholder="<?php esc_attr_e( 'Type a path and press Enter', 'insightx-offload' ); ?>">
-            <button type="button" class="isxs-btn isxs-btn-ghost isxs-folder-browse" aria-expanded="false">+ <?php esc_html_e( 'Add folder', 'insightx-offload' ); ?></button>
+            <input type="text" class="isxs-folder-type" id="<?php echo esc_attr( $type_id ); ?>" placeholder="<?php esc_attr_e( 'Type a path and press Enter', 'insightx-allhub' ); ?>">
+            <button type="button" class="isxs-btn isxs-btn-ghost isxs-folder-browse" aria-expanded="false">+ <?php esc_html_e( 'Add folder', 'insightx-allhub' ); ?></button>
         </div>
         <div class="isxs-folder-picker" hidden>
             <ul class="isxs-folder-tree" role="tree"></ul>
@@ -950,26 +950,26 @@ class ISXM_Admin {
                 <span><?php
                 if ( $version !== '' ) {
                     /* translators: %s: Ghostscript version. */
-                    printf( esc_html__( 'Ghostscript %s found', 'insightx-offload' ), esc_html( $version ) );
+                    printf( esc_html__( 'Ghostscript %s found', 'insightx-allhub' ), esc_html( $version ) );
                 } else {
-                    esc_html_e( 'Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)', 'insightx-offload' );
+                    esc_html_e( 'Ghostscript (gs) was not found on this server. Ask your host to install it (for example: apt install ghostscript)', 'insightx-allhub' );
                 }
                 ?></span>
             </span>
         </p>
         <div class="isxs-field isxs-folder-field">
-            <label for="isxs-pdf-folders-type"><?php esc_html_e( 'Folders to shrink', 'insightx-offload' ); ?></label>
+            <label for="isxs-pdf-folders-type"><?php esc_html_e( 'Folders to shrink', 'insightx-allhub' ); ?></label>
             <input type="hidden" id="isxs-pdf-folders" value="<?php echo esc_attr( implode( ', ', ISXM_Settings::pdf_folders() ) ); ?>">
             <?php $this->folder_picker_markup( 'isxs-pdf-folders-type' ); ?>
         </div>
         <div class="isxs-field">
-            <label for="isxs-pdf-dpi"><?php esc_html_e( 'Resolution', 'insightx-offload' ); ?></label>
+            <label for="isxs-pdf-dpi"><?php esc_html_e( 'Resolution', 'insightx-allhub' ); ?></label>
             <select id="isxs-pdf-dpi" class="isxs-select">
                 <?php
                 $dpis = [
-                    72  => __( '72 dpi — smallest, for screens only', 'insightx-offload' ),
-                    150 => __( '150 dpi — balanced, sharp text (recommended)', 'insightx-offload' ),
-                    300 => __( '300 dpi — print quality, smaller savings', 'insightx-offload' ),
+                    72  => __( '72 dpi — smallest, for screens only', 'insightx-allhub' ),
+                    150 => __( '150 dpi — balanced, sharp text (recommended)', 'insightx-allhub' ),
+                    300 => __( '300 dpi — print quality, smaller savings', 'insightx-allhub' ),
                 ];
                 foreach ( $dpis as $dpi => $label ) :
                     ?>
@@ -977,18 +977,18 @@ class ISXM_Admin {
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php $this->toggle( 'pdf_auto', $s['pdf_auto'], __( 'Shrink automatically', 'insightx-offload' ), __( 'PDFs uploaded, created or copied into the folders above through File Manager are shrunk before they go to storage. Needs Ghostscript', 'insightx-offload' ) ); ?>
+        <?php $this->toggle( 'pdf_auto', $s['pdf_auto'], __( 'Shrink automatically', 'insightx-allhub' ), __( 'PDFs uploaded, created or copied into the folders above through File Manager are shrunk before they go to storage. Needs Ghostscript', 'insightx-allhub' ) ); ?>
         <div class="isxs-field isxs-folder-field isxs-folder-single">
-            <label for="isxs-pdf-backup-type"><?php esc_html_e( 'Keep the originals in', 'insightx-offload' ); ?></label>
+            <label for="isxs-pdf-backup-type"><?php esc_html_e( 'Keep the originals in', 'insightx-allhub' ); ?></label>
             <input type="hidden" id="isxs-pdf-backup" value="<?php echo esc_attr( $s['pdf_backup'] ); ?>">
             <?php $this->folder_picker_markup( 'isxs-pdf-backup-type' ); ?>
-            <p class="isxs-hint"><?php esc_html_e( 'One folder outside the folders above, e.g. pdf-originals/. Each original is copied there under its own path before it is shrunk. Leave empty to keep no originals — the files are then overwritten and cannot be restored', 'insightx-offload' ); ?></p>
+            <p class="isxs-hint"><?php esc_html_e( 'One folder outside the folders above, e.g. pdf-originals/. Each original is copied there under its own path before it is shrunk. Leave empty to keep no originals — the files are then overwritten and cannot be restored', 'insightx-allhub' ); ?></p>
         </div>
         <?php if ( $saved > 0 ) : ?>
             <p class="isxs-hint isxs-pdf-saved">
                 <?php
                 /* translators: %s: size, e.g. 120 MB. */
-                printf( esc_html__( 'Saved so far: %s', 'insightx-offload' ), esc_html( size_format( $saved, 1 ) ) );
+                printf( esc_html__( 'Saved so far: %s', 'insightx-allhub' ), esc_html( size_format( $saved, 1 ) ) );
                 ?>
             </p>
         <?php endif; ?>
@@ -996,9 +996,9 @@ class ISXM_Admin {
         $extra = ob_get_clean();
         $this->tool_card(
             'compress_pdf',
-            __( 'Shrink PDFs', 'insightx-offload' ),
-            __( 'Shrink the PDFs in the chosen folders with Ghostscript and put them back under the same name. Files already on the bucket go up again over the same key. Files that would shrink by less than 10% are left as they are. Runs on the server, so you can close this tab', 'insightx-offload' ),
-            __( 'Shrink PDFs', 'insightx-offload' ),
+            __( 'Shrink PDFs', 'insightx-allhub' ),
+            __( 'Shrink the PDFs in the chosen folders with Ghostscript and put them back under the same name. Files already on the bucket go up again over the same key. Files that would shrink by less than 10% are left as they are. Runs on the server, so you can close this tab', 'insightx-allhub' ),
+            __( 'Shrink PDFs', 'insightx-allhub' ),
             '',
             false,
             $extra
@@ -1025,8 +1025,8 @@ class ISXM_Admin {
                 <span class="isxs-tool-icon"><?php echo $this->tool_icon_svg( $id ); ?></span>
                 <h2><?php echo esc_html( $title ); ?></h2>
                 <div class="isxs-tool-actions">
-                    <button type="button" class="isxs-btn isxs-btn-ghost isxs-tool-stop" hidden><?php esc_html_e( 'Stop', 'insightx-offload' ); ?></button>
-                    <button type="button" class="isxs-btn isxs-btn-danger isxs-tool-cancel" hidden><?php esc_html_e( 'Cancel', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-btn isxs-btn-ghost isxs-tool-stop" hidden><?php esc_html_e( 'Stop', 'insightx-allhub' ); ?></button>
+                    <button type="button" class="isxs-btn isxs-btn-danger isxs-tool-cancel" hidden><?php esc_html_e( 'Cancel', 'insightx-allhub' ); ?></button>
                     <button type="button" class="isxs-btn <?php echo $variant === 'danger' ? 'isxs-btn-danger' : 'isxs-btn-primary'; ?> isxs-tool-run"><?php echo esc_html( $button ); ?></button>
                 </div>
             </div>
@@ -1036,7 +1036,7 @@ class ISXM_Admin {
                 <div class="isxs-tool-progress" hidden>
                     <div class="isxs-progress-track"><div class="isxs-progress-fill"></div></div>
                     <span class="isxs-tool-percent"></span>
-                    <span class="isxs-tool-count"><?php printf( esc_html__( '%s items', 'insightx-offload' ), 0 ); ?></span>
+                    <span class="isxs-tool-count"><?php printf( esc_html__( '%s items', 'insightx-allhub' ), 0 ); ?></span>
                 </div>
                 <p class="isxs-tool-eta"></p>
                 <ul class="isxs-tool-errors" hidden></ul>
@@ -1066,51 +1066,51 @@ class ISXM_Admin {
         $last_clean = ISXM_Sync::last_clean();
         if ( $last_run === null ) {
             $badge_state = 'unknown';
-            $badge_text  = __( 'Never checked against the real bucket', 'insightx-offload' );
+            $badge_text  = __( 'Never checked against the real bucket', 'insightx-allhub' );
         } elseif ( $last_clean === true ) {
             $badge_state = 'ok';
-            $badge_text  = __( 'Everything matches', 'insightx-offload' );
+            $badge_text  = __( 'Everything matches', 'insightx-allhub' );
         } elseif ( $last_clean === false ) {
             $badge_state = 'error';
-            $badge_text  = __( 'Mismatches found', 'insightx-offload' );
+            $badge_text  = __( 'Mismatches found', 'insightx-allhub' );
         } else {
             $badge_state = 'ok';
-            $badge_text  = sprintf( /* translators: %s: human-readable time difference */ __( 'Last checked %s ago', 'insightx-offload' ), human_time_diff( $last_run, time() ) );
+            $badge_text  = sprintf( /* translators: %s: human-readable time difference */ __( 'Last checked %s ago', 'insightx-allhub' ), human_time_diff( $last_run, time() ) );
         }
         // When the verdict replaces the timestamp in the label, the
         // timestamp still has to be reachable — hence the tooltip.
         $badge_title = $last_run === null
             ? ''
-            : sprintf( /* translators: %s: human-readable time difference */ __( 'Last checked %s ago', 'insightx-offload' ), human_time_diff( $last_run, time() ) );
+            : sprintf( /* translators: %s: human-readable time difference */ __( 'Last checked %s ago', 'insightx-allhub' ), human_time_diff( $last_run, time() ) );
         ?>
         <div class="isxs-card isxs-sync-card">
             <div class="isxs-tool-top">
                 <span class="isxs-tool-icon"><?php echo $this->tool_icon_svg( 'sync' ); ?></span>
-                <h2><?php esc_html_e( 'Sync with bucket', 'insightx-offload' ); ?></h2>
+                <h2><?php esc_html_e( 'Sync with bucket', 'insightx-allhub' ); ?></h2>
                 <div class="isxs-tool-actions">
                     <span class="isxs-conn-badge isxs-sync-status" data-state="<?php echo esc_attr( $badge_state ); ?>" title="<?php echo esc_attr( $badge_title ); ?>">
                         <span class="isxs-conn-dot"></span>
                         <span class="isxs-sync-status-text"><?php echo esc_html( $badge_text ); ?></span>
                     </span>
-                    <button type="button" class="isxs-btn isxs-btn-primary isxs-sync-run"><?php esc_html_e( 'Sync with bucket', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-btn isxs-btn-primary isxs-sync-run"><?php esc_html_e( 'Sync with bucket', 'insightx-allhub' ); ?></button>
                 </div>
             </div>
             <div class="isxs-tool-body">
-                <p><?php esc_html_e( 'Compare the bucket with the plugin\'s records. Files deleted from the bucket outside the plugin are marked for upload again', 'insightx-offload' ); ?></p>
+                <p><?php esc_html_e( 'Compare the bucket with the plugin\'s records. Files deleted from the bucket outside the plugin are marked for upload again', 'insightx-allhub' ); ?></p>
                 <div class="isxs-tool-progress" hidden>
                     <div class="isxs-progress-track"><div class="isxs-progress-fill"></div></div>
                     <span class="isxs-tool-percent"></span>
-                    <span class="isxs-tool-count"><?php printf( esc_html__( '%s items', 'insightx-offload' ), 0 ); ?></span>
+                    <span class="isxs-tool-count"><?php printf( esc_html__( '%s items', 'insightx-allhub' ), 0 ); ?></span>
                 </div>
                 <p class="isxs-tool-eta"></p>
                 <ul class="isxs-tool-errors" hidden></ul>
                 <div class="isxs-sync-result" hidden>
                     <div class="isxs-sync-summary"></div>
                     <div class="isxs-sync-sample"></div>
-                    <button type="button" class="isxs-btn isxs-btn-danger isxs-sync-apply" hidden><?php esc_html_e( 'Clear stale meta', 'insightx-offload' ); ?></button>
+                    <button type="button" class="isxs-btn isxs-btn-danger isxs-sync-apply" hidden><?php esc_html_e( 'Clear stale meta', 'insightx-allhub' ); ?></button>
                     <div class="isxs-sync-orphan-actions" hidden>
-                        <button type="button" class="isxs-btn isxs-btn-danger isxs-sync-orphan-run"><?php esc_html_e( 'Delete orphan objects', 'insightx-offload' ); ?></button>
-                        <p class="isxs-hint"><?php esc_html_e( 'Objects in the current prefix with no matching WordPress media', 'insightx-offload' ); ?></p>
+                        <button type="button" class="isxs-btn isxs-btn-danger isxs-sync-orphan-run"><?php esc_html_e( 'Delete orphan objects', 'insightx-allhub' ); ?></button>
+                        <p class="isxs-hint"><?php esc_html_e( 'Objects in the current prefix with no matching WordPress media', 'insightx-allhub' ); ?></p>
                     </div>
                 </div>
             </div>

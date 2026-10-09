@@ -1,3 +1,10 @@
+**[1.0.0] - 2026-10-09**
+
+- **เปลี่ยนชื่อเป็น InsightX AllHub** (เดิม InsightX Offload) — โฟลเดอร์และไฟล์หลัก `insightx-allhub/insightx-allhub.php`, repo ใหม่ `InsightX-th/insightx-allhub`, เมนู InsightX AllHub → Offload · จัดการไฟล์ · สำรองข้อมูล · คู่มือการใช้งาน
+- **ย้ายจาก InsightX Offload:** ติดตั้ง zip ของ AllHub แล้วกดเปิด — InsightX Offload ถูกปิดให้อัตโนมัติ การตั้งค่า การเชื่อมต่อ ไฟล์ที่ offload แล้ว ข้อมูลสำรอง และตารางเวลาเดิมใช้ต่อได้ทันที (ข้อมูลในฐานข้อมูลชุดเดิม ไม่ต้อง offload ใหม่) แล้วลบตัวเดิมได้เลย · ระหว่างที่ตัวเดิมยังเปิดอยู่ AllHub ไม่โหลด (กันประกาศ class ซ้ำ) และมีข้อความเตือน
+- ลิงก์หน้าหลังบ้านเปลี่ยนเป็น `admin.php?page=insightx-allhub` (และ `insightx-allhub-files`, `insightx-allhub-guide`) · text domain `insightx-allhub`
+- test ตัวกันชนกับปลั๊กอินตัวเดิม 7 ตัว (`tests/rename.php`) รันใน CI
+
 **[0.3.0] - 2026-10-09**
 
 - **รวม InsightX Backup เข้ามาแล้ว** — เมนู InsightX Offload → **สำรองข้อมูล** มีแท็บ ส่งออก / นำเข้า / ข้อมูลสำรอง / การเชื่อมต่อ / ตั้งค่า / Reset Hub / Log (เหลือปลั๊กอินเดียว)

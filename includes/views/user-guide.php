@@ -35,7 +35,7 @@ $guide_figure = static function ( $file, $alt, $caption, $width, $height ) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v15M3 3h5a4 4 0 0 1 4 3 4 4 0 0 1 4-3h5v15h-5a4 4 0 0 0-4 3 4 4 0 0 0-4-3H3z"/></svg>
             </div>
             <div>
-                <h1>คู่มือการใช้งาน InsightX Offload</h1>
+                <h1>คู่มือการใช้งาน InsightX AllHub</h1>
                 <p class="isxs-tagline">ตั้งค่าพื้นที่เก็บไฟล์บนคลาวด์ ย้ายสื่อ จัดการไฟล์ และสำรองข้อมูลเว็บไซต์</p>
             </div>
         </div>
@@ -61,10 +61,10 @@ $guide_figure = static function ( $file, $alt, $caption, $width, $height ) {
             <section id="isxs-guide-start" aria-labelledby="isxs-guide-start-title">
                 <h2 id="isxs-guide-start-title">เริ่มต้นใช้งาน</h2>
                 <p>Offload คือการคัดลอกสื่อจากเว็บไซต์ไปเก็บบน Storage ส่วน CDN หรือโดเมนเสิร์ฟไฟล์ใช้เปิดไฟล์เหล่านั้นให้ผู้เข้าชม การเชื่อมต่อ Storage สำเร็จจึงยังต้องตรวจว่า URL ของไฟล์เปิดได้ด้วย</p>
-                <?php $guide_figure( 'navigation-real.png', 'แถบเมนูจริงของ InsightX Offload มีสื่อ รูปภาพ/ไฟล์ ทรัพยากร เครื่องมือ ย้ายข้อมูล การเชื่อมต่อ และช่วยเหลือ', 'หน้าจอจริง: แถบเมนูภายใน Offload', 1440, 135 ); ?>
+                <?php $guide_figure( 'navigation-real.png', 'แถบเมนูจริงของ InsightX AllHub มีสื่อ รูปภาพ/ไฟล์ ทรัพยากร เครื่องมือ ย้ายข้อมูล การเชื่อมต่อ และช่วยเหลือ', 'หน้าจอจริง: แถบเมนูภายใน Offload', 1440, 135 ); ?>
                 <p>เตรียมบัญชี Storage, Bucket, Endpoint, Region, Access Key และ Secret Key ของคุณ ปลั๊กอินรองรับ AWS S3, MinIO, Garage, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage และผู้ให้บริการ S3-compatible อื่น</p>
                 <ol>
-                    <li>เปิด <strong>InsightX Offload → Offload → การเชื่อมต่อ (Connections)</strong> กรอกข้อมูลผู้ให้บริการ แล้วกด <strong>บันทึก (Save)</strong> เพื่อบันทึกและทดสอบ</li>
+                    <li>เปิด <strong>InsightX AllHub → Offload → การเชื่อมต่อ (Connections)</strong> กรอกข้อมูลผู้ให้บริการ แล้วกด <strong>บันทึก (Save)</strong> เพื่อบันทึกและทดสอบ</li>
                     <li>ไปแท็บ <strong>สื่อ (Media)</strong> เลือกผู้ให้บริการที่เชื่อมต่อสำเร็จเป็นปลายทาง</li>
                     <li>เปิด <strong>ส่งสื่อขึ้น Storage อัตโนมัติ (Offload Media)</strong> เพื่ออัปโหลดสื่อใหม่ไป Storage และเปิด <strong>แสดงสื่อจาก Storage/CDN</strong> หากต้องการให้เว็บใช้ URL บน Storage/CDN</li>
                     <li>ทดลองอัปโหลดรูปหนึ่งรูปใน Media Library แล้วตรวจรูปบนหน้าเว็บและ URL ของไฟล์</li>
@@ -144,7 +144,7 @@ $guide_figure = static function ( $file, $alt, $caption, $width, $height ) {
 
             <section id="isxs-guide-files" aria-labelledby="isxs-guide-files-title">
                 <h2 id="isxs-guide-files-title">จัดการไฟล์</h2>
-                <p>เปิด <strong>InsightX Offload → จัดการไฟล์ (File Manager)</strong> เพื่อจัดการไฟล์บนเซิร์ฟเวอร์ WordPress</p>
+                <p>เปิด <strong>InsightX AllHub → จัดการไฟล์ (File Manager)</strong> เพื่อจัดการไฟล์บนเซิร์ฟเวอร์ WordPress</p>
                 <ul>
                     <li>เลือกโฟลเดอร์จากแถบด้านข้าง ค้นหา เรียงรายการ และดูตัวอย่างหรือข้อมูลไฟล์</li>
                     <li>ลากไฟล์มาวางเพื่ออัปโหลด หรือคลิกขวาที่ไฟล์หรือโฟลเดอร์เพื่อสร้าง เปลี่ยนชื่อ ย้าย คัดลอก ดาวน์โหลด หรือลบตามสิทธิ์ที่มี</li>
@@ -181,7 +181,7 @@ $guide_figure = static function ( $file, $alt, $caption, $width, $height ) {
 
             <section id="isxs-guide-backup" aria-labelledby="isxs-guide-backup-title">
                 <h2 id="isxs-guide-backup-title">สำรองและกู้คืนเว็บ</h2>
-                <p>เปิด <strong>InsightX Offload → สำรองข้อมูล (Backup)</strong> ส่วนนี้มีการเชื่อมต่อ Storage ของตัวเอง แยกจาก Connections ของ Offload</p>
+                <p>เปิด <strong>InsightX AllHub → สำรองข้อมูล (Backup)</strong> ส่วนนี้มีการเชื่อมต่อ Storage ของตัวเอง แยกจาก Connections ของ Offload</p>
                 <?php $guide_figure( 'backup-real.png', 'หน้าสำรองข้อมูลจริงในแท็บส่งออก พร้อมตัวเลือกขั้นสูง ผู้ให้บริการ Storage และปุ่มส่งออกเป็นไฟล์หรือส่งออกไปยัง Storage', 'หน้าจอจริง: ส่งออกข้อมูลสำรองเว็บไซต์', 1280, 775 ); ?>
                 <h3>สร้างข้อมูลสำรอง</h3>
                 <ol>

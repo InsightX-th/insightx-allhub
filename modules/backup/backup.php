@@ -1,13 +1,13 @@
 <?php
 /**
- * InsightX Backup, bundled into InsightX Offload (menu "Backup") since
+ * InsightX Backup, bundled into InsightX AllHub (menu "Backup") since
  * Offload 0.3.0. Formerly the separate insightx-backup plugin (0.1.31): the
  * code is that plugin's, unchanged except where it means "this plugin's own
- * folder", which is now all of InsightX Offload.
+ * folder", which is now all of InsightX AllHub.
  *
  * Every option, cron hook, storage folder and WP-CLI command keeps its old
  * name, so a site that ran the standalone plugin carries on as it was.
- * Loaded by insightx-offload.php only when the standalone plugin is not
+ * Loaded by insightx-allhub.php only when the standalone plugin is not
  * active (both at once would declare everything twice).
  */
 
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'ISX_VERSION', '0.1.31-offload' );
 // The plugin file WordPress knows: import and Reset Hub keep it in
 // active_plugins (plugin_basename( ISX_FILE )).
-define( 'ISX_FILE', ISXM_PLUGIN_DIR . 'insightx-offload.php' );
+define( 'ISX_FILE', ISXM_PLUGIN_DIR . 'insightx-allhub.php' );
 define( 'ISX_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ISX_URL', plugin_dir_url( __FILE__ ) );
 // Never deleted or overwritten by an import, never chosen as storage.

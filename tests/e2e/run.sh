@@ -91,11 +91,11 @@ rsync -a --exclude wp-content --exclude wp-config.php "$WP_CORE"/ "$SITE"/
 mkdir -p "$SITE/wp-content/plugins" "$SITE/wp-content/themes/isxm-e2e" "$SITE/wp-content/uploads"
 printf '/*\nTheme Name: ISXM E2E\n*/\n' > "$SITE/wp-content/themes/isxm-e2e/style.css"
 echo '<?php' > "$SITE/wp-content/themes/isxm-e2e/index.php"
-rsync -a --exclude .git --exclude tests "$PLUGIN"/ "$SITE/wp-content/plugins/insightx-offload/"
+rsync -a --exclude .git --exclude tests "$PLUGIN"/ "$SITE/wp-content/plugins/insightx-allhub/"
 wp config create --dbname="$DB" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$WP_DBHOST" --skip-check --quiet
 wp core install --url=http://site.test --title=E2E --admin_user=admin --admin_password=x --admin_email=a@example.com --skip-email --quiet
 wp theme activate isxm-e2e --quiet
-wp plugin activate insightx-offload --quiet
+wp plugin activate insightx-allhub --quiet
 
 echo "== configure + seed"
 stage configure

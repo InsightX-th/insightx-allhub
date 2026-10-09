@@ -164,7 +164,7 @@ class ISXM_CLI_Connection {
             WP_CLI::error( $result->get_error_message() );
         }
 
-        ISXM_Connections::save_status( $slug, 'ok', __( 'Connected to the bucket successfully', 'insightx-offload' ) );
+        ISXM_Connections::save_status( $slug, 'ok', __( 'Connected to the bucket successfully', 'insightx-allhub' ) );
         WP_CLI::success( 'Connected successfully.' );
     }
 

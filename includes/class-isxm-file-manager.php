@@ -529,7 +529,7 @@ class ISXM_File_Manager {
     /** "Cannot delete: the system file x/.htaccess is inside" */
     private function guarded( $relative ) {
         /* translators: %s: path of a system file, e.g. wp-content/uploads/.htaccess */
-        return new WP_Error( 'isxfm_guarded', sprintf( __( 'Cannot delete: the system file %s is inside this folder.', 'insightx-offload' ), $relative ) );
+        return new WP_Error( 'isxfm_guarded', sprintf( __( 'Cannot delete: the system file %s is inside this folder.', 'insightx-allhub' ), $relative ) );
     }
 
     /** Root-relative paths of a file, or of every file under a folder. */
@@ -545,7 +545,7 @@ class ISXM_File_Manager {
     }
 
     /**
-     * Tells other plugins (InsightX Offload) which files were just written;
+     * Tells other plugins (InsightX AllHub) which files were just written;
      * whatever they return is shown to the user.
      *
      * @return string[]
@@ -559,7 +559,7 @@ class ISXM_File_Manager {
     }
 
     /**
-     * Tells other plugins (InsightX Offload) which files are gone from
+     * Tells other plugins (InsightX AllHub) which files are gone from
      * these paths, so their bucket copies can go too.
      *
      * @return string[]
@@ -583,19 +583,19 @@ class ISXM_File_Manager {
 
     private function error( $code ) {
         $messages = [
-            'bad_path'    => __( 'That path is not allowed.', 'insightx-offload' ),
-            'not_found'   => __( 'File or folder not found.', 'insightx-offload' ),
-            'not_dir'     => __( 'Not a folder.', 'insightx-offload' ),
-            'bad_name'    => __( 'That name is not allowed.', 'insightx-offload' ),
-            'hidden_name' => __( 'Names starting with a dot are not allowed.', 'insightx-offload' ),
-            'executable'  => __( 'Executable files (such as .php) are not allowed.', 'insightx-offload' ),
-            'markup'      => __( 'HTML and SVG files can only be added by administrators.', 'insightx-offload' ),
-            'read_only'   => __( 'File changes are turned off on this site (DISALLOW_FILE_MODS).', 'insightx-offload' ),
-            'protected'   => __( 'This location holds the site\'s code and can only be viewed.', 'insightx-offload' ),
-            'secret'      => __( 'This file or folder is private to the server (configuration, backups, logs) and is not available here.', 'insightx-offload' ),
-            'exists'      => __( 'A file or folder with that name already exists.', 'insightx-offload' ),
-            'into_itself' => __( 'A folder cannot be moved into itself.', 'insightx-offload' ),
-            'failed'      => __( 'The server could not complete this. Check folder permissions.', 'insightx-offload' ),
+            'bad_path'    => __( 'That path is not allowed.', 'insightx-allhub' ),
+            'not_found'   => __( 'File or folder not found.', 'insightx-allhub' ),
+            'not_dir'     => __( 'Not a folder.', 'insightx-allhub' ),
+            'bad_name'    => __( 'That name is not allowed.', 'insightx-allhub' ),
+            'hidden_name' => __( 'Names starting with a dot are not allowed.', 'insightx-allhub' ),
+            'executable'  => __( 'Executable files (such as .php) are not allowed.', 'insightx-allhub' ),
+            'markup'      => __( 'HTML and SVG files can only be added by administrators.', 'insightx-allhub' ),
+            'read_only'   => __( 'File changes are turned off on this site (DISALLOW_FILE_MODS).', 'insightx-allhub' ),
+            'protected'   => __( 'This location holds the site\'s code and can only be viewed.', 'insightx-allhub' ),
+            'secret'      => __( 'This file or folder is private to the server (configuration, backups, logs) and is not available here.', 'insightx-allhub' ),
+            'exists'      => __( 'A file or folder with that name already exists.', 'insightx-allhub' ),
+            'into_itself' => __( 'A folder cannot be moved into itself.', 'insightx-allhub' ),
+            'failed'      => __( 'The server could not complete this. Check folder permissions.', 'insightx-allhub' ),
         ];
         return new WP_Error( 'isxfm_' . $code, $messages[ $code ] );
     }

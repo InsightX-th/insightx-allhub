@@ -1,4 +1,4 @@
-/* InsightX Offload — File Manager page. Every change goes through the
+/* InsightX AllHub — File Manager page. Every change goes through the
    isxs_fm AJAX endpoint; the server decides what is allowed. */
 (function ($) {
   "use strict";

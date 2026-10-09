@@ -1,6 +1,6 @@
 <?php
 /**
- * Unit suite for InsightX Offload.
+ * Unit suite for InsightX AllHub.
  *
  * Loads the REAL plugin classes on top of tests/bootstrap.php (WordPress
  * stubs with in-memory options/meta/posts and a recording HTTP fake). The
@@ -692,17 +692,17 @@ $missing = array_diff( array_unique( $used[1] ), $m[1] );
 t( 'I1 every i18n.<key> used by admin.js is localized', empty( $missing ), implode( ', ', $missing ) );
 
 $wrong = array();
-foreach ( array_merge( glob( ISXM_PLUGIN_DIR . 'includes/*.php' ), array( ISXM_PLUGIN_DIR . 'insightx-offload.php' ) ) as $f ) {
+foreach ( array_merge( glob( ISXM_PLUGIN_DIR . 'includes/*.php' ), array( ISXM_PLUGIN_DIR . 'insightx-allhub.php' ) ) as $f ) {
 	if ( preg_match_all( "/\b(?:__|_e|esc_html__|esc_html_e|esc_attr__|esc_attr_e)\(\s*(['\"])(?:(?!\\1).|\\\\\\1)*\\1\s*,\s*'([^']+)'/", file_get_contents( $f ), $mm ) ) {
 		foreach ( $mm[2] as $domain ) {
-			if ( $domain !== 'insightx-offload' ) {
+			if ( $domain !== 'insightx-allhub' ) {
 				$wrong[] = basename( $f ) . ":$domain";
 			}
 		}
 	}
 }
-t( 'I2 every translation call uses the insightx-offload domain', empty( $wrong ), implode( ', ', $wrong ) );
-$po = ISXM_PLUGIN_DIR . 'languages/insightx-offload-th.po';
+t( 'I2 every translation call uses the insightx-allhub domain', empty( $wrong ), implode( ', ', $wrong ) );
+$po = ISXM_PLUGIN_DIR . 'languages/insightx-allhub-th.po';
 t( 'I3 Thai .po and compiled .mo shipped', is_file( $po ) && is_file( substr( $po, 0, -2 ) . 'mo' ) );
 $leftover = array();
 foreach ( array_merge( glob( ISXM_PLUGIN_DIR . 'includes/*.php' ), glob( ISXM_PLUGIN_DIR . 'assets/js/*.js' ) ) as $f ) {

@@ -80,7 +80,7 @@ class ISX_Database {
 }
 
 // ---------- Load the real classes (this file lives in tests/, plugin root is one up) ----------
-$PLUGIN = dirname( __DIR__, 2 ) . '/modules/backup'; // bundled into InsightX Offload
+$PLUGIN = dirname( __DIR__, 2 ) . '/modules/backup'; // bundled into InsightX AllHub
 require $PLUGIN . '/includes/class-isx-archive.php';
 require $PLUGIN . '/includes/class-isx-files.php';
 require $PLUGIN . '/includes/class-isx-serialize.php';

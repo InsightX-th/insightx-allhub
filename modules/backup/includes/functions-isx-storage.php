@@ -52,7 +52,7 @@ function isx_storage_path_conflict( $path ) {
 		}
 	}
 	// Nor inside a folder WordPress replaces wholesale: plugins (this one
-	// included — InsightX Offload carries Backup and is swapped out on every
+	// included — InsightX AllHub carries Backup and is swapped out on every
 	// update), mu-plugins and themes. Backups kept there vanish on the next
 	// update or uninstall.
 	$replaced = array(

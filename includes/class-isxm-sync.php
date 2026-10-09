@@ -785,7 +785,7 @@ class ISXM_Sync {
         }
         return new WP_Error(
             'isxs_orphan_no_media',
-            __( 'No offloaded media is tracked on this destination, so nothing was deleted — check that the connection matches the bucket and endpoint the media was offloaded to', 'insightx-offload' )
+            __( 'No offloaded media is tracked on this destination, so nothing was deleted — check that the connection matches the bucket and endpoint the media was offloaded to', 'insightx-allhub' )
         );
     }
 
@@ -795,7 +795,7 @@ class ISXM_Sync {
         }
         return new WP_Error(
             'isxs_orphan_no_prefix',
-            __( 'Orphan cleanup needs a bucket prefix — without one every object in the bucket that this site does not use would be deleted, including other sites\' files and backups. Turn on the prefix in "File Storage Settings" first', 'insightx-offload' )
+            __( 'Orphan cleanup needs a bucket prefix — without one every object in the bucket that this site does not use would be deleted, including other sites\' files and backups. Turn on the prefix in "File Storage Settings" first', 'insightx-allhub' )
         );
     }
 

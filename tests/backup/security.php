@@ -1,13 +1,13 @@
 <?php
 /**
- * Backup module (bundled in InsightX Offload): security checks.
+ * Backup module (bundled in InsightX AllHub): security checks.
  *
  *  A. Every AJAX endpoint is authenticated, with the right strength.
  *  B. Reset Hub asks for the account password before anything runs.
  *  C. The one-time password reveal after a reset.
  *  D. Background jobs authenticate with a long per-job secret.
  *  E. The storage folder is locked down and never somewhere WordPress replaces.
- *  F. An import never overwrites or deletes InsightX Offload itself.
+ *  F. An import never overwrites or deletes InsightX AllHub itself.
  *  G. Menu, hidden screens and tabs follow each screen's capability.
  *  H. Backup downloads can only ever serve files from the backups folder.
  *
@@ -23,7 +23,7 @@ function t( $label, $ok, $detail = '' ) {
 	if ( $ok ) { $pass++; echo "  PASS $label\n"; } else { $fail++; echo "  FAIL [$group] $label  -> $detail\n"; }
 }
 
-$ROOT   = dirname( __DIR__, 2 );            // insightx-offload/
+$ROOT   = dirname( __DIR__, 2 );            // insightx-allhub/
 $MODULE = $ROOT . '/modules/backup';
 $ADMIN  = file_get_contents( $MODULE . '/includes/class-isx-admin.php' );
 
@@ -205,14 +205,14 @@ $base = sys_get_temp_dir() . "/isxsec_wp_" . getmypid();
 define( "ABSPATH", $base . "/" );
 define( "WP_CONTENT_DIR", $base . "/wp-content" );
 define( "WP_PLUGIN_DIR", WP_CONTENT_DIR . "/plugins" );
-define( "ISX_PLUGIN_ROOT", WP_PLUGIN_DIR . "/insightx-offload" );
+define( "ISX_PLUGIN_ROOT", WP_PLUGIN_DIR . "/insightx-allhub" );
 function untrailingslashit( $s ) { return rtrim( $s, "/\\\\" ); }
 require ' . var_export( $MODULE . '/includes/functions-isx-storage.php', true ) . ';
 $wc = WP_CONTENT_DIR; $r = [];
 foreach ( [ ISX_PLUGIN_ROOT, ISX_PLUGIN_ROOT . "/storage", ISX_PLUGIN_ROOT . "/modules/backup/storage", "$wc/plugins/insightx-backup/storage", "$wc/themes/flatsome/backups", "$wc/mu-plugins/b", "$wc/plugins/../plugins/x", "$wc/insightx-backup", "$wc/uploads/backups", "/srv/backups" ] as $p ) $r[ str_replace( $base, "", $p ) ] = isx_storage_path_conflict( $p ) !== "";
 echo json_encode( $r );' );
 $r = json_decode( $out, true );
-t( 'E1 InsightX Offload\'s own folder (and anything in it) is refused', is_array( $r ) && $r['/wp-content/plugins/insightx-offload'] && $r['/wp-content/plugins/insightx-offload/storage'] && $r['/wp-content/plugins/insightx-offload/modules/backup/storage'], $out );
+t( 'E1 InsightX AllHub\'s own folder (and anything in it) is refused', is_array( $r ) && $r['/wp-content/plugins/insightx-allhub'] && $r['/wp-content/plugins/insightx-allhub/storage'] && $r['/wp-content/plugins/insightx-allhub/modules/backup/storage'], $out );
 t( 'E2 inside any plugin, theme or mu-plugin folder is refused (replaced on update)', is_array( $r ) && $r['/wp-content/plugins/insightx-backup/storage'] && $r['/wp-content/themes/flatsome/backups'] && $r['/wp-content/mu-plugins/b'], $out );
 t( 'E3 "../" cannot walk back into plugins', is_array( $r ) && $r['/wp-content/plugins/../plugins/x'], $out );
 t( 'E4 a dedicated folder elsewhere is fine (the default, uploads, outside the site)', is_array( $r ) && ! $r['/wp-content/insightx-backup'] && ! $r['/wp-content/uploads/backups'] && ! $r['/srv/backups'], $out );
@@ -236,13 +236,13 @@ t( 'E6 …and has an index.php (no directory listing)', is_array( $r ) && $r['in
 t( 'E7 the old one-line rule is upgraded, an admin\'s own rules are left alone', is_array( $r ) && $r['custom_kept'], $out );
 
 // =====================================================================
-group( 'F. An import never overwrites or deletes InsightX Offload itself' );
+group( 'F. An import never overwrites or deletes InsightX AllHub itself' );
 // =====================================================================
 $out = isx_sub( '
 $base = sys_get_temp_dir() . "/isxsec_imp_" . getmypid();
 define( "ABSPATH", $base . "/" );
 define( "WP_CONTENT_DIR", $base . "/wp-content" );
-define( "ISX_PLUGIN_ROOT", WP_CONTENT_DIR . "/plugins/insightx-offload" );
+define( "ISX_PLUGIN_ROOT", WP_CONTENT_DIR . "/plugins/insightx-allhub" );
 define( "ISX_PATH", ISX_PLUGIN_ROOT . "/modules/backup/" );
 define( "ISX_STORAGE_PATH", WP_CONTENT_DIR . "/insightx-backup" );
 function untrailingslashit( $s ) { return rtrim( $s, "/\\\\" ); }
@@ -252,18 +252,18 @@ require ' . var_export( $MODULE . '/includes/class-isx-files.php', true ) . ';
 $p = new ReflectionMethod( "ISX_Files", "permanent_protected" ); $e = new ReflectionMethod( "ISX_Files", "is_excluded" );
 if ( PHP_VERSION_ID < 80100 ) { $p->setAccessible( true ); $e->setAccessible( true ); }
 $prot = $p->invoke( null ); $wc = WP_CONTENT_DIR; $r = [ "root_listed" => in_array( ISX_PLUGIN_ROOT, $prot, true ) ];
-foreach ( [ "$wc/plugins/insightx-offload/insightx-offload.php", "$wc/plugins/insightx-offload/includes/class-isxm-tools.php", "$wc/plugins/insightx-offload/modules/backup/includes/class-isx-import.php", "$wc/insightx-backup/backups/x.wpress", "$wc/plugins/akismet/akismet.php", "$wc/plugins/insightx-offload-evil/x.php", "$wc/uploads/2024/a.jpg" ] as $f ) $r[ str_replace( $wc, "", $f ) ] = $e->invoke( null, $f, $prot );
+foreach ( [ "$wc/plugins/insightx-allhub/insightx-allhub.php", "$wc/plugins/insightx-allhub/includes/class-isxm-tools.php", "$wc/plugins/insightx-allhub/modules/backup/includes/class-isx-import.php", "$wc/insightx-backup/backups/x.wpress", "$wc/plugins/akismet/akismet.php", "$wc/plugins/insightx-allhub-evil/x.php", "$wc/uploads/2024/a.jpg" ] as $f ) $r[ str_replace( $wc, "", $f ) ] = $e->invoke( null, $f, $prot );
 echo json_encode( $r );' );
 $r = json_decode( $out, true );
-t( 'F1 the whole InsightX Offload folder is a protected path', is_array( $r ) && $r['root_listed'], $out );
-t( 'F2 its main file, its own code and the Backup module are never restored over or cleaned', is_array( $r ) && $r['/plugins/insightx-offload/insightx-offload.php'] && $r['/plugins/insightx-offload/includes/class-isxm-tools.php'] && $r['/plugins/insightx-offload/modules/backup/includes/class-isx-import.php'], $out );
+t( 'F1 the whole InsightX AllHub folder is a protected path', is_array( $r ) && $r['root_listed'], $out );
+t( 'F2 its main file, its own code and the Backup module are never restored over or cleaned', is_array( $r ) && $r['/plugins/insightx-allhub/insightx-allhub.php'] && $r['/plugins/insightx-allhub/includes/class-isxm-tools.php'] && $r['/plugins/insightx-allhub/modules/backup/includes/class-isx-import.php'], $out );
 t( 'F3 the backups themselves are protected too', is_array( $r ) && $r['/insightx-backup/backups/x.wpress'], $out );
 t( 'F4 other plugins and uploads are restored normally', is_array( $r ) && ! $r['/plugins/akismet/akismet.php'] && ! $r['/uploads/2024/a.jpg'], $out );
-t( 'F5 a look-alike folder (insightx-offload-evil) is not treated as ours', is_array( $r ) && ! $r['/plugins/insightx-offload-evil/x.php'], $out );
+t( 'F5 a look-alike folder (insightx-allhub-evil) is not treated as ours', is_array( $r ) && ! $r['/plugins/insightx-allhub-evil/x.php'], $out );
 $imp = file_get_contents( $MODULE . '/includes/class-isx-import.php' );
-t( 'F6 after an import, InsightX Offload is put back into active_plugins if it went missing', strpos( $imp, '$self   = plugin_basename( ISX_FILE );' ) !== false && strpos( $imp, '$active[] = $self;' ) !== false );
+t( 'F6 after an import, InsightX AllHub is put back into active_plugins if it went missing', strpos( $imp, '$self   = plugin_basename( ISX_FILE );' ) !== false && strpos( $imp, '$active[] = $self;' ) !== false );
 $reset = file_get_contents( $MODULE . '/includes/class-isx-reset.php' );
-t( 'F7 Reset Hub never deletes InsightX Offload (it is left out of "remove all plugins")', strpos( $reset, 'array_diff( array_keys( get_plugins() ), array( $self ) )' ) !== false );
+t( 'F7 Reset Hub never deletes InsightX AllHub (it is left out of "remove all plugins")', strpos( $reset, 'array_diff( array_keys( get_plugins() ), array( $self ) )' ) !== false );
 
 // =====================================================================
 group( 'G. Menu, hidden screens and tabs follow each screen\'s capability' );
@@ -288,11 +288,11 @@ preg_match_all( "/page=(isx_[a-z_]+)/", $h, $m );
 echo json_encode( [ "pages" => $GLOBALS["pages"], "removed" => $GLOBALS["removed"] ?? [], "tabs" => $m[1], "count_badge" => strpos( $h, "isx-tab-count\">2<" ) !== false, "parent" => ISX_Admin::parent_file( "x" ), "sub" => ISX_Admin::submenu_file( "x" ) ] );' );
 }
 $r = json_decode( isx_menu( array( 'export', 'import', 'manage_options' ) ), true );
-t( 'G1 one menu item under InsightX Offload (Export); the rest are hidden screens', is_array( $r ) && $r['pages']['isx_export'][0] === 'insightx-offload' && count( array_filter( $r['pages'], function ( $p ) { return $p[0] === 'options.php'; } ) ) === 6, json_encode( $r ) );
+t( 'G1 one menu item under InsightX AllHub (Export); the rest are hidden screens', is_array( $r ) && $r['pages']['isx_export'][0] === 'insightx-allhub' && count( array_filter( $r['pages'], function ( $p ) { return $p[0] === 'options.php'; } ) ) === 6, json_encode( $r ) );
 t( 'G2 hidden screens are not removed after registering (that made WordPress refuse them)', is_array( $r ) && $r['removed'] === array() );
 t( 'G3 Reset Hub needs manage_options; import needs import; the rest export', is_array( $r ) && $r['pages']['isx_reset_hub'][1] === 'manage_options' && $r['pages']['isx_import'][1] === 'import' && $r['pages']['isx_backups'][1] === 'export' );
 t( 'G4 an administrator sees all seven tabs, with the backup count', is_array( $r ) && count( $r['tabs'] ) === 7 && $r['count_badge'], json_encode( $r['tabs'] ?? null ) );
-t( 'G5 every Backup tab keeps InsightX Offload → Backup highlighted', is_array( $r ) && $r['parent'] === 'insightx-offload' && $r['sub'] === 'isx_export' );
+t( 'G5 every Backup tab keeps InsightX AllHub → Backup highlighted', is_array( $r ) && $r['parent'] === 'insightx-allhub' && $r['sub'] === 'isx_export' );
 $r = json_decode( isx_menu( array( 'export' ) ), true );
 t( 'G6 an export-only user sees no Import or Reset Hub tab', is_array( $r ) && ! in_array( 'isx_reset_hub', $r['tabs'], true ) && ! in_array( 'isx_import', $r['tabs'], true ) && in_array( 'isx_export', $r['tabs'], true ), json_encode( $r['tabs'] ?? null ) );
 $r = json_decode( isx_menu( array( 'export', 'import', 'manage_options', 'manage_network_options' ), true ), true );

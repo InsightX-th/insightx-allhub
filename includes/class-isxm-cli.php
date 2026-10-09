@@ -42,8 +42,8 @@ class ISXM_CLI {
             return;
         }
         WP_CLI::error( sprintf(
-            __( 'The job "%s" is running (%s items) — %s now would run on top of it', 'insightx-offload' )
-                . "\n" . __( 'Stop it first with: wp isxm job pause %s   or use `wp isxm job run` to drive it to completion', 'insightx-offload' ),
+            __( 'The job "%s" is running (%s items) — %s now would run on top of it', 'insightx-allhub' )
+                . "\n" . __( 'Stop it first with: wp isxm job pause %s   or use `wp isxm job run` to drive it to completion', 'insightx-allhub' ),
             ISXM_Tools::tool_label( $running->tool ),
             number_format_i18n( $running->processed ),
             $what,

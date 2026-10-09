@@ -97,6 +97,9 @@ jobs:
       - name: Backup module security
         run: php tests/backup/security.php
 
+      - name: Rename guard (old InsightX Offload)
+        run: php tests/rename.php
+
       - name: Parallel transfers (threaded S3 fixture)
         run: php tests/migration-transfers.php
 

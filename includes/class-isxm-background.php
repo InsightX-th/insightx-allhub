@@ -128,7 +128,7 @@ class ISXM_Background {
         if ( ! isset( $schedules['isxs_one_minute'] ) ) {
             $schedules['isxs_one_minute'] = [
                 'interval' => self::CRON_INTERVAL,
-                'display'  => __( 'Every minute (InsightX Storage)', 'insightx-offload' ),
+                'display'  => __( 'Every minute (InsightX Storage)', 'insightx-allhub' ),
             ];
         }
         return $schedules;
@@ -534,7 +534,7 @@ class ISXM_Background {
      */
     public static function start_job( $tool, $resume = false, $runner = null ) {
         if ( ! ISXM_Tools::is_known_tool( $tool ) ) {
-            return [ 'error' => __( 'Unknown tool', 'insightx-offload' ) ];
+            return [ 'error' => __( 'Unknown tool', 'insightx-allhub' ) ];
         }
 
         // "Is anything running?" and "claim the running slot" have to be one
@@ -542,7 +542,7 @@ class ISXM_Background {
         // tabs, a CLI run beside the UI) both used to pass the check and both
         // start, which is how two cards ended up showing "Working…" at once.
         if ( ! self::claim( self::START_LOCK, self::START_LOCK_TTL ) ) {
-            return [ 'error' => __( 'Another start request is in progress — wait a moment and try again', 'insightx-offload' ) ];
+            return [ 'error' => __( 'Another start request is in progress — wait a moment and try again', 'insightx-allhub' ) ];
         }
 
         // Note: the lock is released before the caller responds, never in a
@@ -577,13 +577,13 @@ class ISXM_Background {
                 return [ 'payload' => self::status_payload() ];
             }
             return [
-                'error' => sprintf( __( 'The job "%s" is running — stop it before starting a new one', 'insightx-offload' ), ISXM_Tools::tool_label( $running->tool ) ),
+                'error' => sprintf( __( 'The job "%s" is running — stop it before starting a new one', 'insightx-allhub' ), ISXM_Tools::tool_label( $running->tool ) ),
             ];
         }
         if ( $running && $running->is_stalled() && $running->tool !== $tool ) {
             // The previous run's driver is demonstrably gone; park it as
             // resumable so this one can take the single running slot.
-            $running->finish( ISXM_Job::STATE_PAUSED, __( 'Stopped automatically because it stopped responding', 'insightx-offload' ) );
+            $running->finish( ISXM_Job::STATE_PAUSED, __( 'Stopped automatically because it stopped responding', 'insightx-allhub' ) );
         }
 
         $precheck = ISXM_Tools::precheck_tool( $tool );
@@ -829,7 +829,7 @@ class ISXM_Background {
      */
     private function guard() {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( [ 'message' => __( 'Permission denied', 'insightx-offload' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Permission denied', 'insightx-allhub' ) ], 403 );
         }
         check_ajax_referer( ISXM_Tools::NONCE_ACTION, 'nonce' );
     }
@@ -840,7 +840,7 @@ class ISXM_Background {
     private function requested_tool() {
         $tool = isset( $_POST['tool'] ) ? sanitize_key( wp_unslash( $_POST['tool'] ) ) : '';
         if ( ! ISXM_Tools::is_known_tool( $tool ) ) {
-            wp_send_json_error( [ 'message' => __( 'Unknown tool', 'insightx-offload' ) ] );
+            wp_send_json_error( [ 'message' => __( 'Unknown tool', 'insightx-allhub' ) ] );
         }
         return $tool;
     }

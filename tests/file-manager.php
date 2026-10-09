@@ -253,6 +253,17 @@ file_put_contents( $root . 'download/guarded/a.pdf', 'a' );
 check( 'emptying a folder holding a dot-file deletes nothing', is_wp_error( $fs->empty_dir( 'download/guarded' ) ) && is_file( $root . 'download/guarded/a.pdf' ) && is_file( $root . 'download/guarded/.htaccess' ) );
 mkdir( $root . 'download/outer/inner', 0777, true );
 file_put_contents( $root . 'download/outer/inner/.htaccess', 'deny' );
-check( 'deleting a folder with a dot-file anywhere inside is refused', is_wp_error( $fs->delete( 'download/outer' ) ) && is_file( $root . 'download/outer/inner/.htaccess' ) );
+$guard = $fs->delete( 'download/outer' );
+check( 'deleting a folder with a dot-file anywhere inside is refused', is_wp_error( $guard ) && is_file( $root . 'download/outer/inner/.htaccess' ) );
+check( '…and the message names that file', is_wp_error( $guard ) && strpos( $guard->get_error_message(), 'download/outer/inner/.htaccess' ) !== false, is_wp_error( $guard ) ? $guard->get_error_message() : '' );
+mkdir( $root . 'download/junk/sub', 0777, true );
+file_put_contents( $root . 'download/junk/.DS_Store', 'x' );
+file_put_contents( $root . 'download/junk/sub/._photo.jpg', 'x' );
+file_put_contents( $root . 'download/junk/a.jpg', 'a' );
+check( 'desktop junk (.DS_Store, ._*) does not block deleting a folder', ! is_wp_error( $fs->delete( 'download/junk' ) ) && ! file_exists( $root . 'download/junk' ) );
+mkdir( $root . 'download/junk2' );
+file_put_contents( $root . 'download/junk2/.DS_Store', 'x' );
+file_put_contents( $root . 'download/junk2/b.jpg', 'b' );
+check( '…nor emptying one', ! is_wp_error( $fs->empty_dir( 'download/junk2' ) ) && scandir( $root . 'download/junk2' ) === [ '.', '..' ] );
 
 finish();

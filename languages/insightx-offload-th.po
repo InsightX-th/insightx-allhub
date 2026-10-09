@@ -2255,3 +2255,8 @@ msgstr "ไฟล์หรือโฟลเดอร์นี้เป็นข
 #: includes/class-isxm-file-manager-admin.php
 msgid "Administrators can always do everything. Everyone else gets what their role allows."
 msgstr "ผู้ดูแลระบบทำได้ทุกอย่างเสมอ คนอื่นได้สิทธิ์ตาม role ของตัวเอง"
+
+#: includes/class-isxm-file-manager.php
+#, php-format
+msgid "Cannot delete: the system file %s is inside this folder."
+msgstr "ลบไม่ได้: มีไฟล์ระบบ %s อยู่ในโฟลเดอร์นี้"

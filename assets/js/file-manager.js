@@ -249,7 +249,9 @@
     }).join("");
     const body = rows.map((r) => {
       const where = state.search ? '<small class="isxs-fm-where">/' + esc(parentOf(r)) + "</small>" : "";
-      return '<tr data-path="' + esc(r.path) + '" class="' + (state.selected.has(r.path) ? "is-selected" : "") + '">' +
+      const on = state.selected.has(r.path);
+      return '<tr data-path="' + esc(r.path) + '" class="' + (on ? "is-selected" : "") + '">' +
+        '<td class="isxs-fm-check"><input type="checkbox"' + (on ? " checked" : "") + ' aria-label="' + esc(r.name) + '"></td>' +
         '<td class="isxs-fm-name"><div>' + (isDir(r) ? folderSvg : fileSvg) + '<span class="isxs-fm-label"><span>' + esc(r.name) + "</span>" + where + "</span>" + (r.bucket ? cloudSvg : "") + "</div></td>" +
         "<td>" + esc(permText(r)) + "</td>" +
         "<td>" + esc(r.mtime ? dateText(r.mtime) : "—") + "</td>" +
@@ -257,8 +259,8 @@
         "<td>" + esc(kindOf(r)) + "</td></tr>";
     });
     $table.html(
-      "<thead><tr>" + head + "</tr></thead><tbody>" +
-      (body.length ? body.join("") : '<tr class="isxs-fm-empty"><td colspan="5">' + esc(state.search ? t.noResults : t.empty) + "</td></tr>") + "</tbody>"
+      '<thead><tr><th class="isxs-fm-check"><input type="checkbox" id="isxs-fm-all" aria-label="' + esc(t.menu.all) + '"></th>' + head + "</tr></thead><tbody>" +
+      (body.length ? body.join("") : '<tr class="isxs-fm-empty"><td colspan="6">' + esc(state.search ? t.noResults : t.empty) + "</td></tr>") + "</tbody>"
     );
     renderStatus();
   };
@@ -301,8 +303,11 @@
 
   const showSelection = () => {
     $table.find("tbody tr[data-path]").each(function () {
-      $(this).toggleClass("is-selected", state.selected.has($(this).attr("data-path")));
+      const on = state.selected.has($(this).attr("data-path"));
+      $(this).toggleClass("is-selected", on).find(".isxs-fm-check input").prop("checked", on);
     });
+    const n = state.selected.size;
+    $("#isxs-fm-all").prop("checked", n > 0 && n === state.rows.length).prop("indeterminate", n > 0 && n < state.rows.length);
     syncButtons();
   };
 
@@ -373,6 +378,20 @@
     renderTable();
     syncButtons();
   });
+
+  // Tick boxes: add or remove one row, like ⌘/Ctrl+click; the header box picks all.
+  $table.on("click", "tbody .isxs-fm-check", function (e) {
+    e.stopPropagation();
+    const path = $(this).closest("tr").attr("data-path");
+    state.selected.has(path) ? state.selected.delete(path) : state.selected.add(path);
+    state.anchor = path;
+    showSelection();
+  });
+  $table.on("change", "#isxs-fm-all", function () {
+    state.selected = this.checked ? new Set(state.rows.map((r) => r.path)) : new Set();
+    showSelection();
+  });
+  $table.on("dblclick", ".isxs-fm-check", (e) => e.stopPropagation());
 
   $table.on("click", "tbody tr[data-path]", function (e) {
     const path = $(this).attr("data-path");

@@ -337,7 +337,8 @@ class ISXM_File_Manager {
         if ( is_wp_error( $path ) ) return $path;
         $ok = $this->changeable( $path );
         if ( is_wp_error( $ok ) ) return $ok;
-        if ( $this->holds_hidden( $path ) ) return $this->error( 'protected' );
+        $guard = $this->holds_hidden( $path );
+        if ( $guard !== '' ) return $this->guarded( $guard );
         $files = $this->files_in( $path );
         if ( ! $this->remove( $path ) ) return $this->error( 'failed' );
         return [ 'notes' => $this->removed( $files ) ];
@@ -398,9 +399,12 @@ class ISXM_File_Manager {
         if ( is_wp_error( $ok ) ) return $ok;
         $items = array_values( array_diff( (array) scandir( $dir ), [ '.', '..' ] ) );
         foreach ( $items as $name ) {
+            if ( self::is_junk( $name ) ) continue; // .DS_Store & co. simply go
+            if ( $name[0] === '.' ) return $this->guarded( $this->relative( $dir . '/' . $name ) );
             $ok = $this->changeable( $dir . '/' . $name );
             if ( is_wp_error( $ok ) ) return $ok;
-            if ( $this->holds_hidden( $dir . '/' . $name ) ) return $this->error( 'protected' );
+            $guard = $this->holds_hidden( $dir . '/' . $name );
+            if ( $guard !== '' ) return $this->guarded( $guard );
         }
         $files = $this->files_in( $dir );
         foreach ( $items as $name ) {
@@ -459,14 +463,30 @@ class ISXM_File_Manager {
         return [ 'path' => $this->relative( $to ), 'notes' => array_values( array_unique( array_merge( $notes, $this->removed( $old ) ) ) ) ];
     }
 
-    /** Does a folder hold a dot-file anywhere below it (.htaccess guarding uploads …)? */
+    /** Dot-files desktops leave behind: deleted along with their folder. */
+    private static function is_junk( $name ) {
+        return strtolower( $name ) === '.ds_store' || strpos( $name, '._' ) === 0;
+    }
+
+    /**
+     * The first dot-file below a folder that matters (.htaccess guarding
+     * uploads, .user.ini, .env …), root-relative, or "" when there is none.
+     * Desktop junk (.DS_Store, ._*) does not count.
+     */
     private function holds_hidden( $path ) {
-        if ( is_link( $path ) || ! is_dir( $path ) ) return false;
+        if ( is_link( $path ) || ! is_dir( $path ) ) return '';
         $iter = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::SELF_FIRST );
         foreach ( $iter as $item ) {
-            if ( strpos( $item->getFilename(), '.' ) === 0 ) return true;
+            $name = $item->getFilename();
+            if ( strpos( $name, '.' ) === 0 && ! self::is_junk( $name ) ) return $this->relative( $item->getPathname() );
         }
-        return false;
+        return '';
+    }
+
+    /** "Cannot delete: the system file x/.htaccess is inside" */
+    private function guarded( $relative ) {
+        /* translators: %s: path of a system file, e.g. wp-content/uploads/.htaccess */
+        return new WP_Error( 'isxfm_guarded', sprintf( __( 'Cannot delete: the system file %s is inside this folder.', 'insightx-offload' ), $relative ) );
     }
 
     /** Root-relative paths of a file, or of every file under a folder. */

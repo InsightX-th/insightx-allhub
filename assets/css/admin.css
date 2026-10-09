@@ -2704,3 +2704,24 @@
     opacity: 0.5;
   }
 }
+
+/* File Manager: tick column for picking many rows at once. */
+.isxs-fm-table th.isxs-fm-check,
+.isxs-fm-table td.isxs-fm-check {
+  width: 36px;
+  padding: 0 0 0 14px;
+  text-align: left;
+}
+.isxs-fm-table td.isxs-fm-check {
+  cursor: pointer;
+}
+.isxs-wrap input[type="checkbox"]:indeterminate {
+  background: var(--isxs-accent);
+  border-color: var(--isxs-accent);
+}
+.isxs-wrap input[type="checkbox"]:indeterminate::before {
+  transform: scale(1);
+  clip-path: none;
+  height: 2px;
+  border-radius: 1px;
+}

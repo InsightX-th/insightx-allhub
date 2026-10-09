@@ -34,7 +34,8 @@ class ISXM_File_Manager_Admin {
 
     /** This user's file system: locked to their folder. */
     private function fs() {
-        return new ISXM_File_Manager( ABSPATH, null, ISXM_File_Manager_Access::rules()['root'], current_user_can( 'unfiltered_html' ) );
+        return ( new ISXM_File_Manager( ABSPATH, null, ISXM_File_Manager_Access::rules()['root'], current_user_can( 'unfiltered_html' ) ) )
+            ->force_hidden( current_user_can( 'manage_options' ) );
     }
 
     public function enqueue_assets( $hook ) {
@@ -291,7 +292,7 @@ class ISXM_File_Manager_Admin {
     }
 
     /** The action each request needs; admin-only ops need manage_options. */
-    const OP_ACTION = [ 'list' => 'view', 'search' => 'view', 'check' => 'view', 'mkdir' => 'mkdir', 'upload' => 'upload', 'rename' => 'rename', 'move' => 'move', 'delete' => 'delete',
+    const OP_ACTION = [ 'list' => 'view', 'search' => 'view', 'check' => 'view', 'sizes' => 'view', 'mkdir' => 'mkdir', 'upload' => 'upload', 'rename' => 'rename', 'move' => 'move', 'delete' => 'delete',
         // A copy is new files, like an upload; emptying a folder is deleting.
         'copy' => 'upload', 'duplicate' => 'upload', 'mkfile' => 'upload', 'empty' => 'delete' ];
 
@@ -383,12 +384,55 @@ class ISXM_File_Manager_Admin {
             case 'empty':
                 $result = $fs->empty_dir( $path );
                 break;
+            case 'sizes':
+                $result = $this->folder_sizes( $fs, isset( $_POST['paths'] ) ? (array) wp_unslash( $_POST['paths'] ) : [] );
+                break;
         }
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'code' => $result->get_error_code(), 'message' => $result->get_error_message() ] );
         }
+        // Anything that changed files: cached folder sizes up the tree are stale.
+        if ( ! in_array( $op, [ 'list', 'search', 'check', 'sizes' ], true ) ) {
+            $this->forget_sizes( [ $fs->normalize( $path ), isset( $_POST['to'] ) ? $fs->normalize( (string) wp_unslash( $_POST['to'] ) ) : '' ] );
+        }
         wp_send_json_success( $result );
+    }
+
+    const SIZE_CACHE = 'isxs_fm_size_';
+
+    /**
+     * Folder totals for the size column: from a 10-minute cache, the rest
+     * worked out now (about 5 seconds per request; the page asks again for
+     * what is still pending).
+     *
+     * @return array{sizes: array<string,int>, pending: string[]}
+     */
+    private function folder_sizes( ISXM_File_Manager $fs, array $paths ) {
+        $sizes = []; $todo = [];
+        foreach ( array_slice( $paths, 0, 200 ) as $path ) {
+            $norm = $fs->normalize( (string) $path );
+            if ( is_wp_error( $norm ) ) continue;
+            $hit = get_transient( self::SIZE_CACHE . md5( $norm ) );
+            if ( $hit !== false ) $sizes[ $norm ] = (int) $hit; else $todo[] = $norm;
+        }
+        $done = $fs->dir_sizes( $todo, 5.0 );
+        foreach ( $done['sizes'] as $path => $bytes ) {
+            set_transient( self::SIZE_CACHE . md5( $path ), $bytes, 10 * MINUTE_IN_SECONDS );
+            $sizes[ $path ] = $bytes;
+        }
+        return [ 'sizes' => $sizes, 'pending' => $done['pending'] ];
+    }
+
+    /** Drops cached totals of these folders and every folder above them. */
+    private function forget_sizes( array $paths ) {
+        foreach ( $paths as $path ) {
+            if ( is_wp_error( $path ) || $path === null ) continue;
+            $parts = $path === '' ? [] : explode( '/', $path );
+            for ( $i = count( $parts ); $i >= 0; $i-- ) {
+                delete_transient( self::SIZE_CACHE . md5( implode( '/', array_slice( $parts, 0, $i ) ) ) );
+            }
+        }
     }
 
     public function download() {

@@ -55,6 +55,16 @@ class ISXM_File_Manager {
         return $this->read_only;
     }
 
+    /**
+     * Administrators: delete or empty folders even when dot-files are inside
+     * (they go with the folder). Site code stays protected either way.
+     */
+    private $force_hidden = false;
+    public function force_hidden( $on = true ) {
+        $this->force_hidden = (bool) $on;
+        return $this;
+    }
+
     /** The folder this user starts in and cannot leave, root-relative. */
     public function jail() {
         return $this->jail === "\0" ? '' : $this->relative( rtrim( $this->jail, '/' ) );
@@ -236,6 +246,36 @@ class ISXM_File_Manager {
         return [ 'path' => $base, 'writable' => $this->writable( $dir . '/x' ) === true, 'dirs' => $dirs, 'files' => $files ];
     }
 
+    /**
+     * Total size of each folder (everything below it; symlinks are not
+     * followed). Stops starting new folders after $seconds, but always
+     * finishes at least one, so repeated calls always make progress.
+     *
+     * @param string[] $relatives
+     * @return array{sizes: array<string,int>, pending: string[]}
+     */
+    public function dir_sizes( array $relatives, $seconds = 5.0 ) {
+        $stop  = microtime( true ) + $seconds;
+        $sizes = [];
+        $pending = [];
+        foreach ( array_values( array_unique( array_map( 'strval', $relatives ) ) ) as $i => $relative ) {
+            if ( $i > 0 && microtime( true ) > $stop ) { $pending[] = $relative; continue; }
+            $dir = $this->resolve( $relative );
+            if ( is_wp_error( $dir ) || ! is_dir( $dir ) || $this->readable( $dir ) !== true ) continue;
+            $total = 0;
+            $iter  = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
+                RecursiveIteratorIterator::LEAVES_ONLY,
+                RecursiveIteratorIterator::CATCH_GET_CHILD
+            );
+            foreach ( $iter as $item ) {
+                if ( ! $item->isLink() && $item->isFile() ) $total += (int) $item->getSize();
+            }
+            $sizes[ $this->relative( $dir ) ] = $total;
+        }
+        return [ 'sizes' => $sizes, 'pending' => $pending ];
+    }
+
     /** One row of a listing or of search results; folders have no size. */
     private function entry( $path, $name ) {
         $entry = [ 'name' => $name, 'path' => $this->relative( $path ), 'mtime' => (int) @filemtime( $path ), 'writable' => $this->changeable( $path ) === true ];
@@ -337,7 +377,7 @@ class ISXM_File_Manager {
         if ( is_wp_error( $path ) ) return $path;
         $ok = $this->changeable( $path );
         if ( is_wp_error( $ok ) ) return $ok;
-        $guard = $this->holds_hidden( $path );
+        $guard = $this->force_hidden ? '' : $this->holds_hidden( $path );
         if ( $guard !== '' ) return $this->guarded( $guard );
         $files = $this->files_in( $path );
         if ( ! $this->remove( $path ) ) return $this->error( 'failed' );
@@ -400,10 +440,13 @@ class ISXM_File_Manager {
         $items = array_values( array_diff( (array) scandir( $dir ), [ '.', '..' ] ) );
         foreach ( $items as $name ) {
             if ( self::is_junk( $name ) ) continue; // .DS_Store & co. simply go
-            if ( $name[0] === '.' ) return $this->guarded( $this->relative( $dir . '/' . $name ) );
+            if ( $name[0] === '.' ) {
+                if ( $this->force_hidden ) continue;
+                return $this->guarded( $this->relative( $dir . '/' . $name ) );
+            }
             $ok = $this->changeable( $dir . '/' . $name );
             if ( is_wp_error( $ok ) ) return $ok;
-            $guard = $this->holds_hidden( $dir . '/' . $name );
+            $guard = $this->force_hidden ? '' : $this->holds_hidden( $dir . '/' . $name );
             if ( $guard !== '' ) return $this->guarded( $guard );
         }
         $files = $this->files_in( $dir );

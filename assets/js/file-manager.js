@@ -219,7 +219,8 @@
 
   const sortRows = (rows) => {
     const { key, dir } = state.sort;
-    const val = (r) => (key === "kind" ? kindOf(r) : key === "perm" ? (r.writable ? 1 : 0) : r[key]);
+    const val = (r) =>
+      key === "kind" ? kindOf(r) : key === "perm" ? (r.writable ? 1 : 0) : key === "size" && isDir(r) ? (sizes.has(r.path) ? sizes.get(r.path) : -1) : r[key];
     return rows.slice().sort((a, b) => {
       if (isDir(a) !== isDir(b)) return isDir(a) ? -1 : 1; // folders first, always
       const va = val(a), vb = val(b);
@@ -255,7 +256,7 @@
         '<td class="isxs-fm-name"><div>' + (isDir(r) ? folderSvg : fileSvg) + '<span class="isxs-fm-label"><span>' + esc(r.name) + "</span>" + where + "</span>" + (r.bucket ? cloudSvg : "") + "</div></td>" +
         "<td>" + esc(permText(r)) + "</td>" +
         "<td>" + esc(r.mtime ? dateText(r.mtime) : "—") + "</td>" +
-        '<td class="is-num">' + (isDir(r) ? "—" : esc(sizeText(r.size))) + "</td>" +
+        '<td class="is-num isxs-fm-size">' + esc(sizeCell(r)) + "</td>" +
         "<td>" + esc(kindOf(r)) + "</td></tr>";
     });
     $table.html(
@@ -265,8 +266,37 @@
     renderStatus();
   };
 
+  /* Folder totals come after the listing (they mean walking every file
+     below): "…" until the server has added them up, then kept for the
+     session; cleared after any change. */
+  const sizes = new Map(); // folder path => bytes
+  const sizeCell = (r) => (!isDir(r) ? sizeText(r.size) : sizes.has(r.path) ? sizeText(sizes.get(r.path)) : state.search ? "—" : "…");
+  let sizeSeq = 0;
+  const fetchSizes = (paths, seq) => {
+    const todo = paths.filter((p) => !sizes.has(p));
+    if (!todo.length) return;
+    api("sizes", { paths: todo })
+      .then((d) => {
+        Object.keys(d.sizes).forEach((p) => sizes.set(p, d.sizes[p]));
+        if (seq !== sizeSeq) return; // another folder is open now
+        $table.find("tbody tr[data-path]").each(function () {
+          const row = rowOf($(this).attr("data-path"));
+          if (row && isDir(row)) $(this).find(".isxs-fm-size").text(sizeCell(row));
+        });
+        renderStatus();
+        if (d.pending.length) fetchSizes(d.pending, seq);
+      })
+      .catch(() => {});
+  };
+  const loadSizes = () => {
+    if (state.search) return;
+    const seq = ++sizeSeq;
+    fetchSizes([state.path].concat(state.rows.filter(isDir).map((r) => r.path)), seq);
+  };
+
   const renderStatus = () => {
-    const total = state.rows.reduce((n, r) => n + (r.size || 0), 0);
+    // The open folder's own total once known; until then, the files shown.
+    const total = !state.search && sizes.has(state.path) ? sizes.get(state.path) : state.rows.reduce((n, r) => n + (r.size || 0), 0);
     const picked = state.rows.filter((r) => state.selected.has(r.path));
     const pickedSize = picked.reduce((n, r) => n + (r.size || 0), 0);
     $("#isxs-fm-status-path").text("/" + state.path);
@@ -327,6 +357,7 @@
     if (!keep) $("#isxs-fm-q").val("");
     renderCrumbs(d.path);
     renderTable();
+    loadSizes();
     $("#isxs-fm-note").text(t.readOnly).prop("hidden", d.writable);
     syncButtons();
     if (select && !keep) {
@@ -366,6 +397,7 @@
   };
   // After a change: forget these folders (and the open one), then show it fresh.
   const reloadAfter = (paths, select) => {
+    sizes.clear(); // totals up the tree changed
     invalidate([state.path].concat(paths || []));
     return load(state.path, select);
   };
@@ -519,6 +551,7 @@
     if (done) toast(withNotes(t.uploaded + " " + done, [...new Set(notes)]), false);
     setTimeout(() => $queue.find("li.is-ok").fadeOut(300, function () { $(this).remove(); if (!$queue.children().length) $queue.prop("hidden", true); }), 4000);
     invalidate([dir]);
+    sizes.clear();
     if (state.path === dir && !state.search) load(dir);
   };
 

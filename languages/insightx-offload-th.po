@@ -2260,3 +2260,27 @@ msgstr "ผู้ดูแลระบบทำได้ทุกอย่าง
 #, php-format
 msgid "Cannot delete: the system file %s is inside this folder."
 msgstr "ลบไม่ได้: มีไฟล์ระบบ %s อยู่ในโฟลเดอร์นี้"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Deleting"
+msgstr "กำลังลบ"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Emptying"
+msgstr "กำลังล้าง"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Moving"
+msgstr "กำลังย้าย"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Copying"
+msgstr "กำลังคัดลอก"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Duplicating"
+msgstr "กำลังทำสำเนา"
+
+#: includes/class-isxm-file-manager-admin.php
+msgid "Renaming"
+msgstr "กำลังเปลี่ยนชื่อ"

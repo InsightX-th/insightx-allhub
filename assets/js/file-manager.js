@@ -57,11 +57,11 @@
     });
 
   let toastTimer = null;
-  const toast = (text, isError) => {
+  const toast = (text, isError, sticky) => {
     const $t = $("#isxs-toast");
     clearTimeout(toastTimer);
-    $t.text(text).toggleClass("is-error", !!isError).toggleClass("is-ok", !isError).addClass("is-visible");
-    toastTimer = setTimeout(() => $t.removeClass("is-visible"), isError ? 5000 : 3000);
+    $t.text(text).toggleClass("is-error", !!isError).toggleClass("is-ok", !isError && !sticky).toggleClass("is-busy", !!sticky).addClass("is-visible");
+    if (!sticky) toastTimer = setTimeout(() => $t.removeClass("is-visible"), isError ? 5000 : 3000);
   };
   const withNotes = (text, notes) => (notes && notes.length ? text + " · " + notes.join(" · ") : text);
 
@@ -312,6 +312,7 @@
   const rowOf = (path) => byPath.get(path);
 
   const syncButtons = () => {
+    if (state.busy) return;
     const picked = [...state.selected].map(rowOf).filter(Boolean);
     const writable = !!(state.listing && state.listing.writable) && !state.search;
     const changeable = picked.length > 0 && picked.every((r) => r.writable);
@@ -388,7 +389,11 @@
       .catch((e) => {
         if (seq !== loadSeq) return;
         toast(e.message, true);
-        if (!cached && path !== cfg.jail) load(cfg.jail);
+        if (cached || path === cfg.jail) return;
+        // Gone (deleted meanwhile): drop it from the tree and open its parent.
+        $(".isxs-fm-tree li" + sel(path)).remove();
+        invalidate([path, parentPath(path)]);
+        load(path.length > cfg.jail.length && parentPath(path).length >= cfg.jail.length ? parentPath(path) : cfg.jail);
       })
       .finally(() => {
         clearTimeout(slow);
@@ -398,7 +403,13 @@
   // After a change: forget these folders (and the open one), then show it fresh.
   const reloadAfter = (paths, select) => {
     sizes.clear(); // totals up the tree changed
-    invalidate([state.path].concat(paths || []));
+    const changed = [state.path].concat(paths || []);
+    invalidate(changed);
+    // Folders in the tree that were touched are re-read too, even when
+    // another folder is open by now (a long delete finishing later).
+    changed.forEach((p) => {
+      if (p !== state.path && $(".isxs-fm-tree li" + sel(p)).children("ul").length) fetchList(p).catch(() => {});
+    });
     return load(state.path, select);
   };
 
@@ -580,19 +591,40 @@
     window.location.href = cfg.downloadUrl + "&_wpnonce=" + encodeURIComponent(cfg.nonce) + "&path=" + encodeURIComponent(path);
   };
 
+  // While a delete / move / copy … runs: a loading bar, the row being worked
+  // on dimmed with a spinner, "Deleting 1/3 · name…", and no second click.
+  const setBusy = (on) => {
+    state.busy = on;
+    $("#isxs-fm-main").toggleClass("is-loading", on);
+    if (on) $(".isxs-fm-actions [data-fm]").prop("disabled", true);
+    else syncButtons();
+  };
+  $(window).on("beforeunload", (e) => {
+    if (!state.busy) return;
+    e.preventDefault();
+    e.returnValue = ""; // the browser asks before leaving mid-way
+    return "";
+  });
+
   const runEach = async (paths, op, extra, okText) => {
+    if (state.busy) return;
     let notes = [];
     let done = 0;
-    for (const path of paths) {
+    setBusy(true);
+    for (const [i, path] of paths.entries()) {
+      const $row = $table.find("tr" + sel(path)).addClass("is-working");
+      toast((t.busy[op] || t.busy.delete) + " " + (i + 1) + "/" + paths.length + " · " + nameOf(path) + "…", false, true);
       try {
         const d = await api(op, Object.assign({ path }, extra));
         done++;
         notes = notes.concat((d && d.notes) || []);
       } catch (e) {
+        $row.removeClass("is-working");
         toast(e.message, true);
         break;
       }
     }
+    setBusy(false);
     if (done === paths.length) toast(withNotes(okText, [...new Set(notes)]), false);
     // The open folder, where things went (to), and where they came from.
     reloadAfter([extra.to].concat(paths.map(parentPath)).filter((p) => typeof p === "string"));
@@ -704,6 +736,7 @@
 
   // Every action, from the toolbar, the right-click menu or the keyboard.
   const act = async (op, picked, target) => {
+    if (state.busy) return; // one change at a time
     const rows = picked.map(rowOf).filter(Boolean);
     const one = rows[0];
     switch (op) {

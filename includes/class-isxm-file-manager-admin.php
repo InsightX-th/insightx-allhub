@@ -150,6 +150,14 @@ class ISXM_File_Manager_Admin {
                 /* translators: %d: number of items. */
                 'clipCut'       => __( '%d item(s) cut, paste them in another folder', 'insightx-offload' ),
                 'compressing'   => __( 'Shrinking…', 'insightx-offload' ),
+                'busy'          => [
+                    'delete'    => __( 'Deleting', 'insightx-offload' ),
+                    'empty'     => __( 'Emptying', 'insightx-offload' ),
+                    'move'      => __( 'Moving', 'insightx-offload' ),
+                    'copy'      => __( 'Copying', 'insightx-offload' ),
+                    'duplicate' => __( 'Duplicating', 'insightx-offload' ),
+                    'rename'    => __( 'Renaming', 'insightx-offload' ),
+                ],
                 /* translators: 1: size before, 2: size after. */
                 'shrunk'        => __( 'Shrunk from %1$s to %2$s', 'insightx-offload' ),
                 'notShrunk'     => __( 'Already small — left as it is', 'insightx-offload' ),

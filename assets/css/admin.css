@@ -2725,3 +2725,29 @@
   height: 2px;
   border-radius: 1px;
 }
+
+/* File Manager: the row being deleted / moved / copied, and the toast meanwhile. */
+.isxs-fm-table tbody tr.is-working td {
+  opacity: 0.45;
+}
+.isxs-fm-table tbody tr.is-working .isxs-fm-name > div::after {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--isxs-accent-line);
+  border-top-color: var(--isxs-accent);
+  border-radius: 50%;
+  animation: isxs-fm-spin 0.7s linear infinite;
+}
+@keyframes isxs-fm-spin {
+  to { transform: rotate(360deg); }
+}
+.isxs-toast.is-busy {
+  background: var(--isxs-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .isxs-fm-table tbody tr.is-working .isxs-fm-name > div::after {
+    animation: none;
+  }
+}

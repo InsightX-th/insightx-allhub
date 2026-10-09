@@ -4,15 +4,15 @@ Tags: offload, s3, minio, cloudflare r2, digitalocean spaces, cdn, migrate, medi
 Requires at least: 5.8
 Tested up to: 7.1.2
 Requires PHP: 7.4
-Stable tag: 0.2.55
+Stable tag: 0.3.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-Offload media and server folders to S3-compatible storage, with CDN delivery, migration, File Manager, PDF compression and background jobs.
+Offload media and server folders to S3-compatible storage, with CDN delivery, migration, File Manager, PDF compression, full-site backup and background jobs.
 
 == Description ==
 
-InsightX Offload จัดเก็บสื่อ WordPress และไฟล์ในโฟลเดอร์บนเซิร์ฟเวอร์บน S3-compatible storage พร้อมเสิร์ฟผ่าน Storage/CDN ย้ายไฟล์ระหว่างผู้ให้บริการ จัดการไฟล์ และย่อ PDF จากหลังบ้าน WordPress
+InsightX Offload จัดเก็บสื่อ WordPress และไฟล์ในโฟลเดอร์บนเซิร์ฟเวอร์บน S3-compatible storage พร้อมเสิร์ฟผ่าน Storage/CDN ย้ายไฟล์ระหว่างผู้ให้บริการ จัดการไฟล์ ย่อ PDF และสำรอง/ย้ายเว็บทั้งเว็บ (รวม InsightX Backup ไว้ในตัวแล้ว) จากหลังบ้าน WordPress
 
 รองรับ Amazon S3, MinIO, Cloudflare R2, DigitalOcean Spaces, Garage, Google Cloud Storage ผ่าน S3-compatible API และ Custom S3 พร้อมภาษาไทยและอังกฤษ
 
@@ -34,6 +34,14 @@ InsightX Offload จัดเก็บสื่อ WordPress และไฟล�
 * **ย่อ PDF อัตโนมัติ** — PDF ที่ผู้ดูแลระบบเพิ่มผ่าน File Manager เข้าโฟลเดอร์ที่เลือกจะถูกย่อก่อนอัปโหลดเมื่อเปิดสวิตช์ (Ghostscript หยุดเมื่อเกิน 60 วินาที) หากย่อไม่ได้ ระบบแจ้งเหตุผลและยังอัปโหลดไฟล์เดิม
 * **รูปภาพและโปรไฟล์** — เลือกไม่สร้าง thumbnail สำหรับการอัปโหลดใหม่ และใช้รูปโปรไฟล์วงกลมตัวอักษรที่รองรับภาษาไทยโดยไม่โหลด Gravatar
 
+**สำรองข้อมูล (รวม InsightX Backup)**
+
+* **ส่งออก / นำเข้า** — แพ็กฐานข้อมูลและ wp-content เป็นไฟล์ .wpress เก็บในเครื่องหรือ S3-compatible storage แล้วนำเข้ากลับพร้อมปรับ URL/path อัตโนมัติ
+* **ข้อมูลสำรองและตั้งเวลา** — ดู กู้คืน ดาวน์โหลด ตรวจสอบแพ็กเกจ ตั้งเวลาสำรองรายวัน/สัปดาห์/เดือน และจำกัดจำนวนที่เก็บ
+* **ตัวเลือกขั้นสูง** — บีบอัด เข้ารหัสด้วยรหัสผ่าน และเลือกสิ่งที่ไม่รวม
+* **Reset Hub** — ล้างปลั๊กอิน ธีม สื่อ หรือฐานข้อมูล โดยยืนยันด้วยรหัสผ่าน
+* **WP-CLI** — wp isx export / wp isx import <file> / wp isx providers
+
 **งานเบื้องหลังและเครื่องมือดูแลระบบ**
 
 * **Bulk Jobs** — Offload, Retry failed, Download กลับ, ลบสำเนา local ที่ตรวจว่ามีใน bucket แล้ว, ลบสื่อบน bucket, Migrate และจัดการ WooCommerce downloads พร้อมหยุดพัก/ทำต่อ/ยกเลิก ความคืบหน้า เวลาที่ใช้ และ ETA
@@ -41,6 +49,7 @@ InsightX Offload จัดเก็บสื่อ WordPress และไฟล�
 * **Media Library** — คอลัมน์ Storage/Bucket ตัวกรองสถานะ รวมรูปที่ขึ้นไม่ครบทุกขนาด และคำสั่ง Offload รายไฟล์/หลายไฟล์
 * **Sync และ Diagnostics** — เทียบข้อมูลติดตามกับ bucket เพื่อหา metadata ค้าง ไฟล์หาย และ orphan objects พร้อมทดสอบ connection
 * **WooCommerce** — จัดการไฟล์สินค้าดาวน์โหลดและเสิร์ฟผ่าน signed URL อายุสั้น
+* **คู่มือการใช้งาน** — เมนูคู่มือภาษาไทยพร้อมภาพหน้าจอ ตั้งแต่เชื่อมต่อ Storage จนถึงสำรองข้อมูลและแก้ปัญหา
 * **WP-CLI** — ตรวจสถานะ สั่งงาน และควบคุม Job ชุดเดียวกับหน้า Admin รองรับ external cron
 
 Secret Key ใช้ AES-256-GCM เมื่อ OpenSSL รองรับ และยังอ่านข้อมูลเดิมแบบ AES-256-CBC ได้
@@ -70,9 +79,13 @@ Secret Key ใช้ AES-256-GCM เมื่อ OpenSSL รองรับ แ�
 
 == Frequently Asked Questions ==
 
-= ต่างจากปลั๊กอินสำรองข้อมูลอย่างไร? =
+= สำรองข้อมูลทั้งเว็บได้ไหม? =
 
-InsightX Offload จัดเก็บและเสิร์ฟไฟล์สื่อ/โฟลเดอร์บน Storage ไม่ได้สร้างแพ็กเกจสำรองทั้งเว็บไซต์หรือฐานข้อมูลแบบ InsightX Backup
+ได้ ตั้งแต่ 0.3.0 รวม InsightX Backup ไว้ในเมนู InsightX Offload → สำรองข้อมูล ส่งออก/นำเข้าทั้งเว็บ (ฐานข้อมูล + wp-content) เป็นแพ็กเกจ .wpress ตั้งเวลาสำรองอัตโนมัติ และเก็บใน Storage ได้
+
+= ใช้ปลั๊กอิน InsightX Backup อยู่แล้ว ต้องทำอะไร? =
+
+อัปเดต InsightX Offload เป็น 0.3.0 ขึ้นไป แล้วปิดและลบ InsightX Backup ตัวเดิม ไฟล์สำรอง ตารางเวลา การเชื่อมต่อ และการตั้งค่าเดิมใช้ต่อได้ทันที ระหว่างที่ตัวเดิมยังเปิดอยู่ ส่วนสำรองข้อมูลของ InsightX Offload จะยังไม่ทำงาน (กันการชนกัน) และมีข้อความเตือนให้ลบตัวเดิม
 
 = อัปโหลดไฟล์นอก Media Library ได้ไหม? =
 

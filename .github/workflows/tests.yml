@@ -88,6 +88,15 @@ jobs:
       - name: File Manager access rules
         run: php tests/file-manager-access.php
 
+      - name: Backup module (bundled InsightX Backup)
+        run: php tests/backup/run.php
+
+      - name: Backup module loading
+        run: php tests/backup/module.php
+
+      - name: Backup module security
+        run: php tests/backup/security.php
+
       - name: Parallel transfers (threaded S3 fixture)
         run: php tests/migration-transfers.php
 

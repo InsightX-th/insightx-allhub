@@ -15,9 +15,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_Admin {
 
     const PAGE_SLUG = 'insightx-offload';
+    const GUIDE_SLUG = 'insightx-offload-guide';
+
+    private $guide_hook = '';
 
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'register_menu' ] );
+        // Append help after File Manager (20) and Backup (30).
+        add_action( 'admin_menu', [ $this, 'register_guide_menu' ], 99 );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
     }
 
@@ -36,7 +41,18 @@ class ISXM_Admin {
         add_submenu_page( self::PAGE_SLUG, __( 'InsightX Offload', 'insightx-offload' ), __( 'Offload', 'insightx-offload' ), 'manage_options', self::PAGE_SLUG, [ $this, 'render_page' ] );
     }
 
+    public function register_guide_menu() {
+        $this->guide_hook = add_submenu_page( self::PAGE_SLUG, __( 'User Guide', 'insightx-offload' ), __( 'User Guide', 'insightx-offload' ), 'manage_options', self::GUIDE_SLUG, [ $this, 'render_guide_page' ] );
+    }
+
     public function enqueue_assets( $hook ) {
+        if ( $this->guide_hook && $hook === $this->guide_hook ) {
+            wp_enqueue_style( 'isxs-admin', ISXM_PLUGIN_URL . 'assets/css/admin.css', [], filemtime( ISXM_PLUGIN_DIR . 'assets/css/admin.css' ) );
+            wp_enqueue_style( 'isxs-user-guide', ISXM_PLUGIN_URL . 'assets/css/user-guide.css', [ 'isxs-admin' ], filemtime( ISXM_PLUGIN_DIR . 'assets/css/user-guide.css' ) );
+            wp_enqueue_script( 'isxs-user-guide', ISXM_PLUGIN_URL . 'assets/js/user-guide.js', [], filemtime( ISXM_PLUGIN_DIR . 'assets/js/user-guide.js' ), true );
+            return;
+        }
+
         if ( $hook !== 'toplevel_page_' . self::PAGE_SLUG ) {
             return;
         }
@@ -179,6 +195,14 @@ class ISXM_Admin {
                 'orphansDeleted'    => __( 'Deleted %s orphan objects — the bucket is clean', 'insightx-offload' ),
             ],
         ] );
+    }
+
+    public function render_guide_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        require ISXM_PLUGIN_DIR . 'includes/views/user-guide.php';
     }
 
     public function render_page() {
@@ -333,15 +357,15 @@ class ISXM_Admin {
                                     </div>
                                 </div>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], 'Offload Media', __( 'Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'remove_local', $s['remove_local'], 'Remove Local Media', __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
+                                    <?php $this->toggle( 'offload_enabled', $s['offload_enabled'], __( 'Offload Media', 'insightx-offload' ), __( 'Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'remove_local', $s['remove_local'], __( 'Remove Local Media', 'insightx-offload' ), __( 'Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy', 'insightx-offload' ), 'warn' ); ?>
                                     <?php $this->toggle( 'persist_urls', $s['persist_urls'], __( 'Write permanent URLs to the database', 'insightx-offload' ), __( 'Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'use_prefix', $s['use_prefix'], 'Add Prefix to Bucket Path', __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_prefix', $s['use_prefix'], __( 'Add Prefix to Bucket Path', 'insightx-offload' ), __( 'Group this site\'s files under a prefix in the bucket', 'insightx-offload' ) ); ?>
                                     <div class="isxs-field isxs-indent" id="isxs-prefix-field">
                                         <input type="text" id="isxs-prefix" value="<?php echo esc_attr( $s['prefix'] ); ?>" placeholder="wp-content/uploads/">
                                     </div>
-                                    <?php $this->toggle( 'use_year_month', $s['use_year_month'], 'Add Year & Month to Bucket Path', __( 'Add the upload year/month to the path for extra organization', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'use_object_version', $s['use_object_version'], 'Add Object Version to Bucket Path', __( 'Add a version number to the path so the CDN always serves the latest file', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_year_month', $s['use_year_month'], __( 'Add Year & Month to Bucket Path', 'insightx-offload' ), __( 'Add the upload year/month to the path for extra organization', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'use_object_version', $s['use_object_version'], __( 'Add Object Version to Bucket Path', 'insightx-offload' ), __( 'Add a version number to the path so the CDN always serves the latest file', 'insightx-offload' ) ); ?>
                                 </div>
                             </div>
 
@@ -388,10 +412,10 @@ class ISXM_Admin {
                                     <div class="isxs-alert isxs-alert-warn isxs-delivery-alert"><?php echo esc_html( $isxm_delivery_alert ); ?></div>
                                 <?php endif; ?>
                                 <div class="isxs-card-body">
-                                    <?php $this->toggle( 'deliver_enabled', $s['deliver_enabled'], 'Deliver Offloaded Media', __( 'Rewrite URLs of offloaded media to point at storage/CDN', 'insightx-offload' ) ); ?>
-                                    <?php $this->toggle( 'force_https', $s['force_https'], 'Force HTTPS', __( 'Always use https for every rewritten URL', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'deliver_enabled', $s['deliver_enabled'], __( 'Deliver Offloaded Media', 'insightx-offload' ), __( 'Rewrite URLs of offloaded media to point at storage/CDN', 'insightx-offload' ) ); ?>
+                                    <?php $this->toggle( 'force_https', $s['force_https'], __( 'Force HTTPS', 'insightx-offload' ), __( 'Always use https for every rewritten URL', 'insightx-offload' ) ); ?>
                                     <div class="isxs-field">
-                                        <label for="isxs-cdn-domain">Custom Delivery Domain (CDN)</label>
+                                        <label for="isxs-cdn-domain"><?php esc_html_e( 'Custom Delivery Domain (CDN)', 'insightx-offload' ); ?></label>
                                         <input type="text" id="isxs-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['cdn_domain'] ); ?>">
                                         <p class="isxs-hint"><?php esc_html_e( 'Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL', 'insightx-offload' ); ?></p>
                                     </div>
@@ -436,16 +460,16 @@ class ISXM_Admin {
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>
                                     </span>
                                     <div>
-                                        <h2>Assets Pull</h2>
+                                        <h2><?php esc_html_e( 'Assets Pull', 'insightx-offload' ); ?></h2>
                                         <p class="isxs-card-sub"><?php esc_html_e( 'Serve theme and plugin CSS / JS through a CDN', 'insightx-offload' ); ?></p>
                                     </div>
                                 </div>
                             </div>
                             <div class="isxs-card-body">
-                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], 'Rewrite Asset URLs', __( 'Serve theme and plugin CSS/JS files from the CDN domain', 'insightx-offload' ) ); ?>
-                                <?php $this->toggle( 'assets_force_https', $s['assets_force_https'], 'Force HTTPS', __( 'Always use https for every rewritten asset URL', 'insightx-offload' ) ); ?>
+                                <?php $this->toggle( 'assets_enabled', $s['assets_enabled'], __( 'Rewrite Asset URLs', 'insightx-offload' ), __( 'Serve theme and plugin CSS/JS files from the CDN domain', 'insightx-offload' ) ); ?>
+                                <?php $this->toggle( 'assets_force_https', $s['assets_force_https'], __( 'Force HTTPS', 'insightx-offload' ), __( 'Always use https for every rewritten asset URL', 'insightx-offload' ) ); ?>
                                 <div class="isxs-field">
-                                    <label for="isxs-assets-cdn-domain">CDN Domain (Assets)</label>
+                                    <label for="isxs-assets-cdn-domain"><?php esc_html_e( 'CDN Domain (Assets)', 'insightx-offload' ); ?></label>
                                     <input type="text" id="isxs-assets-cdn-domain" placeholder="cdn.example.com" value="<?php echo esc_attr( $s['assets_cdn_domain'] ); ?>">
                                     <p class="isxs-hint"><?php esc_html_e( 'Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site', 'insightx-offload' ); ?></p>
                                 </div>
@@ -671,31 +695,31 @@ class ISXM_Admin {
             <div class="isxs-card-body">
                 <div class="isxs-grid-2">
                     <div class="isxs-field">
-                        <label>Endpoint URL</label>
+                        <label><?php esc_html_e( 'Endpoint URL', 'insightx-offload' ); ?></label>
                         <input type="url" class="isxs-conn-endpoint" placeholder="<?php echo esc_attr( $meta['endpoint_placeholder'] ); ?>" value="<?php echo esc_attr( $config['endpoint'] ); ?>" <?php disabled( $meta['endpoint_locked'] ); ?>>
                         <p class="isxs-hint"><?php echo esc_html( $meta['endpoint_hint'] ); ?></p>
                     </div>
                     <div class="isxs-field">
-                        <label>Region</label>
+                        <label><?php esc_html_e( 'Region', 'insightx-offload' ); ?></label>
                         <input type="text" class="isxs-conn-region" placeholder="<?php echo esc_attr( $meta['region_default'] ); ?>" value="<?php echo esc_attr( $config['region'] ); ?>">
                         <p class="isxs-hint"><?php echo esc_html( $meta['region_hint'] ); ?></p>
                     </div>
                     <div class="isxs-field">
-                        <label>Bucket</label>
+                        <label><?php esc_html_e( 'Bucket', 'insightx-offload' ); ?></label>
                         <input type="text" class="isxs-conn-bucket" placeholder="<?php echo esc_attr( $meta['bucket_placeholder'] ); ?>" value="<?php echo esc_attr( $config['bucket'] ); ?>">
                     </div>
                     <div class="isxs-field">
-                        <label>Access Key</label>
+                        <label><?php esc_html_e( 'Access Key', 'insightx-offload' ); ?></label>
                         <input type="text" class="isxs-conn-access-key" autocomplete="off" placeholder="<?php echo esc_attr( $meta['access_key_placeholder'] ); ?>" value="<?php echo esc_attr( $config['access_key'] ); ?>">
                     </div>
                     <div class="isxs-field isxs-col-span">
-                        <label>Secret Key</label>
+                        <label><?php esc_html_e( 'Secret Key', 'insightx-offload' ); ?></label>
                         <input type="password" class="isxs-conn-secret-key" autocomplete="new-password" data-has-secret="<?php echo $has_secret ? '1' : '0'; ?>" value="<?php echo $has_secret ? esc_attr( str_repeat( '•', 16 ) ) : ''; ?>" placeholder="<?php echo esc_attr( $meta['secret_key_placeholder'] ); ?>">
                         <p class="isxs-hint"><?php esc_html_e( '🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key', 'insightx-offload' ); ?></p>
                     </div>
                 </div>
                 <div class="isxs-toggle-row">
-                    <?php $this->toggle( 'path_style', $config['path_style'], 'Path-style URL', __( 'Required for Minio/Garage — off for AWS S3 (virtual-hosted)', 'insightx-offload' ) ); ?>
+                    <?php $this->toggle( 'path_style', $config['path_style'], __( 'Path-style URL', 'insightx-offload' ), __( 'Required for Minio/Garage — off for AWS S3 (virtual-hosted)', 'insightx-offload' ) ); ?>
                     <?php $this->toggle( 'send_public_acl', $config['send_public_acl'], __( 'Send ACL public-read', 'insightx-offload' ), __( 'Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy', 'insightx-offload' ) ); ?>
                 </div>
                 <div class="isxs-card-foot">
@@ -837,7 +861,7 @@ class ISXM_Admin {
     private function url_preview_card() {
         ?>
         <div class="isxs-card">
-            <div class="isxs-card-head"><h2>URL Preview</h2></div>
+            <div class="isxs-card-head"><h2><?php esc_html_e( 'URL Preview', 'insightx-offload' ); ?></h2></div>
             <div class="isxs-card-body">
                 <p class="isxs-hint"><?php esc_html_e( 'Media URL structure with the current settings (live preview):', 'insightx-offload' ); ?></p>
                 <div class="isxs-url-preview" data-url-preview>

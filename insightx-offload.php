@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX Offload
  * Plugin URI:  https://insightx.in.th/
- * Version:     0.2.55
+ * Version:     0.3.0
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-offload
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '0.2.55' );
+define( 'ISXM_PLUGIN_VERSION', '0.3.0' );
 
 /*
  * GitHub update checker.
@@ -90,6 +90,14 @@ foreach ( $isxm_files_to_load as $isxm_file ) {
     if ( file_exists( ISXM_PLUGIN_DIR . $isxm_file ) ) {
         require_once ISXM_PLUGIN_DIR . $isxm_file;
     }
+}
+
+// Backup (formerly the separate InsightX Backup plugin) — see modules/backup/load.php.
+if ( require ISXM_PLUGIN_DIR . 'modules/backup/load.php' ) {
+    register_activation_hook( __FILE__, 'isx_activate' );
+    // As the standalone plugin did: no scheduled-backup event left behind
+    // with nothing to run it (it is put back from the saved schedule later).
+    register_deactivation_hook( __FILE__, 'isx_deactivate' );
 }
 
 /**

@@ -1,0 +1,1077 @@
+<?php
+/**
+ * Copyright (C) 2026 InsightX. GPLv3 or later. Original work by InsightX.
+ *
+ * Export pipeline. Each run() call performs one bounded slice of work and
+ * returns progress so a JS driver can poll it to completion without hitting PHP
+ * time / memory limits.
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class ISX_Export {
+
+	const ROWS_PER_BATCH  = 1000;
+	const FILES_PER_BATCH = 300;
+
+	/**
+	 * Soft wall-clock budget (seconds) for a single run() call. Each work step
+	 * keeps doing batches in a loop until this elapses (or the phase finishes),
+	 * instead of returning after one small batch — this is what collapses a
+	 * huge export from tens of thousands of HTTP round-trips down to dozens.
+	 * Filterable so hosts with tighter PHP time limits can lower it.
+	 *
+	 * @var int
+	 */
+	const STEP_TIME_BUDGET = 10;
+
+	/**
+	 * Microtime deadline for the current run() call's work loop.
+	 *
+	 * @return float
+	 */
+	private static function deadline() {
+		return microtime( true ) + (float) apply_filters( 'isx_step_time_budget', self::STEP_TIME_BUDGET );
+	}
+
+	/**
+	 * Advance the export by one step.
+	 *
+	 * @param ISX_Job $job
+	 * @return array { progress:int, done:bool, message:string, download?:string }
+	 */
+	public static function run( ISX_Job $job ) {
+		$step = $job->get( 'step', 'init' );
+
+		switch ( $step ) {
+			case 'init':
+				return self::init( $job );
+			case 'database':
+				return self::database( $job );
+			case 'pack_meta':
+				return self::pack_meta( $job );
+			case 'files':
+				return self::files( $job );
+			case 'finalize':
+				return self::finalize( $job );
+			case 'upload':
+				return self::upload( $job );
+		}
+
+		return array( 'progress' => 100, 'done' => true, 'message' => __( 'Done', 'insightx-backup' ) );
+	}
+
+	private static function init( ISX_Job $job ) {
+		global $wpdb;
+
+		ISX_Archive::init( $job->archive() );
+
+		$options = (array) $job->get( 'options', array() );
+
+		$manifest = array(
+			'generator'               => 'InsightX Backup ' . ISX_VERSION,
+			'created'                 => time(),
+			'siteurl'                 => get_option( 'siteurl' ),
+			'home'                    => get_option( 'home' ),
+			'abspath'                 => untrailingslashit( ABSPATH ),
+			'content_dir'             => untrailingslashit( WP_CONTENT_DIR ),
+			'content_url'             => untrailingslashit( content_url() ),
+			// Recorded separately from content_url because a site can point
+			// upload_path/upload_url_path anywhere it likes — outside
+			// wp-content included, in which case content_url covers none of the
+			// media library's URLs. wp_get_upload_dir() rather than
+			// wp_upload_dir(): the latter creates the directory as a side
+			// effect, which an export has no business doing.
+			'uploads_url'             => untrailingslashit( self::uploads_base_url() ),
+			'table_prefix'            => $wpdb->prefix,
+			'wp_version'              => get_bloginfo( 'version' ),
+			'no_replace_email_domain' => ! empty( $options['no_replace_email_domain'] ),
+			// Recorded so the import can re-assert the theme/plugins at the very
+			// end (same trick All-in-One WP Migration plays with its
+			// package.json — see ISX_Import::reassert_package_theme()). The dump
+			// normally carries these values too, but this copy is immune to any
+			// mangling the URL rewrite does on the way in.
+			'template'                => (string) get_option( 'template' ),
+			'stylesheet'              => (string) get_option( 'stylesheet' ),
+			'active_plugins'          => (array) get_option( 'active_plugins', array() ),
+		);
+
+		$tables = empty( $options['exclude_database'] ) ? ISX_Database::tables() : array();
+		if ( ! empty( $options['exclude_selected_tables'] ) ) {
+			$tables = array_values( array_diff( $tables, (array) $options['exclude_selected_tables'] ) );
+		}
+		$job->set( 'tables', $tables );
+
+		$exclude_dirs = array();
+		if ( ! empty( $options['exclude_media'] ) ) {
+			$exclude_dirs[] = 'uploads';
+		}
+		if ( ! empty( $options['exclude_themes'] ) ) {
+			$exclude_dirs[] = 'themes';
+		}
+		if ( ! empty( $options['exclude_mu_plugins'] ) ) {
+			$exclude_dirs[] = 'mu-plugins';
+		}
+		if ( ! empty( $options['exclude_plugins'] ) ) {
+			$exclude_dirs[] = 'plugins';
+		}
+
+		$keep_only_subdirs = array();
+		if ( empty( $options['exclude_themes'] ) && ! empty( $options['exclude_inactive_themes'] ) ) {
+			$keep_only_subdirs['themes'] = ISX_Files::active_theme_dirs();
+		}
+		if ( empty( $options['exclude_plugins'] ) && ! empty( $options['exclude_inactive_plugins'] ) ) {
+			$keep_only_subdirs['plugins'] = ISX_Files::active_plugin_entries();
+		}
+
+		$filters = array(
+			'exclude_dirs'      => $exclude_dirs,
+			'keep_only_subdirs' => $keep_only_subdirs,
+			'exclude_cache'     => ! empty( $options['exclude_cache_files'] ),
+			'exclude_paths'     => isset( $options['exclude_selected_files'] ) ? (array) $options['exclude_selected_files'] : array(),
+		);
+		$list_result = ISX_Files::build_list( $job->file_list(), $filters );
+		if ( empty( $list_result['ok'] ) ) {
+			return self::write_failed( $job, $job->file_list() );
+		}
+		$total_files = $list_result['total'];
+		$job->set( 'total_files', $total_files );
+		$job->set( 'file_category_bounds', $list_result['bounds'] );
+
+		// Written into manifest.json (inside the archive itself) — not just the
+		// job's own state — so the import side can compute a true files-done/
+		// total percentage instead of the old fixed-cap guess once it reads this
+		// back on the other site.
+		$manifest['total_files'] = $total_files;
+		$job->set( 'manifest', $manifest );
+
+		$job->set( 'cursor', array( 'ti' => 0, 'off' => 0, 'table_rows' => 0 ) );
+		$job->set( 'step', 'database' );
+		$job->set( 'progress', 5 );
+		$job->save();
+
+		return array( 'progress' => 5, 'done' => false, 'message' => __( 'Preparing...', 'insightx-backup' ) );
+	}
+
+	private static function database( ISX_Job $job ) {
+		global $wpdb;
+
+		$tables  = (array) $job->get( 'tables', array() );
+		$cursor  = (array) $job->get( 'cursor', array( 'ti' => 0, 'off' => 0, 'table_rows' => 0 ) );
+		$options = (array) $job->get( 'options', array() );
+
+		$search  = isset( $options['replace_old'] ) ? array_values( (array) $options['replace_old'] ) : array();
+		$replace = isset( $options['replace_new'] ) ? array_values( (array) $options['replace_new'] ) : array();
+
+		$deadline = self::deadline();
+		$progress = (int) $job->get( 'progress', 5 );
+		$message  = '';
+
+		// Keep the dump handle open across the whole budget window instead of
+		// reopening it per batch — every batch appends to the same file.
+		$fh = fopen( $job->db_dump(), 'ab' );
+		if ( $fh === false ) {
+			return self::write_failed( $job, $job->db_dump() );
+		}
+
+		// A freshly created dump gets a charset declaration as its first line,
+		// so the import replays rows under the same charset they were written
+		// with (utf8mb4) regardless of the target connection's default —
+		// without it, non-ASCII text (Thai etc.) can garble when the two
+		// databases differ. Only written when the file is empty: a resumed job
+		// already has its header from the first call.
+		$charset_line = "/*!40101 SET NAMES utf8mb4 */;\n";
+		clearstatcache( true, $job->db_dump() );
+		if ( (int) @filesize( $job->db_dump() ) === 0 ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors
+			if ( @fwrite( $fh, $charset_line ) !== strlen( $charset_line ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors
+				fclose( $fh );
+				return self::write_failed( $job, $job->db_dump() );
+			}
+		}
+
+		do {
+			$ti  = (int) $cursor['ti'];
+			$off = (int) $cursor['off'];
+
+			if ( $ti >= count( $tables ) ) {
+				fclose( $fh );
+				$job->set( 'cursor', $cursor );
+				$job->set( 'step', 'pack_meta' );
+				$job->set( 'progress', 50 );
+				$job->save();
+				return array( 'progress' => 50, 'done' => false, 'message' => __( 'Packing database...', 'insightx-backup' ) );
+			}
+
+			$table = $tables[ $ti ];
+
+			// Structured exclusion, never raw SQL: dump_rows() binds every value
+			// through $wpdb->prepare() (see its $exclude parameter).
+			$exclude = array();
+			if ( $table === $wpdb->comments && ! empty( $options['exclude_spam_comments'] ) ) {
+				$exclude['comment_approved'] = array( 'spam' );
+			} elseif ( $table === $wpdb->posts && ! empty( $options['exclude_post_revisions'] ) ) {
+				$exclude['post_type'] = array( 'revision' );
+			}
+
+			// Captured once per table (at off === 0): the total row count (for
+			// progress) and the keyset column, if any. dump_rows() then pages
+			// by keyset (WHERE pk > last) when a column is available — avoiding
+			// the O(n²) deep-OFFSET scan that made big tables slower each batch.
+			if ( $off === 0 ) {
+				if ( ! ISX_Database::dump_schema( $fh, $table ) ) {
+					fclose( $fh );
+					return self::write_failed( $job, $job->db_dump() );
+				}
+				$cursor['table_rows'] = ISX_Database::row_count( $table );
+				$cursor['keyset']     = ISX_Database::keyset_column( $table );
+				$cursor['last_pk']    = null;
+			}
+			$table_rows = (int) $cursor['table_rows'];
+			$keyset     = isset( $cursor['keyset'] ) ? $cursor['keyset'] : null;
+			$last_pk    = isset( $cursor['last_pk'] ) ? $cursor['last_pk'] : null;
+
+			$res = ISX_Database::dump_rows( $fh, $table, $off, self::ROWS_PER_BATCH, $exclude, $search, $replace, $keyset, $last_pk );
+			if ( empty( $res['ok'] ) ) {
+				fclose( $fh );
+				return self::write_failed( $job, $job->db_dump() );
+			}
+			$written = (int) $res['written'];
+			if ( $keyset !== null ) {
+				$cursor['last_pk'] = $res['last_pk'];
+			}
+
+			if ( $written < self::ROWS_PER_BATCH ) {
+				$cursor['ti']         = $ti + 1;
+				$cursor['off']        = 0;
+				$cursor['table_rows'] = 0;
+				$cursor['keyset']     = null;
+				$cursor['last_pk']    = null;
+			} else {
+				$cursor['off'] = $off + $written;
+			}
+
+			// Fractional progress within the current table blended into the
+			// per-table step, so a single huge table (millions of rows in
+			// wp_postmeta) still shows the bar moving instead of sitting still.
+			$table_fraction = $table_rows > 0 ? min( 1, ( $off + $written ) / $table_rows ) : 1;
+			$progress       = 5 + 45 * ( ( $ti + $table_fraction ) / max( 1, count( $tables ) ) );
+			$message        = $table_rows > 0
+				? sprintf( __( 'Exporting table %s (%d/%d rows)...', 'insightx-backup' ), $table, min( $off + $written, $table_rows ), $table_rows )
+				: sprintf( __( 'Exporting table %s...', 'insightx-backup' ), $table );
+		} while ( microtime( true ) < $deadline && ! $job->is_cancel_requested() );
+
+		fclose( $fh );
+		$job->set( 'cursor', $cursor );
+		$job->set( 'progress', $progress );
+		$job->save();
+
+		return array(
+			'progress' => $progress,
+			'done'     => false,
+			'message'  => $message,
+		);
+	}
+
+	private static function pack_meta( ISX_Job $job ) {
+		$options  = (array) $job->get( 'options', array() );
+		$compress = ! empty( $options['compression'] ) && $options['compression'] === 'gzip';
+
+		// package.json stays uncompressed — it's a few hundred bytes, and
+		// keeping it plain lets a package be sanity-checked by eye/grep
+		// without needing this plugin's own inflate step.
+		if ( ! ISX_Archive::add_data( $job->archive(), 'package.json', wp_json_encode( $job->get( 'manifest', array() ) ) ) ) {
+			return self::write_failed( $job );
+		}
+		if ( is_file( $job->db_dump() ) ) {
+			// Unlike pack_batch()'s tolerance for a vanished source file, this one
+			// is a file we just wrote ourselves a moment ago — anything other than
+			// a clean write (including null, "not found") means the disk, not a
+			// race with a live site, and the export cannot continue without it.
+			if ( ISX_Archive::add_file( $job->archive(), $job->db_dump(), 'database.sql', $compress ) !== true ) {
+				return self::write_failed( $job );
+			}
+		}
+		$job->set( 'cursor', array( 'fo' => 0 ) );
+		$job->set( 'step', 'files' );
+		$job->set( 'progress', 55 );
+		$job->save();
+
+		return array( 'progress' => 55, 'done' => false, 'message' => __( 'Packing files...', 'insightx-backup' ) );
+	}
+
+	private static function files( ISX_Job $job ) {
+		$options  = (array) $job->get( 'options', array() );
+		$compress = ! empty( $options['compression'] ) && $options['compression'] === 'gzip';
+
+		$cursor     = (array) $job->get( 'cursor', array( 'fo' => 0 ) );
+		$done_files = (int) $job->get( 'done_files', 0 );
+		$total      = max( 1, (int) $job->get( 'total_files', 1 ) );
+		$deadline   = self::deadline();
+		$phase_done = false;
+
+		// Keep packing file batches into the archive until the time budget is
+		// spent (or every file is packed), rather than one small batch per
+		// request — the same round-trip collapse the database step gets. The
+		// cancel check is what makes "Cancel" feel immediate on a big site: this
+		// is the phase that runs for hours, and without it the click would sit
+		// there until the whole time budget was spent.
+		do {
+			$result       = ISX_Files::pack_batch( $job->archive(), $job->file_list(), (int) $cursor['fo'], self::FILES_PER_BATCH, $compress );
+			$cursor['fo'] = $result['offset'];
+			$done_files  += $result['added'];
+			if ( empty( $result['ok'] ) ) {
+				// Persist the cursor first — pack_batch() already rewound the
+				// offset to before the failed entry, so a retried export (or a
+				// look at the job's own state) doesn't believe this batch packed.
+				$job->set( 'cursor', $cursor );
+				$job->set( 'done_files', $done_files );
+				$job->save();
+				return self::write_failed( $job );
+			}
+			if ( $result['done'] ) {
+				$phase_done = true;
+				break;
+			}
+		} while ( microtime( true ) < $deadline && ! $job->is_cancel_requested() );
+
+		$job->set( 'cursor', $cursor );
+		$job->set( 'done_files', $done_files );
+
+		$progress = 55 + 40 * min( 1, $done_files / $total );
+		if ( $phase_done ) {
+			$job->set( 'step', 'finalize' );
+		}
+		$job->set( 'progress', $progress );
+		$job->save();
+
+		return array(
+			'progress' => $progress,
+			'done'     => false,
+			'message'  => sprintf( __( 'Collecting %s — %d/%d items', 'insightx-backup' ), self::current_category_label( $job, $done_files ), $done_files, $total ),
+		);
+	}
+
+	/**
+	 * Which content category $done_files (the cumulative files-packed count)
+	 * currently falls into, based on the per-category boundaries build_list()
+	 * recorded — so the status message can say "Collecting plugins" / "Collecting themes" /
+	 * etc. instead of just a bare item counter.
+	 *
+	 * @param ISX_Job $job
+	 * @param int     $done_files
+	 * @return string
+	 */
+	/**
+	 * Base URL of the media library.
+	 *
+	 * wp_get_upload_dir() landed in WordPress 4.5; this plugin still declares
+	 * support well below that, so fall back to wp_upload_dir() where it is
+	 * missing. The fallback creates the uploads directory if it isn't there,
+	 * which is why it isn't the first choice.
+	 *
+	 * @return string
+	 */
+	private static function uploads_base_url() {
+		$dir = function_exists( 'wp_get_upload_dir' ) ? wp_get_upload_dir() : wp_upload_dir();
+		return isset( $dir['baseurl'] ) ? (string) $dir['baseurl'] : '';
+	}
+
+	private static function current_category_label( ISX_Job $job, $done_files ) {
+		$labels = array(
+			'plugins'    => __( 'plugins', 'insightx-backup' ),
+			'themes'     => __( 'themes', 'insightx-backup' ),
+			'uploads'    => __( 'media library', 'insightx-backup' ),
+			'mu-plugins' => __( 'plugins', 'insightx-backup' ),
+			'other'      => __( 'other files', 'insightx-backup' ),
+		);
+		$bounds = (array) $job->get( 'file_category_bounds', array() );
+		foreach ( $bounds as $key => $upto ) {
+			if ( $done_files <= $upto ) {
+				return isset( $labels[ $key ] ) ? $labels[ $key ] : __( 'files', 'insightx-backup' );
+			}
+		}
+		return __( 'files', 'insightx-backup' );
+	}
+
+	private static function finalize( ISX_Job $job ) {
+		if ( ! ISX_Archive::finish( $job->archive() ) ) {
+			return self::write_failed( $job );
+		}
+
+		$backup_name = ISX_Backups::store( $job->archive() );
+		if ( $backup_name === null ) {
+			return self::write_failed( $job, ISX_Backups::dir() );
+		}
+		$backup_path = ISX_Backups::path( $backup_name );
+
+		$options = (array) $job->get( 'options', array() );
+
+		if ( $backup_path !== null && ! empty( $options['encrypt'] ) ) {
+			$password = ISX_Crypto::decrypt_string( (string) $job->get( 'encrypt_password_enc', '' ) );
+			if ( $password === '' ) {
+				return self::encrypt_failed( $job, $backup_path, __( 'Could not read the saved password', 'insightx-backup' ) );
+			}
+
+			$tmp    = $backup_path . '.enc';
+			$result = ISX_Crypto::encrypt_file( $password, $backup_path, $tmp );
+			if ( is_wp_error( $result ) ) {
+				// Falling through here used to hand back the *unencrypted*
+				// archive under the same name, with nothing in the UI to say the
+				// encryption the user explicitly asked for hadn't happened. A
+				// backup that is silently not encrypted is worse than no backup.
+				@unlink( $tmp );
+				return self::encrypt_failed( $job, $backup_path, $result->get_error_message() );
+			}
+
+			// rename() replaces the destination atomically on POSIX, so the
+			// plaintext original is never deleted ahead of a move that might
+			// fail. Windows won't overwrite, hence the unlink-then-retry.
+			if ( ! @rename( $tmp, $backup_path ) ) {
+				@unlink( $backup_path );
+				if ( ! @rename( $tmp, $backup_path ) ) {
+					@unlink( $tmp );
+					return self::encrypt_failed( $job, $backup_path, __( 'Could not move the encrypted file', 'insightx-backup' ) );
+				}
+			}
+			clearstatcache( true, $backup_path );
+		}
+
+		$size = $backup_path !== null ? filesize( $backup_path ) : 0;
+		$job->set( 'backup_name', $backup_name );
+		$job->set( 'archive_size', $size );
+
+		$provider = $job->get( 'to_storage', '' );
+		if ( $provider !== '' ) {
+			$job->set( 'step', 'upload' );
+			$job->set( 'progress', 97 );
+			$job->save();
+			return array( 'progress' => 97, 'done' => false, 'message' => __( 'Backup file created', 'insightx-backup' ) );
+		}
+
+		$job->finish( __( 'Export complete', 'insightx-backup' ) );
+
+		return array(
+			'progress' => 100,
+			'done'     => true,
+			'message'  => __( 'Export complete', 'insightx-backup' ),
+			'size'     => size_format( (int) $size ),
+			'backup'   => $backup_name,
+		);
+	}
+
+	/**
+	 * Number of times a single part may fail before the whole upload is
+	 * abandoned. Each retry costs one round-trip, not a blocking sleep, so the
+	 * worker is free in between — a flaky endpoint gets several chances without
+	 * a 260MB archive being thrown away over one dropped connection.
+	 */
+	const UPLOAD_MAX_RETRIES = 5;
+
+	/**
+	 * Push the finished archive to the configured Storage provider.
+	 *
+	 * Unlike every other step this one used to run to completion inside a single
+	 * request: one put_object() call that looped through every multipart part
+	 * back to back. On a big archive that meant one PHP request holding the job
+	 * lock for minutes — long enough for the stall watchdog to declare the job
+	 * wedged while it was still uploading, with the progress bar frozen because
+	 * nothing reported back until it was over, and with every poll/loopback/cron
+	 * tick piling onto the same PHP worker pool behind that lock.
+	 *
+	 * Now it behaves like database()/files(): send parts until the time budget
+	 * is spent, persist the cursor, return. The upload survives a killed worker
+	 * (it resumes at up_offset), reports real byte-level progress, and each
+	 * request stays short.
+	 */
+	private static function upload( ISX_Job $job ) {
+		$provider    = $job->get( 'to_storage', '' );
+		$backup_name = $job->get( 'backup_name', '' );
+		$backup      = ISX_Backups::path( $backup_name );
+
+		if ( $backup === null || ! ISX_Destinations::is_configured( $provider ) ) {
+			$message = __( 'This provider is not configured yet — the file has been kept in Backups', 'insightx-backup' );
+			$job->finish( $message, true );
+			return array(
+				'progress' => 100,
+				'done'     => true,
+				'error'    => true,
+				'message'  => $message,
+			);
+		}
+
+		$client = new ISX_S3_Client( ISX_Destinations::get( $provider ) );
+		$key    = ISX_Destinations::prefix( $provider ) . basename( $backup );
+		$total  = (int) filesize( $backup );
+
+		if ( $total <= ISX_S3_Client::part_size() ) {
+			$result = $client->put_object( $key, $backup );
+			return is_wp_error( $result )
+				? self::upload_failed( $job, $result->get_error_message() )
+				: self::upload_finished( $job, $backup_name );
+		}
+
+		$target = $client->resolve_target( $key );
+
+		$upload_id = (string) $job->get( 'up_id', '' );
+		if ( $upload_id === '' ) {
+			$upload_id = $client->multipart_initiate( $target['host'], $target['uri'] );
+			if ( is_wp_error( $upload_id ) ) {
+				return self::upload_failed( $job, $upload_id->get_error_message() );
+			}
+
+			$job->set( 'up_id', $upload_id );
+			$job->set( 'up_host', $target['host'] );
+			$job->set( 'up_uri', $target['uri'] );
+			$job->set( 'up_offset', 0 );
+			$job->set( 'up_total', $total );
+			$job->set( 'up_part_size', ISX_S3_Client::part_size_for( $total ) );
+			$job->set( 'up_parts', array() );
+			$job->set( 'up_retries', 0 );
+			$job->save();
+
+			// Also record it outside the job directory. The job's own state file
+			// is the fast path for aborting, but it disappears with the storage
+			// directory — changed path, reinstall, wiped disk — and then nothing
+			// knows the upload id any more. This registry lives in wp_options,
+			// so sweep_orphaned_uploads() can still release the upload the
+			// moment its job is gone, without waiting for an age cutoff.
+			self::register_pending_upload( $upload_id, $provider, $job->id(), $target['host'], $target['uri'] );
+
+			return array(
+				'progress' => 97,
+				'done'     => false,
+				'message'  => '',
+			);
+		}
+
+		$host      = (string) $job->get( 'up_host', $target['host'] );
+		$uri       = (string) $job->get( 'up_uri', $target['uri'] );
+		$offset    = (int) $job->get( 'up_offset', 0 );
+		$total     = max( 1, (int) $job->get( 'up_total', $total ) );
+		$parts     = (array) $job->get( 'up_parts', array() );
+		$part_size = max( 1, (int) $job->get( 'up_part_size', ISX_S3_Client::part_size_for( $total ) ) );
+		$deadline  = self::deadline();
+
+		while ( $offset < $total ) {
+			$length = (int) min( $part_size, $total - $offset );
+			$number = count( $parts ) + 1;
+
+			$etag = $client->multipart_upload_part( $host, $uri, $upload_id, $number, $backup, $offset, $length );
+
+			if ( is_wp_error( $etag ) ) {
+				$retries = (int) $job->get( 'up_retries', 0 ) + 1;
+				$job->set( 'up_retries', $retries );
+				$job->save();
+
+				if ( $retries > self::UPLOAD_MAX_RETRIES ) {
+					$client->multipart_abort( $host, $uri, $upload_id );
+					self::conclude_upload( $job, $upload_id );
+					return self::upload_failed( $job, $etag->get_error_message() );
+				}
+
+				ISX_Logger::log_error(
+					'export',
+					sprintf( __( 'Uploading part %d failed, retrying (%d/%d)', 'insightx-backup' ), $number, $retries, self::UPLOAD_MAX_RETRIES ),
+					array(
+						'job'    => $job->id(),
+						'part'   => $number,
+						'offset' => $offset,
+						'error'  => $etag->get_error_message(),
+					)
+				);
+
+				return array(
+					'progress' => 97 + 3 * ( $offset / $total ),
+					'done'     => false,
+					'message'  => sprintf( __( 'Retrying (%d/%d)', 'insightx-backup' ), $retries, self::UPLOAD_MAX_RETRIES ),
+				);
+			}
+
+			$parts[] = array(
+				'number' => $number,
+				'etag'   => $etag,
+			);
+			$offset += $length;
+
+			$job->set( 'up_parts', $parts );
+			$job->set( 'up_offset', $offset );
+			$job->set( 'up_retries', 0 );
+			$job->set( 'progress', 97 + 3 * ( $offset / $total ) );
+			$job->save();
+
+			// A single part can take far longer than the whole step budget on a
+			// slow link, so cancelling has to be checked per part, not just per
+			// step — otherwise the click waits out the current part before
+			// anything happens. run_step() releases the multipart upload.
+			if ( microtime( true ) >= $deadline || $job->is_cancel_requested() ) {
+				break;
+			}
+		}
+
+		if ( $offset < $total ) {
+			return array(
+				'progress' => 97 + 3 * ( $offset / $total ),
+				'done'     => false,
+				'message'  => '',
+			);
+		}
+
+		$result = $client->multipart_complete( $host, $uri, $upload_id, $parts );
+		if ( is_wp_error( $result ) ) {
+			$client->multipart_abort( $host, $uri, $upload_id );
+			self::conclude_upload( $job, $upload_id );
+			return self::upload_failed( $job, $result->get_error_message() );
+		}
+		self::conclude_upload( $job, $upload_id );
+
+		ISX_Logger::log_info(
+			's3',
+			__( 'Multipart upload completed', 'insightx-backup' ),
+			array(
+				'host'  => $host,
+				'parts' => count( $parts ),
+				'size'  => $total,
+			)
+		);
+
+		return self::upload_finished( $job, $backup_name );
+	}
+
+	/**
+	 * A write to the archive, the database dump, or the backups directory
+	 * failed — checked by every write on the export path (see ISX_Archive,
+	 * ISX_Database::dump_schema()/dump_rows(), ISX_Files::pack_batch(),
+	 * ISX_Backups::store()), all of which used to be trusted blindly. PHP
+	 * doesn't throw when fwrite()/rename()/copy() come up short on a full
+	 * disk — it just quietly writes less than asked, or nothing — so an
+	 * unchecked return here was the difference between "no backup" and a
+	 * truncated .wpress reported as "Export complete".
+	 *
+	 * @return array Step result.
+	 */
+	private static function write_failed( ISX_Job $job, $path = null ) {
+		$path = $path !== null ? $path : $job->archive();
+		$free = @disk_free_space( dirname( $path ) );
+
+		// Name the file and the space left, the way All-in-One WP Migration does
+		// ("Out of disk space. Could not write content to file. File: …"): on a
+		// shared host the path is what tells the user *which* mount filled up,
+		// and without it "disk full" sends people to check the wrong volume.
+		$message = __( 'Not enough disk space, could not write the file', 'insightx-backup' );
+		if ( $free !== false ) {
+			/* translators: %s: free disk space */
+			$message .= sprintf( __( ' (free: %s)', 'insightx-backup' ), size_format( (float) $free ) );
+		}
+		$message .= __( ' — file: ', 'insightx-backup' ) . $path;
+
+		$job->finish( $message, true );
+
+		ISX_Logger::log_error(
+			'export',
+			$message,
+			array(
+				'job'        => $job->id(),
+				'step'       => (string) $job->get( 'step', '' ),
+				'file'       => $path,
+				'free_space' => $free,
+			)
+		);
+
+		return array(
+			'progress' => 100,
+			'done'     => true,
+			'error'    => true,
+			'message'  => $message,
+		);
+	}
+
+	/**
+	 * Encryption was requested but couldn't be delivered. The half-made backup
+	 * is deleted rather than kept: it is plaintext, it sits in a directory whose
+	 * only protection on nginx is an unguessable filename, and leaving it would
+	 * mean the "Backups" list shows a file the user would reasonably assume
+	 * is encrypted.
+	 *
+	 * @param string $backup_path Plaintext archive to remove, or null.
+	 * @param string $reason      Already human-readable.
+	 * @return array Step result.
+	 */
+	private static function encrypt_failed( ISX_Job $job, $backup_path, $reason ) {
+		if ( $backup_path !== null ) {
+			@unlink( $backup_path );
+		}
+
+		/* translators: %s: error reason */
+		$message = sprintf( __( 'Backup encryption failed: %s — this backup has been discarded so no unencrypted file is left behind', 'insightx-backup' ), $reason );
+		$job->finish( $message, true );
+
+		ISX_Logger::log_error(
+			'export',
+			$message,
+			array(
+				'job'        => $job->id(),
+				'free_space' => @disk_free_space( dirname( (string) $backup_path ) ),
+			)
+		);
+
+		return array(
+			'progress' => 100,
+			'done'     => true,
+			'error'    => true,
+			'message'  => $message,
+		);
+	}
+
+	/**
+	 * This multipart upload is over — completed or abandoned — so drop every
+	 * record that could make something try to touch it again.
+	 *
+	 * Clearing the registry alone was not enough: the job's own state kept
+	 * up_id, and the stall watchdog and the cancel path both call
+	 * abort_pending_upload(), which reads exactly that. Aborting an upload that
+	 * already completed earns a 404 NoSuchUpload from S3 — which is how a
+	 * finished, successfully uploaded export could still surface
+	 * "HTTP 404: The specified multipart upload does not exist".
+	 *
+	 * @param string $upload_id
+	 * @return void
+	 */
+	private static function conclude_upload( ISX_Job $job, $upload_id ) {
+		self::forget_pending_upload( $upload_id );
+		$job->set( 'up_id', '' );
+		$job->save();
+	}
+
+	/**
+	 * @param string $message Reason, already human-readable.
+	 * @return array Step result.
+	 */
+	private static function upload_failed( ISX_Job $job, $message ) {
+		// Naming the local copy matters: finalize() stores the package in
+		// Backups *before* the upload step begins, so a failed upload never
+		// costs the export itself. Without saying so, the red error next to a
+		// backup that is sitting right there reads as a contradiction.
+		$backup  = (string) $job->get( 'backup_name', '' );
+		$message = __( 'Upload failed: ', 'insightx-backup' ) . $message;
+		if ( $backup !== '' ) {
+			/* translators: %s: backup file name */
+			$message .= sprintf( __( ' — the backup file was already created and is in the "Backups" menu (%s) — you can download it or send it to Storage again', 'insightx-backup' ), $backup );
+		}
+		$job->finish( $message, true );
+
+		return array(
+			'progress' => 100,
+			'done'     => true,
+			'error'    => true,
+			'message'  => $message,
+		);
+	}
+
+	/**
+	 * @return array Step result.
+	 */
+	private static function upload_finished( ISX_Job $job, $backup_name ) {
+		$message = __( 'Exported and uploaded to Storage successfully', 'insightx-backup' );
+		$job->finish( $message );
+
+		return array(
+			'progress' => 100,
+			'done'     => true,
+			'message'  => $message,
+			'backup'   => $backup_name,
+		);
+	}
+
+	// Registry of multipart uploads this site started, so one can still be
+	// released after its job directory is gone. Keyed by upload id.
+	const PENDING_OPTION = 'isx_pending_uploads';
+
+	// Age cutoff for uploads that are NOT in the registry — leftovers from
+	// before this bookkeeping existed, or from another site sharing the bucket
+	// folder. A pending multipart upload is also what an upload *in progress*
+	// looks like, and there is no way to tell a stranded one from a live one
+	// from the outside, so these need to be clearly stale before being touched.
+	// Uploads this site owns are released immediately instead, no cutoff.
+	const FOREIGN_UPLOAD_MAX_AGE = 12 * HOUR_IN_SECONDS;
+
+	/**
+	 * How recently-registered an upload of our own has to be before the sweep
+	 * will leave it alone despite not being able to confirm its job is alive.
+	 *
+	 * Only reachable when the job can't be read at all *and* its directory is
+	 * gone, so in practice this is the last guard before an irreversible abort.
+	 * Sized to sit well past a slow step rather than past a whole upload — a
+	 * live job rewrites its state every part, so it is never this quiet.
+	 *
+	 * @var int
+	 */
+	const PENDING_MIN_AGE = 15 * MINUTE_IN_SECONDS;
+
+	/**
+	 * @return void
+	 */
+	private static function register_pending_upload( $upload_id, $provider, $job_id, $host, $uri ) {
+		$pending = get_option( self::PENDING_OPTION, array() );
+		if ( ! is_array( $pending ) ) {
+			$pending = array();
+		}
+		$pending[ $upload_id ] = array(
+			'provider' => $provider,
+			'job'      => $job_id,
+			'host'     => $host,
+			'uri'      => $uri,
+			'started'  => time(),
+		);
+		update_option( self::PENDING_OPTION, $pending, false );
+	}
+
+	/**
+	 * @return void
+	 */
+	private static function forget_pending_upload( $upload_id ) {
+		$pending = get_option( self::PENDING_OPTION, array() );
+		if ( ! is_array( $pending ) || ! isset( $pending[ $upload_id ] ) ) {
+			return;
+		}
+		unset( $pending[ $upload_id ] );
+		update_option( self::PENDING_OPTION, $pending, false );
+	}
+
+	/**
+	 * Release every multipart upload that can no longer belong to a live job.
+	 *
+	 * Two passes, because "is this upload dead?" is answerable with certainty
+	 * only for uploads this site started:
+	 *
+	 *  1. Registry pass — an entry whose job is finished or gone cannot be
+	 *     uploading any more, so it is aborted right away. No listing call and
+	 *     no waiting: this is what makes a failed export stop costing storage
+	 *     within the same minute rather than a day later.
+	 *  2. Listing pass (only when $include_foreign) — anything the bucket
+	 *     reports under this destination's folder that the registry has never
+	 *     heard of: pre-upgrade leftovers, or another site writing to the same
+	 *     folder. Those get the age cutoff, since aborting one that is actually
+	 *     mid-upload elsewhere would break that site's export.
+	 *
+	 * @param bool       $include_foreign Also do the listing pass (one HTTP
+	 *                                    request per configured provider).
+	 * @param array|null $only_providers Restrict both passes to these provider
+	 *                                    slugs. Null (the default) means every
+	 *                                    configured provider, same as before
+	 *                                    this parameter existed.
+	 * @return array { aborted:int, errors: array<string,string> } errors maps
+	 *               provider slug => the listing-pass failure for it, e.g. an
+	 *               R2 API token missing multipart-list permission — silently
+	 *               skipping that provider used to mean its leftovers were
+	 *               never found by anything but a manual look at the bucket.
+	 */
+	public static function sweep_orphaned_uploads( $include_foreign = false, $only_providers = null ) {
+		$pending = get_option( self::PENDING_OPTION, array() );
+		$pending = is_array( $pending ) ? $pending : array();
+		$aborted = 0;
+		$known   = array();
+		$errors  = array();
+
+		foreach ( $pending as $upload_id => $entry ) {
+			$provider = isset( $entry['provider'] ) ? (string) $entry['provider'] : '';
+			$host     = isset( $entry['host'] ) ? (string) $entry['host'] : '';
+			$uri      = isset( $entry['uri'] ) ? (string) $entry['uri'] : '';
+
+			if ( is_array( $only_providers ) && ! in_array( $provider, $only_providers, true ) ) {
+				continue;
+			}
+
+			$known[ $upload_id ] = true;
+
+			if ( $host === '' || $uri === '' || ! ISX_Destinations::is_configured( $provider ) ) {
+				// Deliberately kept, not forgotten. Dropping the entry here used
+				// to discard the only record of an upload nobody had aborted —
+				// credentials rotated or a provider temporarily unreadable, and
+				// the upload became invisible to this pass forever, left billing
+				// against the bucket. Keeping it costs an option row; losing it
+				// costs storage indefinitely.
+				ISX_Logger::log_warn(
+					's3',
+					__( 'Found a stale upload that cannot be aborted right now (provider not configured or incomplete settings) — keeping it for the next run', 'insightx-backup' ),
+					array( 'provider' => $provider, 'upload_id' => $upload_id )
+				);
+				continue;
+			}
+
+			$job_id = isset( $entry['job'] ) ? (string) $entry['job'] : '';
+			$job    = $job_id !== '' ? ISX_Job::load( $job_id ) : null;
+
+			// Still being driven by a job that hasn't finished — leave it alone.
+			if ( $job !== null && $job->get( 'step' ) !== 'done' ) {
+				continue;
+			}
+
+			// A job that cannot be *loaded* is not the same as a job that is
+			// gone, and treating them alike is how this sweep used to kill live
+			// uploads: a state.json caught mid-write read back as null, the
+			// upload was aborted underneath a running export, and its next part
+			// came back "404 The specified multipart upload does not exist".
+			// save() is atomic now, but this runs on every admin request against
+			// something irreversible, so it asks the narrower question too.
+			if ( $job === null && $job_id !== '' && ISX_Job::exists( $job_id ) ) {
+				ISX_Logger::log_debug(
+					's3',
+					__( 'Skipped upload cleanup: cannot read the job state, but the job folder still exists', 'insightx-backup' ),
+					array( 'provider' => $provider, 'upload_id' => $upload_id, 'job' => $job_id )
+				);
+				continue;
+			}
+
+			// An entry with no job to check against is the one genuinely
+			// ambiguous case left — nothing to load, nothing to stat, so a live
+			// upload and a stranded one look identical. Give it a grace period
+			// rather than guessing: the cost of being wrong is asymmetric, a
+			// premature abort destroys hours of transfer while a late one bills
+			// a little storage. (A missing job *directory*, checked above, is
+			// positive proof and gets no such wait.)
+			$started = isset( $entry['started'] ) ? (int) $entry['started'] : 0;
+			if ( $job_id === '' && $started > 0 && ( time() - $started ) < self::PENDING_MIN_AGE ) {
+				continue;
+			}
+
+			$client = new ISX_S3_Client( ISX_Destinations::get( $provider ) );
+			$result = $client->multipart_abort( $host, $uri, $upload_id );
+
+			if ( is_wp_error( $result ) ) {
+				// Keep the entry so the next sweep retries it — the endpoint may
+				// simply have been unreachable this minute.
+				ISX_Logger::log_warn(
+					's3',
+					__( 'Stale upload cleanup failed: ', 'insightx-backup' ) . $result->get_error_message(),
+					array( 'provider' => $provider, 'upload_id' => $upload_id )
+				);
+				continue;
+			}
+
+			self::forget_pending_upload( $upload_id );
+			$aborted++;
+			ISX_Logger::log_info(
+				's3',
+				__( 'Cleaned up stale upload of a finished job', 'insightx-backup' ),
+				array( 'provider' => $provider, 'upload_id' => $upload_id )
+			);
+		}
+
+		if ( ! $include_foreign ) {
+			return array( 'aborted' => $aborted, 'errors' => $errors );
+		}
+
+		$max_age = (int) apply_filters( 'isx_foreign_upload_max_age', self::FOREIGN_UPLOAD_MAX_AGE );
+
+		foreach ( ISX_Destinations::providers() as $slug => $meta ) {
+			if ( ! ISX_Destinations::is_configured( $slug ) ) {
+				continue;
+			}
+			if ( is_array( $only_providers ) && ! in_array( $slug, $only_providers, true ) ) {
+				continue;
+			}
+			$client  = new ISX_S3_Client( ISX_Destinations::get( $slug ) );
+			$uploads = $client->list_multipart_uploads( ISX_Destinations::prefix( $slug ) );
+			if ( is_wp_error( $uploads ) ) {
+				// Skipping silently meant a provider whose ListMultipartUploads
+				// is broken or unpermitted would never have its leftovers swept,
+				// with nothing anywhere to say why — the bucket just kept
+				// accumulating. Say it out loud instead, and hand it back to the
+				// caller too: this is exactly how an R2 API token missing the
+				// multipart-list permission was found in the first place —
+				// buried in the log, indistinguishable from "nothing to sweep".
+				$errors[ $slug ] = $uploads->get_error_message();
+				ISX_Logger::log_warn(
+					's3',
+					__( 'Could not list stale uploads on Storage: ', 'insightx-backup' ) . $uploads->get_error_message(),
+					array( 'provider' => $slug )
+				);
+				continue;
+			}
+
+			foreach ( $uploads as $upload ) {
+				if ( isset( $known[ $upload['upload_id'] ] ) ) {
+					continue; // Handled by the registry pass above.
+				}
+				$started = strtotime( (string) $upload['initiated'] );
+				if ( $started === false || time() - $started < $max_age ) {
+					continue;
+				}
+
+				$target = $client->resolve_target( $upload['key'] );
+				$result = $client->multipart_abort( $target['host'], $target['uri'], $upload['upload_id'] );
+				if ( is_wp_error( $result ) ) {
+					continue;
+				}
+				$aborted++;
+				ISX_Logger::log_info(
+					's3',
+					__( 'Cleaned up orphaned stale upload', 'insightx-backup' ),
+					array( 'provider' => $slug, 'key' => $upload['key'] )
+				);
+			}
+		}
+
+		return array( 'aborted' => $aborted, 'errors' => $errors );
+	}
+
+	/**
+	 * Abort the multipart upload this job left pending on the bucket, if any.
+	 *
+	 * upload() only ever aborts from inside a request that still holds the
+	 * upload id in a local variable, so a job that dies any other way — stall
+	 * watchdog, cancelled by the user, worker killed mid-part — leaves parts
+	 * sitting in the bucket as an "ongoing multipart upload" that no object
+	 * browser can delete. The three paths that end a job from the outside call
+	 * this so those parts don't accumulate.
+	 *
+	 * @return bool Whether an upload was pending and is now aborted.
+	 */
+	public static function abort_pending_upload( ISX_Job $job ) {
+		$upload_id = (string) $job->get( 'up_id', '' );
+		$host      = (string) $job->get( 'up_host', '' );
+		$uri       = (string) $job->get( 'up_uri', '' );
+		$provider  = (string) $job->get( 'to_storage', '' );
+
+		if ( $upload_id === '' || $host === '' || $uri === '' ) {
+			return false; // Never reached multipart, or already aborted.
+		}
+		if ( ! ISX_Destinations::is_configured( $provider ) ) {
+			return false; // Credentials are gone; nothing can be signed.
+		}
+
+		// Drop the local record before the call, not after: this job is being
+		// ended either way, and a stale up_id would let a later tick try to
+		// resume or re-abort the same upload. If the abort itself fails the
+		// upload is still findable from the Storage settings cleanup screen,
+		// which lists what the bucket reports rather than what jobs remember.
+		$job->set( 'up_id', '' );
+		$job->save();
+
+		$client = new ISX_S3_Client( ISX_Destinations::get( $provider ) );
+		$result = $client->multipart_abort( $host, $uri, $upload_id );
+
+		if ( ! is_wp_error( $result ) ) {
+			self::forget_pending_upload( $upload_id );
+		}
+		// A failed abort keeps its registry entry on purpose: the next sweep
+		// retries it once the endpoint answers again.
+
+		$context = array(
+			'job'       => $job->id(),
+			'host'      => $host,
+			'upload_id' => $upload_id,
+		);
+
+		if ( is_wp_error( $result ) ) {
+			$context['error'] = $result->get_error_message();
+			ISX_Logger::log_warn( 's3', __( 'Could not abort the stale upload — you can clean it up from the Storage Settings page', 'insightx-backup' ), $context );
+			return false;
+		}
+
+		ISX_Logger::log_info( 's3', __( 'Aborted the stale upload on Storage', 'insightx-backup' ), $context );
+		return true;
+	}
+}

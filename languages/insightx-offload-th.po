@@ -44,7 +44,7 @@ msgstr "กำลังทดสอบ…"
 
 #: includes/class-isxm-admin.php:78
 msgid "Remove all files from the bucket?\n\nFiles missing from the server will be downloaded back before removal, but always keep a backup first"
-msgstr "ลบไฟล์ทั้งหมดออกจาก bucket?\n\nระบบจะดาวน์โหลดไฟล์ที่ไม่มีบนเซิร์ฟเวอร์กลับมาก่อนลบ แต่ควรมี backup ไว้ก่อนเสมอ"
+msgstr "ลบสื่อที่ปลั๊กอินจัดการบน Bucket หรือไม่?\n\nไฟล์ที่ไม่มีสำเนาบนเซิร์ฟเวอร์จะถูกดาวน์โหลดกลับก่อนลบ ควรสำรองข้อมูลก่อนดำเนินการ"
 
 #: includes/class-isxm-admin.php:79
 msgid "Working…"
@@ -60,15 +60,15 @@ msgstr "เกิดข้อผิดพลาด"
 
 #: includes/class-isxm-admin.php:82 includes/class-isxm-admin.php:796
 msgid "Stop"
-msgstr "หยุด"
+msgstr "หยุดพัก"
 
 #: includes/class-isxm-admin.php:83
 msgid "Stopping…"
-msgstr "กำลังหยุด…"
+msgstr "กำลังหยุดพัก…"
 
 #: includes/class-isxm-admin.php:84
 msgid "Stopped"
-msgstr "หยุดแล้ว"
+msgstr "หยุดพักแล้ว"
 
 #: includes/class-isxm-admin.php:85 includes/class-isxm-admin.php:797
 msgid "Cancel"
@@ -80,17 +80,17 @@ msgstr "กำลังยกเลิก…"
 
 #: includes/class-isxm-admin.php:89
 msgid "Cancel this job?\n\nWork already done stays intact, but the saved checkpoint is deleted — the next run will scan from the beginning"
-msgstr "ยกเลิกงานนี้?\n\nงานที่ทำไปแล้วยังอยู่ครบ แต่จุดที่ค้างไว้จะถูกลบ — เริ่มใหม่ครั้งหน้าจะไล่หาตั้งแต่ต้น"
+msgstr "ยกเลิกงานนี้หรือไม่?\n\nไฟล์ที่ทำเสร็จแล้วจะยังอยู่ แต่ระบบจะลบจุดที่บันทึกไว้สำหรับทำต่อ หากเริ่มงานใหม่จะสแกนตั้งแต่ต้น"
 
 #: includes/class-isxm-admin.php:93
 msgid "Stalled — waiting for a worker"
-msgstr "สะดุด — กำลังรอตัวประมวลผลงาน"
+msgstr "งานยังไม่คืบหน้า กำลังรอระบบทำต่อ"
 
 msgid "Stalled — waiting for the current worker lease"
-msgstr "สะดุด — กำลังรอตัวประมวลผลเดิมปล่อยสิทธิ์ทำงาน"
+msgstr "กำลังรอให้รอบประมวลผลปัจจุบันสิ้นสุด"
 
 msgid "Stalled — restart request sent"
-msgstr "สะดุด — ส่งคำขอเริ่มทำต่อแล้ว"
+msgstr "ส่งคำขอให้ระบบทำงานต่อแล้ว"
 
 #: includes/class-isxm-admin.php:94
 msgid "Resume"
@@ -110,15 +110,15 @@ msgstr "การเชื่อมต่อขาดหลายครั้ง
 
 #: includes/class-isxm-admin.php:100
 msgid "Counting files in the source bucket…"
-msgstr "กำลังนับไฟล์ใน source bucket…"
+msgstr "กำลังนับไฟล์ใน Bucket ต้นทาง…"
 
 #: includes/class-isxm-admin.php:106
 msgid "Building attachment index…"
-msgstr "กำลังสร้างดัชนีไฟล์แนบ…"
+msgstr "กำลังเตรียมรายการสื่อสำหรับย้ายไฟล์…"
 
 #: includes/class-isxm-admin.php:107
 msgid "Finalizing migration…"
-msgstr "กำลังปิดงานย้ายไฟล์…"
+msgstr "กำลังดำเนินการขั้นตอนสุดท้ายของการย้าย…"
 
 #: includes/class-isxm-admin.php:108
 msgid "Writing URLs to the database…"
@@ -126,15 +126,15 @@ msgstr "กำลังเขียน URL ลงฐานข้อมูล…"
 
 #: includes/class-isxm-admin.php:105
 msgid "This site cannot call itself — keep this page open until the job finishes"
-msgstr "เว็บนี้เรียกตัวเองไม่ได้ — เปิดหน้านี้ทิ้งไว้จนกว่างานจะเสร็จ"
+msgstr "ระบบยังทำงานต่อในเบื้องหลังไม่ได้ กรุณาเปิดหน้านี้ไว้จนกว่างานจะเสร็จ"
 
 #: includes/class-isxm-admin.php:106
 msgid "Session expired or logged out — refresh this page and try again (all work so far is saved)"
-msgstr "เซสชันหมดอายุหรือถูก logout — refresh หน้านี้แล้วลองใหม่ (งานที่ทำไปแล้วถูกบันทึกครบ)"
+msgstr "การเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบและโหลดหน้านี้ใหม่ งานที่ทำไปแล้วถูกบันทึกไว้"
 
 #: includes/class-isxm-admin.php:107
 msgid "This provider is not configured yet — set it up in the “Connections” tab"
-msgstr "ยังไม่ได้ตั้งค่า provider นี้ — ไปตั้งค่าที่แท็บ “การเชื่อมต่อ”"
+msgstr "ยังไม่ได้ตั้งค่าผู้ให้บริการนี้ ไปที่แท็บ “การเชื่อมต่อ” เพื่อกรอกข้อมูลก่อน"
 
 #: includes/class-isxm-admin.php:108 includes/class-isxm-admin.php:613
 msgid "Connected successfully"
@@ -276,70 +276,70 @@ msgstr "%s วินาที"
 #: includes/class-isxm-admin.php:138
 #, php-format
 msgid "%s items with stale meta"
-msgstr "พบ meta ค้าง %s รายการ"
+msgstr "ข้อมูลติดตามไม่ตรงกับไฟล์บน Bucket %s รายการ"
 
 #: includes/class-isxm-admin.php:139
 #, php-format
 msgid "of which %s are missing everywhere (see the red badge on the Media page)"
-msgstr "ในนั้น %s รายการไฟล์หายทั้งสองที่ (ดู badge แดงในหน้าสื่อ)"
+msgstr "ในจำนวนนี้ ไม่พบไฟล์ทั้งบนเซิร์ฟเวอร์และ Bucket %s รายการ ดูป้ายสีแดงในหน้าสื่อ"
 
 #: includes/class-isxm-admin.php:140
 #, php-format
 msgid "%s items missing everywhere (see the red badge on the Media page)"
-msgstr "%s รายการไฟล์หายทั้งสองที่ (ดู badge แดงในหน้าสื่อ)"
+msgstr "ไม่พบไฟล์ทั้งบนเซิร์ฟเวอร์และ Bucket %s รายการ ดูป้ายสีแดงในหน้าสื่อ"
 
 #: includes/class-isxm-admin.php:141
 #, php-format
 msgid "%s items with missing sizes"
-msgstr "ขึ้นไม่ครบทุกขนาด %s รายการ"
+msgstr "มีรูปขนาดย่อยบน Bucket ไม่ครบ %s รายการ"
 
 #: includes/class-isxm-admin.php:142
 #, php-format
 msgid "%s objects with no matching media"
-msgstr "object ไม่มี media ตรงกัน %s ไฟล์"
+msgstr "ไฟล์บน Bucket ที่ไม่พบสื่ออ้างอิงในเว็บนี้ %s ไฟล์"
 
 #: includes/class-isxm-admin.php:143
 #, php-format
 msgid "%s objects outside the prefix (left alone)"
-msgstr "object นอก prefix %s ไฟล์ (ไม่แตะ)"
+msgstr "ไฟล์นอก Prefix ที่เลือก %s ไฟล์ (ไม่ดำเนินการ)"
 
 #: includes/class-isxm-admin.php:144
 #, php-format
 msgid "Clear stale meta (%s)"
-msgstr "ล้าง meta ค้าง (%s)"
+msgstr "ล้างข้อมูลติดตามที่ไม่ตรง (%s)"
 
 #: includes/class-isxm-admin.php:145 includes/class-isxm-admin.php:878
 msgid "Clear stale meta"
-msgstr "ล้าง meta ค้าง"
+msgstr "ล้างข้อมูลติดตามที่ไม่ตรง"
 
 #: includes/class-isxm-admin.php:146
 #, php-format
 msgid "Delete orphan objects (%s)"
-msgstr "ลบ orphan objects (%s)"
+msgstr "ลบไฟล์ที่ไม่มีสื่ออ้างอิง (%s)"
 
 #: includes/class-isxm-admin.php:147 includes/class-isxm-admin.php:880
 msgid "Delete orphan objects"
-msgstr "ลบ orphan objects"
+msgstr "ลบไฟล์ที่ไม่มีสื่ออ้างอิง"
 
 #: includes/class-isxm-admin.php:148 includes/class-isxm-admin.php:857 includes/class-isxm-admin.php:863
 msgid "Sync with bucket"
-msgstr "ซิงก์ให้ตรงกับ bucket"
+msgstr "ตรวจสอบไฟล์กับ Bucket"
 
 #: includes/class-isxm-admin.php:149
 msgid "Sync failed"
-msgstr "ซิงก์ไม่สำเร็จ"
+msgstr "ตรวจสอบไฟล์ไม่สำเร็จ"
 
 #: includes/class-isxm-admin.php:150
 msgid "Syncing…"
-msgstr "กำลังซิงก์…"
+msgstr "กำลังตรวจสอบข้อมูลไฟล์…"
 
 #: includes/class-isxm-admin.php:151
 msgid "Checking against the bucket…"
-msgstr "กำลังตรวจกับ bucket…"
+msgstr "กำลังตรวจสอบไฟล์จริงบน Bucket…"
 
 #: includes/class-isxm-admin.php:152
 msgid "Syncing with the real bucket…"
-msgstr "กำลังซิงก์กับ bucket จริง…"
+msgstr "กำลังเทียบข้อมูลกับไฟล์จริงบน Bucket…"
 
 #: includes/class-isxm-admin.php:153
 msgid "Clearing…"
@@ -348,11 +348,11 @@ msgstr "กำลังล้าง…"
 #: includes/class-isxm-admin.php:154
 #, php-format
 msgid "Cleared stale meta for %s items — click “Start Offload” to upload them again"
-msgstr "ล้าง meta ค้างเรียบร้อย %s รายการ — กด “เริ่ม Offload” เพื่ออัปโหลดขึ้นใหม่"
+msgstr "ล้างข้อมูลติดตามแล้ว %s รายการ กด “เริ่ม Offload” เพื่ออัปโหลดไฟล์เหล่านี้อีกครั้ง"
 
 #: includes/class-isxm-admin.php:155
 msgid "Delete all orphan objects from the bucket?\n\nEvery object under the current prefix that no media on THIS site uses will be deleted — including files another site keeps under the same prefix in this bucket (e.g. a staging copy). Objects outside the prefix are left alone. Always keep a backup first"
-msgstr "ลบ orphan objects ทั้งหมดออกจาก bucket?\n\nทุก object ใต้ prefix ปัจจุบันที่ไม่มี media ของเว็บนี้ใช้อยู่จะถูกลบ — รวมถึงไฟล์ของเว็บอื่นที่เก็บไว้ใต้ prefix เดียวกันใน bucket นี้ (เช่นเว็บ staging ที่ clone มา) ส่วน object นอก prefix จะไม่ถูกแตะ ควรมี backup ก่อนเสมอ"
+msgstr "ลบไฟล์บน Bucket ที่ไม่มีสื่อของเว็บนี้อ้างอิงหรือไม่?\n\nจะลบทุกไฟล์ภายใต้ Prefix ปัจจุบันที่ไม่พบในสื่อของเว็บนี้ รวมถึงไฟล์ของเว็บอื่นที่ใช้ Prefix เดียวกันด้วย ไฟล์นอก Prefix จะไม่ถูกลบ ควรสำรองข้อมูลก่อนดำเนินการ"
 
 #: includes/class-isxm-admin.php:156
 msgid "Deleting…"
@@ -360,24 +360,24 @@ msgstr "กำลังลบ…"
 
 #: includes/class-isxm-admin.php:157
 msgid "Listing and deleting orphans…"
-msgstr "กำลังลิสต์และลบ orphan…"
+msgstr "กำลังค้นหาและลบไฟล์ที่ไม่มีสื่ออ้างอิง…"
 
 #: includes/class-isxm-admin.php:158
 #, php-format
 msgid "Deleted %s orphan objects — the bucket is clean"
-msgstr "ลบ orphan objects เรียบร้อย %s ไฟล์ — bucket สะอาดแล้ว"
+msgstr "ลบไฟล์ที่ไม่มีสื่ออ้างอิงแล้ว %s ไฟล์"
 
 #: includes/class-isxm-admin.php:181
 msgid "Media delivery cannot be tested until storage connects successfully — see the \"File Storage Settings\" section on the left"
-msgstr "ไม่สามารถทดสอบการเสิร์ฟ media ได้จนกว่าจะเชื่อมต่อ storage สำเร็จ — ดูหัวข้อ \"การตั้งค่าจัดเก็บไฟล์\" ด้านซ้าย"
+msgstr "ต้องเชื่อมต่อ Storage ให้สำเร็จก่อนทดสอบการแสดงไฟล์ ตรวจการ์ด “ตั้งค่าจัดเก็บไฟล์”"
 
 #: includes/class-isxm-admin.php:194
 msgid "Media and server folders on cloud storage, with CDN delivery, File Manager and PDF compression"
-msgstr "จัดเก็บสื่อและโฟลเดอร์บนคลาวด์ พร้อมเสิร์ฟผ่าน CDN จัดการไฟล์ และย่อ PDF"
+msgstr "ส่งสื่อและไฟล์ขึ้นคลาวด์ แสดงไฟล์ผ่าน CDN พร้อมจัดการไฟล์และลดขนาด PDF"
 
 #: includes/class-isxm-admin.php:206
 msgid "Offload Status"
-msgstr "สถานะ Offload"
+msgstr "สถานะการส่งไฟล์ขึ้น Storage"
 
 #: includes/class-isxm-admin.php:209
 msgid "Refresh"
@@ -389,21 +389,21 @@ msgstr "แหล่งที่มา"
 
 #: includes/class-isxm-admin.php:214
 msgid "Offloaded"
-msgstr "Offloaded"
+msgstr "ส่งขึ้นแล้ว"
 
 #: includes/class-isxm-admin.php:214
 msgid "Remaining"
-msgstr "เหลือ"
+msgstr "ยังไม่ส่งขึ้น"
 
 #: includes/class-isxm-admin.php:225
 #, php-format
 msgid "Offload Remaining %s items"
-msgstr "Offload ที่เหลือ %s รายการ"
+msgstr "ส่งไฟล์ที่เหลือขึ้น Storage (%s รายการ)"
 
 #: includes/class-isxm-admin.php:227
 #, php-format
 msgid "Total %1$s items · %2$s on the bucket"
-msgstr "รวม %1$s รายการ · ขึ้น bucket แล้ว %2$s"
+msgstr "ทั้งหมด %1$s รายการ · อยู่บน Bucket แล้ว %2$s รายการ"
 
 #: includes/class-isxm-admin.php:233
 msgid "Media"
@@ -431,47 +431,47 @@ msgstr "ช่วยเหลือ"
 
 #: includes/class-isxm-admin.php:255
 msgid "File Storage Settings"
-msgstr "การตั้งค่าจัดเก็บไฟล์"
+msgstr "ตั้งค่าจัดเก็บไฟล์"
 
 #: includes/class-isxm-admin.php:269
 msgid "Choose a storage provider"
-msgstr "เลือก Storage Provider"
+msgstr "เลือกผู้ให้บริการ Storage"
 
 #: includes/class-isxm-admin.php:284
 msgid "Copy media files to storage automatically after upload"
-msgstr "คัดลอกไฟล์ media ขึ้น storage อัตโนมัติหลังอัปโหลด"
+msgstr "ส่งสำเนาสื่อขึ้น Storage อัตโนมัติเมื่ออัปโหลดเข้าสู่เว็บไซต์"
 
 #: includes/class-isxm-admin.php:285
 msgid "Delete the server copy once a file is confirmed in the bucket, to save disk space. Files are only deleted while “Write permanent URLs to the database” or “Deliver Offloaded Media” is on. Note: image editing plugins need the server copy"
-msgstr "ลบไฟล์บนเซิร์ฟเวอร์เมื่อยืนยันแล้วว่าไฟล์อยู่ใน bucket เพื่อประหยัดพื้นที่ ระบบจะลบเฉพาะเมื่อเปิด “เขียน URL ถาวรลงฐานข้อมูล” หรือ “Deliver Offloaded Media” ไว้ หมายเหตุ: ปลั๊กอินแก้ไขรูปภาพต้องใช้ไฟล์บนเซิร์ฟเวอร์"
+msgstr "ลบสำเนาบนเซิร์ฟเวอร์หลังตรวจว่ามีไฟล์บน Bucket แล้ว ต้องเปิด “บันทึก URL ถาวรในฐานข้อมูล” หรือ “แสดงสื่อจาก Storage/CDN” ด้วย หากใช้ปลั๊กอินแก้ไขภาพ ควรเก็บสำเนาบนเซิร์ฟเวอร์ไว้"
 
 #: includes/class-isxm-admin.php:286
 msgid "Disable intermediate image sizes"
-msgstr "ไม่สร้างรูปขนาดย่อ"
+msgstr "ไม่สร้างรูปขนาดย่อย"
 
 #: includes/class-isxm-admin.php:286
 msgid "Stop WordPress from generating resized copies, so each upload is a single file in the bucket. Responsive images (srcset) are no longer available. Suitable for headless sites that resize images themselves. Applies to new uploads only"
-msgstr "ปิดการสร้างรูปขนาดย่อของ WordPress อัปโหลดหนึ่งครั้งจะได้ไฟล์เดียวบน bucket แต่จะไม่มี srcset สำหรับรูปแบบ responsive เหมาะกับเว็บแบบ headless ที่ย่อรูปเอง มีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
+msgstr "หยุดสร้างรูปหลายขนาดสำหรับการอัปโหลดใหม่ รูปเดิมไม่เปลี่ยนแปลง แต่รูปใหม่จะไม่มีชุดขนาดสำหรับแสดงตามหน้าจอ (srcset) เหมาะกับเว็บที่มีระบบปรับขนาดรูปเอง"
 
 #: includes/class-isxm-admin.php:287
 msgid "Write permanent URLs to the database"
-msgstr "เขียน URL ถาวรลงฐานข้อมูล"
+msgstr "บันทึก URL ถาวรในฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:287
 msgid "Replace old media URLs stored in the database with bucket URLs. Offload and Migrate do this once at the end of each run"
-msgstr "แทนที่ URL ของไฟล์เดิมในฐานข้อมูลด้วย URL บน bucket โดย Offload และ Migrate จะดำเนินการครั้งเดียวเมื่องานเสร็จ"
+msgstr "เปลี่ยนลิงก์สื่อที่บันทึกในฐานข้อมูลให้ใช้ URL จาก Bucket โดยงาน Offload และย้ายข้อมูลจะเปลี่ยนลิงก์ในขั้นตอนสุดท้าย"
 
 #: includes/class-isxm-admin.php:288
 msgid "Group this site's files under a prefix in the bucket"
-msgstr "จัดกลุ่มไฟล์ของเว็บนี้ด้วย prefix ใน bucket"
+msgstr "เก็บไฟล์ของเว็บนี้ใต้เส้นทางนำหน้า (Prefix) บน Bucket ช่วยแยกไฟล์เมื่อใช้ Bucket ร่วมกันหลายเว็บ"
 
 #: includes/class-isxm-admin.php:292
 msgid "Add the upload year/month to the path for extra organization"
-msgstr "ใส่ปี/เดือนที่อัปโหลดใน path เพื่อจัดระเบียบอีกชั้น"
+msgstr "แยกไฟล์ตามปีและเดือนที่อัปโหลด เช่น 2026/10/ เพื่อจัดระเบียบไฟล์"
 
 #: includes/class-isxm-admin.php:293
 msgid "Add a version number to the path so the CDN always serves the latest file"
-msgstr "ใส่เลข version ใน path เพื่อให้ CDN เสิร์ฟไฟล์เวอร์ชันล่าสุดเสมอ"
+msgstr "เพิ่มเลขเวอร์ชันในเส้นทางไฟล์ เพื่อให้ URL ใหม่แยกจากไฟล์เก่าที่ CDN เก็บไว้"
 
 #: includes/class-isxm-admin.php:302
 msgid "Folder Structure"
@@ -479,7 +479,7 @@ msgstr "โครงสร้างโฟลเดอร์"
 
 #: includes/class-isxm-admin.php:303
 msgid "Group files in the bucket by content type"
-msgstr "จัดกลุ่มไฟล์บน bucket แยกตามประเภทเนื้อหา"
+msgstr "แยกไฟล์บน Bucket ตามประเภทเนื้อหาที่อ้างอิงไฟล์นั้น"
 
 #: includes/class-isxm-admin.php:308
 msgid "Folders by content type"
@@ -487,59 +487,59 @@ msgstr "แยกโฟลเดอร์ตามประเภทเนื้
 
 #: includes/class-isxm-admin.php:308
 msgid "Bucket folder name for each content type. Changes apply to new uploads only"
-msgstr "ชื่อโฟลเดอร์บน bucket แยกตามประเภทเนื้อหา การเปลี่ยนแปลงมีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
+msgstr "กำหนดชื่อโฟลเดอร์บน Bucket สำหรับแต่ละประเภทเนื้อหา ค่าที่เปลี่ยนมีผลกับไฟล์ที่อัปโหลดใหม่เท่านั้น"
 
 #: includes/class-isxm-admin.php:319
 msgid "Matching files skip Year & Month and Object Version, giving short paths such as <code>products/product-name/file.jpg</code>. For the shortest paths, also turn off Prefix under “File Storage Settings”"
-msgstr "ไฟล์ที่เข้าเงื่อนไขจะไม่ใช้ Year & Month และ Object Version ทำให้ได้ path สั้น เช่น <code>products/ชื่อสินค้า/ไฟล์.jpg</code> หากต้องการ path สั้นที่สุด ให้ปิด Prefix ใน “การตั้งค่าจัดเก็บไฟล์” ด้วย"
+msgstr "ไฟล์ที่ตรงกับประเภทเนื้อหาจะไม่ใช้โฟลเดอร์ปี/เดือนและเลขเวอร์ชัน เช่น <code>products/product-name/file.jpg</code> หากต้องการเส้นทางสั้นลงอีก ให้ปิด Prefix ใน “ตั้งค่าจัดเก็บไฟล์”"
 
 #: includes/class-isxm-admin.php:320
 msgid "Files not linked to a product, post or category keep Year & Month and Object Version"
-msgstr "ไฟล์ที่ไม่ได้ผูกกับสินค้า บทความ หรือหมวดหมู่ ยังคงใช้ Year & Month และ Object Version ตามเดิม"
+msgstr "ไฟล์ที่ไม่ได้ผูกกับสินค้า บทความ หรือหมวดหมู่ จะยังใช้ปี/เดือนและเลขเวอร์ชันตามที่ตั้งไว้"
 
 #: includes/class-isxm-admin.php:321
 msgid "Caution: without Year & Month and Object Version, two files with the same name under the same product overwrite each other"
-msgstr "ข้อควรระวัง: เมื่อไม่ใช้ Year & Month และ Object Version ไฟล์ชื่อเดียวกันภายใต้สินค้าเดียวกันจะเขียนทับกัน"
+msgstr "เมื่อไม่ใช้ปี/เดือนและเลขเวอร์ชัน ไฟล์ชื่อซ้ำภายใต้สินค้าเดียวกันจะเขียนทับกัน"
 
 #: includes/class-isxm-admin.php:331
 msgid "Delivery"
-msgstr "การเสิร์ฟไฟล์ (Delivery)"
+msgstr "ตั้งค่าการแสดงไฟล์"
 
 #: includes/class-isxm-admin.php:332
 msgid "(no bucket set)"
-msgstr "(ยังไม่ตั้ง bucket)"
+msgstr "(ยังไม่ได้ระบุ Bucket)"
 
 #: includes/class-isxm-admin.php:340
 msgid "Rewrite URLs of offloaded media to point at storage/CDN"
-msgstr "rewrite URL ของ media ที่ offload แล้วให้ชี้ไปที่ storage/CDN"
+msgstr "ให้หน้าเว็บโหลดสื่อที่ส่งขึ้นแล้วจาก Storage หรือ CDN แทนไฟล์บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php:341
 msgid "Always use https for every rewritten URL"
-msgstr "ใช้ https กับทุก URL ที่ rewrite เสมอ"
+msgstr "ใช้ HTTPS กับลิงก์สื่อที่ปลั๊กอินเปลี่ยนทั้งหมด โดเมนที่ใช้ต้องรองรับ HTTPS"
 
 #: includes/class-isxm-admin.php:345
 msgid "Enter the CDN domain if one already points at the bucket. Leave empty to use the bucket URL"
-msgstr "ระบุโดเมน CDN หากมี CDN ชี้ไปที่ bucket อยู่แล้ว เว้นว่างไว้เพื่อใช้ URL ของ bucket"
+msgstr "ใส่โดเมน CDN ที่เชื่อมกับ Bucket แล้ว เช่น cdn.example.com เว้นว่างเพื่อใช้ URL ของ Bucket"
 
 #: includes/class-isxm-admin.php:365
 msgid "Serve theme and plugin CSS / JS through a CDN"
-msgstr "เสิร์ฟไฟล์ CSS / JS ของธีมและปลั๊กอินผ่าน CDN"
+msgstr "ให้เว็บไซต์โหลด CSS และ JavaScript ของธีมและปลั๊กอินผ่าน CDN"
 
 #: includes/class-isxm-admin.php:370
 msgid "Serve theme and plugin CSS/JS files from the CDN domain"
-msgstr "ให้ไฟล์ CSS/JS ของธีมและปลั๊กอินโหลดผ่านโดเมน CDN"
+msgstr "เปลี่ยนลิงก์ CSS และ JavaScript ให้ใช้โดเมน CDN โดยไฟล์ยังอยู่บนเซิร์ฟเวอร์เดิม"
 
 #: includes/class-isxm-admin.php:371
 msgid "Always use https for every rewritten asset URL"
-msgstr "ใช้ https กับทุก URL ของ asset ที่ rewrite เสมอ"
+msgstr "ใช้ HTTPS กับลิงก์ CSS และ JavaScript ที่ปลั๊กอินเปลี่ยนทั้งหมด"
 
 #: includes/class-isxm-admin.php:375
 msgid "Requires a CDN that uses this site as its origin (e.g. CloudFront). Fonts and images referenced inside CSS are still served from this site"
-msgstr "ต้องใช้ CDN ที่ดึงไฟล์จากเว็บนี้ (origin) เช่น CloudFront ส่วนฟอนต์และรูปที่อ้างอิงในไฟล์ CSS ยังโหลดจากเว็บนี้ตามปกติ"
+msgstr "CDN ต้องตั้งต้นทางเป็นเว็บไซต์นี้ เช่น CloudFront ฟอนต์และรูปที่อ้างอิงภายใน CSS ยังโหลดจากเว็บไซต์ตามเดิม"
 
 #: includes/class-isxm-admin.php:377
 msgid "Sample asset URLs after rewrite (live preview):"
-msgstr "ตัวอย่าง URL ของ asset หลัง rewrite (อัปเดตสด):"
+msgstr "ตัวอย่าง URL ของ CSS/JS ตามการตั้งค่าปัจจุบัน:"
 
 #: includes/class-isxm-admin.php:395
 msgid "Offload remaining media"
@@ -555,11 +555,11 @@ msgstr "เริ่ม Offload"
 
 #: includes/class-isxm-admin.php:406
 msgid "Retry failed offloads"
-msgstr "ลองใหม่เฉพาะที่ Offload ไม่ผ่าน"
+msgstr "ส่งไฟล์ที่อัปโหลดไม่สำเร็จอีกครั้ง"
 
 #: includes/class-isxm-admin.php:407
 msgid "Upload again only the files that failed last time. Review them with the “Offload failed” filter on the Media page"
-msgstr "อัปโหลดซ้ำเฉพาะไฟล์ที่ไม่สำเร็จในครั้งก่อน ดูรายการได้จากตัวกรอง “Offload ไม่ผ่าน” ในหน้าสื่อ"
+msgstr "ลองอัปโหลดอีกครั้งเฉพาะรายการที่ไม่สำเร็จ ดูรายการได้ที่หน้าสื่อ โดยเลือกตัวกรอง “Offload ไม่สำเร็จ”"
 
 #: includes/class-isxm-admin.php:408
 msgid "Retry"
@@ -567,23 +567,23 @@ msgstr "ลองใหม่"
 
 #: includes/class-isxm-admin.php:412 includes/class-isxm-tools.php:980
 msgid "Download files back from the bucket"
-msgstr "ดาวน์โหลดไฟล์กลับจาก bucket"
+msgstr "ดาวน์โหลดไฟล์กลับมาไว้บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php:412
 msgid "Download files back to the server, for example after “Remove Local Media” has deleted them"
-msgstr "ดาวน์โหลดไฟล์กลับมาที่เซิร์ฟเวอร์ เช่น หลังจาก “Remove Local Media” ลบไฟล์ไปแล้ว"
+msgstr "ดาวน์โหลดสื่อจาก Bucket กลับมาไว้บนเซิร์ฟเวอร์ ใช้เมื่อต้องการสำเนาในเครื่องคืนหลังเปิด “ลบสำเนาบนเซิร์ฟเวอร์”"
 
 #: includes/class-isxm-admin.php:412
 msgid "Download Files"
-msgstr "ดาวน์โหลดไฟล์"
+msgstr "ดาวน์โหลดกลับเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php:413
 msgid "Remove all files from the bucket"
-msgstr "ลบไฟล์ทั้งหมดออกจาก bucket"
+msgstr "ลบสื่อที่ปลั๊กอินจัดการบน Bucket"
 
 #: includes/class-isxm-admin.php:413
 msgid "Delete all media files from the bucket. Files missing from the server are downloaded first"
-msgstr "ลบไฟล์ media ทั้งหมดออกจาก bucket โดยไฟล์ที่ไม่มีบนเซิร์ฟเวอร์จะถูกดาวน์โหลดกลับมาก่อน"
+msgstr "ลบสื่อบน Bucket ที่ปลั๊กอินติดตาม หากไม่มีสำเนาบนเซิร์ฟเวอร์ ระบบจะดาวน์โหลดกลับก่อนลบ"
 
 #: includes/class-isxm-admin.php:413
 msgid "Remove from Bucket"
@@ -591,11 +591,11 @@ msgstr "ลบออกจาก Bucket"
 
 #: includes/class-isxm-admin.php:415
 msgid "Check and update WooCommerce downloadable products"
-msgstr "ตรวจสอบและอัปเดต WooCommerce Downloadable Products"
+msgstr "ตรวจไฟล์สินค้าดาวน์โหลด WooCommerce"
 
 #: includes/class-isxm-admin.php:415
 msgid "Make downloadable product files private in the bucket and update their URLs"
-msgstr "ตั้งค่าไฟล์ของสินค้าแบบดาวน์โหลดให้เป็น private ใน bucket และอัปเดต URL"
+msgstr "ตั้งไฟล์สินค้าดาวน์โหลดบน Bucket เป็นส่วนตัว และอัปเดตลิงก์ดาวน์โหลดของสินค้า"
 
 #: includes/class-isxm-admin.php:415
 msgid "Check and Update"
@@ -603,31 +603,31 @@ msgstr "ตรวจสอบและอัปเดต"
 
 #: includes/class-isxm-admin.php:427
 msgid "Choose Providers to Migrate"
-msgstr "เลือก Provider สำหรับ Migrate"
+msgstr "เลือก Storage ต้นทางและปลายทาง"
 
 #: includes/class-isxm-admin.php:429
 msgid "Choose the provider to copy from (left) and to (right), from the connections set up in the “Connections” tab. Files are <strong>copied only — the source is never modified</strong>"
-msgstr "เลือก provider ต้นทาง (ซ้าย) และปลายทาง (ขวา) จาก connection ในแท็บ “การเชื่อมต่อ” ระบบจะ<strong>คัดลอกเท่านั้น ไม่แก้ไขไฟล์ต้นทาง</strong>"
+msgstr "เลือกต้นทางและปลายทางที่ตั้งค่าไว้ในแท็บ “การเชื่อมต่อ” ระบบจะ<strong>คัดลอกไฟล์ โดยไม่แก้ไขหรือลบไฟล์ต้นทาง</strong>"
 
 #: includes/class-isxm-admin.php:432
 msgid "From (Source)"
-msgstr "จาก (Source)"
+msgstr "ต้นทาง"
 
 #: includes/class-isxm-admin.php:439
 msgid "To (Destination)"
-msgstr "ไป (ปลายทาง)"
+msgstr "ปลายทาง"
 
 #: includes/class-isxm-admin.php:447
 msgid "Source Path Structure"
-msgstr "โครงสร้าง Path บน Source"
+msgstr "โฟลเดอร์และเส้นทางไฟล์ต้นทาง"
 
 #: includes/class-isxm-admin.php:449
 msgid "Choose the folders on the source bucket to migrate"
-msgstr "เลือกโฟลเดอร์บน source bucket ที่ต้องการย้าย"
+msgstr "เลือกโฟลเดอร์บน Bucket ต้นทางที่ต้องการคัดลอกไปปลายทาง"
 
 #: includes/class-isxm-admin.php:454
 msgid "Year & Month in path"
-msgstr "มี Year & Month ใน Path"
+msgstr "เส้นทางต้นทางมีปีและเดือน"
 
 #: includes/class-isxm-admin.php:454
 msgid "e.g. wp-content/uploads/2025/08/file.jpg"
@@ -639,15 +639,15 @@ msgstr "เปลี่ยน URL ในฐานข้อมูล"
 
 #: includes/class-isxm-admin.php:461
 msgid "The URL your existing media is <strong>served from today</strong>. After migrating, it is replaced with the destination URL throughout the database"
-msgstr "URL ที่ไฟล์เดิม<strong>ใช้งานอยู่ในปัจจุบัน</strong> หลัง Migrate ระบบจะแทนที่ด้วย URL ปลายทางทั่วทั้งฐานข้อมูล"
+msgstr "ระบุ URL ที่สื่อเดิม<strong>ใช้งานอยู่ในปัจจุบัน</strong> เมื่อย้ายเสร็จ ระบบจะแทนที่ URL นี้ในฐานข้อมูลด้วย URL ปลายทาง"
 
 #: includes/class-isxm-admin.php:463
 msgid "Source Public URL (current)"
-msgstr "Source Public URL (เดิม)"
+msgstr "URL สำหรับเปิดไฟล์ต้นทาง (ที่ใช้อยู่ปัจจุบัน)"
 
 #: includes/class-isxm-admin.php:464
 msgid "Leave empty to infer it from the Endpoint/Bucket above"
-msgstr "เว้นว่างเพื่อเดาจาก Endpoint/Bucket ด้านบน"
+msgstr "เว้นว่างเพื่อให้ระบบใช้ URL จาก Endpoint และ Bucket ต้นทาง"
 
 #: includes/class-isxm-admin.php:465
 msgid "For example https://old-bucket.s3.ap-southeast-1.amazonaws.com or your current CDN domain. Leave empty if media still uses this site's URLs (wp-content/uploads)"
@@ -655,19 +655,19 @@ msgstr "เช่น https://old-bucket.s3.ap-southeast-1.amazonaws.com หร�
 
 #: includes/class-isxm-admin.php:472
 msgid "Migrate from Source to Destination"
-msgstr "Migrate จาก Source มา Destination"
+msgstr "คัดลอกไฟล์จาก Storage ต้นทางไปปลายทาง"
 
 #: includes/class-isxm-admin.php:473
 msgid "Copy files from the source bucket to the destination and update database URLs at the end. The source is never modified"
-msgstr "คัดลอกไฟล์จาก source bucket ไปยังปลายทาง และอัปเดต URL ในฐานข้อมูลเมื่องานเสร็จ ไฟล์ต้นทางจะไม่ถูกแก้ไข"
+msgstr "คัดลอกไฟล์จาก Bucket ต้นทางไปปลายทาง แล้วเปลี่ยนลิงก์ในฐานข้อมูลช่วงท้ายงาน ไฟล์ต้นทางยังอยู่ตามเดิม"
 
 #: includes/class-isxm-admin.php:474
 msgid "Start Migration"
-msgstr "เริ่ม Migrate"
+msgstr "เริ่มย้ายข้อมูล"
 
 #: includes/class-isxm-admin.php:501
 msgid "Diagnostics"
-msgstr "ข้อมูลวินิจฉัย (Diagnostic)"
+msgstr "ข้อมูลสำหรับตรวจสอบปัญหา"
 
 #: includes/class-isxm-admin.php:587
 msgid "🔐 Encrypted (AES-256-GCM) before it is saved. The dots are a placeholder, not the actual key"
@@ -675,15 +675,15 @@ msgstr "🔐 เข้ารหัสด้วย AES-256-GCM ก่อนบั
 
 #: includes/class-isxm-admin.php:591
 msgid "Required for Minio/Garage — off for AWS S3 (virtual-hosted)"
-msgstr "จำเป็นสำหรับ Minio/Garage — ปิดสำหรับ AWS S3 (virtual-hosted)"
+msgstr "เปิดสำหรับ MinIO และ Garage ส่วน AWS S3 ที่ใช้ URL แบบ virtual-hosted ให้ปิดตัวเลือกนี้"
 
 #: includes/class-isxm-admin.php:592
 msgid "Send ACL public-read"
-msgstr "ส่ง ACL public-read"
+msgstr "กำหนดสิทธิ์อ่านไฟล์แบบสาธารณะ (ACL)"
 
 #: includes/class-isxm-admin.php:592
 msgid "Turn on if the bucket supports ACLs. Turn off if the bucket already has a public-read policy"
-msgstr "เปิดเมื่อ bucket รองรับ ACL และปิดหาก bucket ตั้ง policy ให้อ่านแบบสาธารณะไว้แล้ว"
+msgstr "เปิดเมื่อ Bucket รองรับ ACL เพื่อกำหนดสิทธิ์อ่านไฟล์ ปิดหาก Bucket มีนโยบายให้อ่านแบบสาธารณะอยู่แล้ว"
 
 #: includes/class-isxm-admin.php:610 includes/class-isxm-connections.php:242
 msgid "Not configured"
@@ -695,28 +695,28 @@ msgstr "ยังไม่ได้ตั้งค่า — ไปที่แ�
 
 #: includes/class-isxm-admin.php:671
 msgid "This provider has not connected successfully yet — check it in the “Connections” tab first"
-msgstr "เชื่อมต่อ provider นี้ยังไม่สำเร็จ — ไปตรวจสอบที่แท็บ “การเชื่อมต่อ” ก่อน"
+msgstr "ผู้ให้บริการนี้ยังเชื่อมต่อไม่สำเร็จ ตรวจข้อมูลในแท็บ “การเชื่อมต่อ” แล้วบันทึกเพื่อทดสอบอีกครั้ง"
 
 #: includes/class-isxm-admin.php:671
 msgid "This provider is not configured yet — set it up in the “Connections” tab first"
-msgstr "ยังไม่ได้ตั้งค่า provider นี้ — ไปตั้งค่าที่แท็บ “การเชื่อมต่อ” ก่อน"
+msgstr "ยังไม่ได้ตั้งค่าผู้ให้บริการนี้ ไปที่แท็บ “การเชื่อมต่อ” ก่อน"
 
 #: includes/class-isxm-admin.php:735
 msgid "Media URL structure with the current settings (live preview):"
-msgstr "โครงสร้าง URL ของ media ตามการตั้งค่าปัจจุบัน (อัปเดตสด):"
+msgstr "ตัวอย่าง URL ของสื่อตามการตั้งค่าปัจจุบัน:"
 
 #: includes/class-isxm-admin.php:846 includes/class-isxm-admin.php:852
 #, php-format
 msgid "Last checked %s ago"
-msgstr "ตรวจล่าสุดเมื่อ %sที่แล้ว"
+msgstr "ตรวจล่าสุดเมื่อ %s ที่แล้ว"
 
 #: includes/class-isxm-admin.php:867
 msgid "Compare the bucket with the plugin's records. Files deleted from the bucket outside the plugin are marked for upload again"
-msgstr "ตรวจสอบไฟล์ใน bucket เทียบกับข้อมูลของปลั๊กอิน ไฟล์ที่ถูกลบออกจาก bucket จากภายนอกจะถูกตั้งให้อัปโหลดใหม่"
+msgstr "เทียบข้อมูลของปลั๊กอินกับไฟล์จริงบน Bucket ไฟล์ที่ถูกลบจาก Bucket ผ่านช่องทางอื่นจะถูกทำเครื่องหมายให้อัปโหลดใหม่"
 
 #: includes/class-isxm-admin.php:881
 msgid "Objects in the current prefix with no matching WordPress media"
-msgstr "object ใน prefix ปัจจุบันที่ไม่มี media ใน WordPress ตรงกัน"
+msgstr "ไฟล์ภายใต้ Prefix ปัจจุบันที่ไม่พบสื่ออ้างอิงใน WordPress ของเว็บนี้"
 
 #: includes/class-isxm-background.php:127
 msgid "Every minute (InsightX Storage)"
@@ -1046,7 +1046,7 @@ msgstr "ขึ้นไม่ครบทุกขนาด"
 
 #: includes/class-isxm-media-library.php:66 includes/class-isxm-media-library.php:133
 msgid "Offload failed"
-msgstr "Offload ไม่ผ่าน"
+msgstr "Offload ไม่สำเร็จ"
 
 #: includes/class-isxm-media-library.php:67
 msgid "In another bucket"
@@ -1338,7 +1338,7 @@ msgstr "ลบไฟล์บนเซิร์ฟเวอร์ %1$s/%2$s"
 
 #: includes/class-isxm-media-library.php
 msgid "Bucket"
-msgstr "Bucket"
+msgstr "ชื่อพื้นที่จัดเก็บ (Bucket)"
 
 #: includes/class-isxm-media-library.php
 msgid "All buckets"
@@ -1402,7 +1402,7 @@ msgstr "ขึ้นไปหนึ่งระดับ"
 
 #: includes/class-isxm-admin.php
 msgid "Select one or more folders. A folder containing your uploads (e.g. wp-content/uploads/) is migrated as the Media Library; other folders are copied with their original paths, and links to them are updated"
-msgstr "เลือกได้หลายโฟลเดอร์ โฟลเดอร์ที่เก็บไฟล์อัปโหลด (เช่น wp-content/uploads/) จะย้ายแบบ Media Library ส่วนโฟลเดอร์อื่นจะคัดลอกโดยใช้ path เดิม และอัปเดตลิงก์ที่อ้างถึงให้"
+msgstr "เลือกได้หลายโฟลเดอร์ โฟลเดอร์ uploads จะย้ายพร้อมข้อมูลในคลังสื่อ ส่วนโฟลเดอร์อื่นจะใช้เส้นทางเดิมและอัปเดตลิงก์ที่อ้างอิงไฟล์เหล่านั้น"
 
 #: includes/class-isxm-admin.php
 msgid "Loading folders…"
@@ -1438,7 +1438,7 @@ msgstr "อัปโหลดขนาดที่ขาด"
 
 #: includes/class-isxm-admin.php
 msgid "Upload the image sizes missing from the bucket, using the copies still on the server"
-msgstr "อัปโหลดขนาดรูปที่ยังไม่มีใน bucket โดยใช้ไฟล์ที่ยังอยู่บนเซิร์ฟเวอร์"
+msgstr "ส่งรูปขนาดย่อยที่ยังขาดบน Bucket โดยใช้ไฟล์ที่มีอยู่บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-offload.php
 msgid "This item has no missing sizes on the current bucket"
@@ -1542,7 +1542,7 @@ msgstr "รูปโปรไฟล์แบบตัวอักษร"
 
 #: includes/class-isxm-admin.php
 msgid "Show every profile picture as a coloured circle with the person's first letter. Nothing is stored or loaded from Gravatar; stored profile pictures are kept and return if this is turned off"
-msgstr "แสดงรูปโปรไฟล์ของทุกคนเป็นวงกลมสีพร้อมตัวอักษรแรกของชื่อ ไม่เก็บไฟล์และไม่โหลดจาก Gravatar รูปโปรไฟล์ที่เก็บไว้เดิมยังอยู่ และจะกลับมาแสดงเมื่อปิดตัวเลือกนี้"
+msgstr "ใช้ตัวอักษรแรกของชื่อในวงกลมสีแทนรูปโปรไฟล์ ไม่โหลดรูปจาก Gravatar รูปเดิมยังถูกเก็บไว้และจะกลับมาแสดงเมื่อปิดตัวเลือกนี้"
 
 #: includes/class-isxm-admin.php
 msgid "Images"
@@ -1562,7 +1562,7 @@ msgstr "ลบไฟล์บนเซิร์ฟเวอร์ที่อย
 
 #: includes/class-isxm-admin.php
 msgid "Free disk space: delete the server copy of each media file that is confirmed to be in the bucket. Files missing from the bucket and other plugins' folders are not touched"
-msgstr "คืนพื้นที่บนเซิร์ฟเวอร์ โดยลบไฟล์ media ที่ตรวจแล้วว่าอยู่ใน bucket ไฟล์ที่ไม่มีใน bucket และโฟลเดอร์ของปลั๊กอินอื่นจะไม่ถูกแตะ"
+msgstr "คืนพื้นที่โดยลบสำเนาสื่อบนเซิร์ฟเวอร์ที่ตรวจแล้วว่ามีบน Bucket เก็บไฟล์ที่ยังไม่มีบน Bucket และไม่ลบโฟลเดอร์ของปลั๊กอินอื่น"
 
 #: includes/class-isxm-admin.php
 msgid "Delete Server Copies"
@@ -1570,7 +1570,7 @@ msgstr "ลบไฟล์บนเซิร์ฟเวอร์"
 
 #: includes/class-isxm-admin.php
 msgid "Delete the server copies of media already in the bucket?\n\nOnly files confirmed in the bucket are deleted; pages keep loading them from the bucket. Keep a backup first"
-msgstr "ลบไฟล์บนเซิร์ฟเวอร์ของ media ที่อยู่ใน bucket แล้ว?\n\nระบบลบเฉพาะไฟล์ที่ตรวจแล้วว่ามีใน bucket หน้าเว็บจะโหลดรูปจาก bucket ตามเดิม ควรสำรองข้อมูลไว้ก่อน"
+msgstr "ลบสำเนาสื่อบนเซิร์ฟเวอร์หรือไม่?\n\nจะลบเฉพาะไฟล์ที่ตรวจว่ามีบน Bucket แล้ว หน้าเว็บจะใช้ไฟล์จาก Bucket ต่อ ควรสำรองข้อมูลก่อนดำเนินการ"
 
 #: includes/class-isxm-tools.php
 msgid "Turn on “Write permanent URLs to the database” or “Deliver Offloaded Media” first — otherwise pages still point at the server copies"
@@ -1590,7 +1590,7 @@ msgstr "โฟลเดอร์ที่จะ offload"
 
 #: includes/class-isxm-admin.php
 msgid "Choose the folders to offload. %s is the whole Media Library (new files and missing image sizes); other folders go up under their own path and keep their server copies. Runs on the server, so you can close this tab"
-msgstr "เลือกโฟลเดอร์ที่จะ offload — %s คือ Media Library ทั้งหมด (ไฟล์ใหม่และขนาดรูปที่ขาด) ส่วนโฟลเดอร์อื่นจะอัปโหลดด้วย path เดิม และเก็บไฟล์บนเซิร์ฟเวอร์ไว้ งานทำงานบนเซิร์ฟเวอร์ ปิดแท็บนี้ได้"
+msgstr "เลือก %s เพื่อส่งสื่อและรูปขนาดย่อยที่ยังขาด ส่วนโฟลเดอร์อื่นจะใช้เส้นทางเดิมและเก็บสำเนาบนเซิร์ฟเวอร์ไว้ งานทำต่อในเบื้องหลังได้เมื่อระบบรองรับ หากมีข้อความให้เปิดหน้านี้ไว้ ให้รอจนเสร็จ"
 
 #: includes/class-isxm-tools.php
 msgid "Choose at least one folder to offload first"
@@ -1610,7 +1610,7 @@ msgstr "ต้องการลบแบบไหน"
 
 #: includes/class-isxm-admin.php
 msgid "Copy files to storage automatically: media right after upload, and new files in the folders chosen on the Offload media card every hour"
-msgstr "คัดลอกไฟล์ขึ้น storage อัตโนมัติ: media ทันทีหลังอัปโหลด และไฟล์ใหม่ในโฟลเดอร์ที่เลือกไว้ในการ์ด Offload media ทุกชั่วโมง"
+msgstr "ส่งสื่อใหม่ขึ้น Storage ทันทีหลังอัปโหลด ส่วนไฟล์ใหม่ในโฟลเดอร์ที่เลือกไว้ในการ์ด Offload media จะตรวจและส่งขึ้นทุกชั่วโมง"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Offload"
@@ -1706,7 +1706,7 @@ msgstr "ย้ายมาที่นี่"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Delete %d item(s)? Folders are deleted with everything in them. This cannot be undone."
-msgstr "ลบ %d รายการ? โฟลเดอร์จะถูกลบพร้อมทุกอย่างข้างใน ย้อนกลับไม่ได้"
+msgstr "ลบ %d รายการหรือไม่? หากเป็นโฟลเดอร์ ไฟล์ทั้งหมดภายในจะถูกลบด้วย การลบนี้ย้อนกลับไม่ได้"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Replace"
@@ -1818,7 +1818,7 @@ msgstr "ย้ายโฟลเดอร์เข้าไปในตัวเ
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "The server could not complete this. Check folder permissions."
-msgstr "เซิร์ฟเวอร์ทำรายการนี้ไม่สำเร็จ ตรวจสิทธิ์ของโฟลเดอร์"
+msgstr "ทำรายการไม่สำเร็จ กรุณาตรวจสิทธิ์อ่านและเขียนของโฟลเดอร์แล้วลองอีกครั้ง"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Permissions"
@@ -1979,7 +1979,7 @@ msgstr "ข้อมูล"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Delete everything inside \"%s\"? The folder itself is kept. This cannot be undone."
-msgstr "ลบทุกอย่างใน \"%s\"? ตัวโฟลเดอร์ยังอยู่ ย้อนกลับไม่ได้"
+msgstr "ลบไฟล์และโฟลเดอร์ทั้งหมดภายใน \"%s\" หรือไม่? โฟลเดอร์หลักจะยังอยู่ การลบนี้ย้อนกลับไม่ได้"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Folder emptied"
@@ -2047,15 +2047,15 @@ msgstr "เพิ่ม %s ในการ์ด Offload media แล้ว"
 
 #: includes/class-isxm-tools.php
 msgid "Files on this server. Files added outside the Media Library go to the bucket at once while Offload Media is on."
-msgstr "ไฟล์บนเซิร์ฟเวอร์ ไฟล์ที่เพิ่มนอก Media Library จะขึ้น provider ทันทีเมื่อเปิด Offload Media"
+msgstr "จัดการไฟล์บนเซิร์ฟเวอร์ เมื่อเปิด Offload Media ไฟล์ใหม่ที่เพิ่มนอกคลังสื่อจะถูกส่งขึ้น Storage ตามโฟลเดอร์และสิทธิ์ที่อนุญาต"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Uploaded to %s"
-msgstr "ขึ้น %s แล้ว"
+msgstr "ส่งไฟล์ขึ้น %s แล้ว"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Not on %1$s yet: %2$s (retried on the next hourly check)"
-msgstr "ยังไม่ขึ้น %1$s: %2$s (ระบบจะลองใหม่ในรอบตรวจรายชั่วโมง)"
+msgstr "ยังส่งขึ้น %1$s ไม่สำเร็จ: %2$s ระบบจะลองอีกครั้งในรอบตรวจรายชั่วโมง"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "%1$s · bucket %2$s"
@@ -2071,7 +2071,7 @@ msgstr "ปิด Offload Media อยู่"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Check on the bucket"
-msgstr "ตรวจใน bucket"
+msgstr "ตรวจว่าไฟล์อยู่บน Bucket"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Checking…"
@@ -2087,7 +2087,7 @@ msgstr "ไม่พบใน %s"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Open the bucket copy"
-msgstr "เปิดไฟล์ใน bucket"
+msgstr "เปิดสำเนาบน Bucket"
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Bucket URL"
@@ -2118,7 +2118,7 @@ msgstr "รูปภาพ/ไฟล์"
 
 #: includes/class-isxm-admin.php
 msgid "Shrink PDFs"
-msgstr "ย่อไฟล์ PDF"
+msgstr "ลดขนาดไฟล์ PDF"
 
 #: includes/class-isxm-admin.php
 msgid "Shrink PDF"
@@ -2126,7 +2126,7 @@ msgstr "ย่อไฟล์ PDF"
 
 #: includes/class-isxm-admin.php
 msgid "Ghostscript (gs) is not installed on this server — ask your host to install it"
-msgstr "เซิร์ฟเวอร์ไม่มี Ghostscript (gs) ให้ host ติดตั้งให้"
+msgstr "ยังลดขนาด PDF ไม่ได้ กรุณาให้ผู้ดูแลเซิร์ฟเวอร์ติดตั้ง Ghostscript (gs)"
 
 #: includes/class-isxm-admin.php
 msgid "File not found"
@@ -2158,7 +2158,7 @@ msgstr "โฟลเดอร์เก็บต้นฉบับต้องไ
 
 #: includes/class-isxm-admin.php
 msgid "The originals folder cannot be inside a folder on the Offload media card (the originals would go up to the bucket)"
-msgstr "โฟลเดอร์เก็บต้นฉบับต้องไม่อยู่ในโฟลเดอร์ของการ์ด Offload media (ไม่อย่างนั้นต้นฉบับจะถูกอัปขึ้น bucket)"
+msgstr "เลือกโฟลเดอร์เก็บต้นฉบับที่อยู่นอกโฟลเดอร์ Offload เพื่อไม่ให้ต้นฉบับถูกส่งขึ้น Bucket ด้วย"
 
 #: includes/class-isxm-admin.php
 msgid "Could not copy the original to the originals folder — the file was not shrunk"
@@ -2194,11 +2194,11 @@ msgstr "300 dpi — คุณภาพพิมพ์ ลดได้น้อ�
 
 #: includes/class-isxm-admin.php
 msgid "Keep the originals in"
-msgstr "เก็บต้นฉบับไว้ที่"
+msgstr "โฟลเดอร์เก็บ PDF ต้นฉบับ"
 
 #: includes/class-isxm-admin.php
 msgid "One folder outside the folders above, e.g. pdf-originals/. Each original is copied there under its own path before it is shrunk. Leave empty to keep no originals — the files are then overwritten and cannot be restored"
-msgstr "เลือก 1 โฟลเดอร์ที่อยู่นอกโฟลเดอร์ด้านบน เช่น pdf-originals/ ต้นฉบับจะถูกคัดลอกไปเก็บตาม path เดิมก่อนย่อ ถ้าเว้นว่าง จะไม่เก็บต้นฉบับ ไฟล์ถูกเขียนทับและย้อนกลับไม่ได้"
+msgstr "เลือกโฟลเดอร์แยก เช่น pdf-originals/ เพื่อเก็บต้นฉบับก่อนลดขนาด โดยเก็บเส้นทางเดิมของแต่ละไฟล์ หากเว้นว่าง ระบบจะเขียนทับไฟล์โดยไม่มีสำเนาสำหรับกู้คืน"
 
 #: includes/class-isxm-admin.php
 msgid "Saved so far: %s"
@@ -2206,7 +2206,7 @@ msgstr "ประหยัดไปแล้ว: %s"
 
 #: includes/class-isxm-admin.php
 msgid "Shrink the PDFs in the chosen folders with Ghostscript and put them back under the same name. Files already on the bucket go up again over the same key. Files that would shrink by less than 10% are left as they are. Runs on the server, so you can close this tab"
-msgstr "ย่อ PDF ในโฟลเดอร์ที่เลือกด้วย Ghostscript แล้วเก็บกลับด้วยชื่อเดิม ไฟล์ที่อยู่ใน bucket แล้วจะถูกอัปทับ key เดิม ไฟล์ที่ย่อได้น้อยกว่า 10% จะไม่ถูกแตะ ทำงานบนเซิร์ฟเวอร์ ปิดแท็บนี้ได้"
+msgstr "ลดขนาด PDF ในโฟลเดอร์ที่เลือกด้วย Ghostscript โดยใช้ชื่อเดิม และอัปโหลดทับไฟล์เดิมบน Bucket หากมีอยู่แล้ว เปลี่ยนไฟล์เฉพาะเมื่อขนาดลดลงอย่างน้อย 10% หากระบบแจ้งให้เปิดหน้านี้ไว้ ให้รอจนเสร็จ"
 
 #: includes/class-isxm-admin.php
 msgid "Not a PDF file."
@@ -2222,19 +2222,19 @@ msgstr "ย่อจาก %1$s เหลือ %2$s"
 
 #: includes/class-isxm-admin.php
 msgid "Already small — left as it is"
-msgstr "ไฟล์เล็กอยู่แล้ว ไม่ได้แก้"
+msgstr "ขนาดไม่ลดถึงเกณฑ์ จึงเก็บไฟล์เดิมไว้"
 
 #: includes/class-isxm-admin.php
 msgid "bucket copy replaced"
-msgstr "อัปทับใน bucket แล้ว"
+msgstr "อัปเดตไฟล์เดิมบน Bucket แล้ว"
 
 #: includes/class-isxm-tools.php
 msgid "Shrink automatically"
-msgstr "ย่ออัตโนมัติ"
+msgstr "ลดขนาด PDF อัตโนมัติ"
 
 #: includes/class-isxm-tools.php
 msgid "PDFs uploaded, created or copied into the folders above through File Manager are shrunk before they go to storage. Needs Ghostscript"
-msgstr "PDF ที่อัปโหลด สร้าง หรือคัดลอกเข้าโฟลเดอร์ด้านบนผ่านหน้า จัดการไฟล์ จะถูกย่อก่อนขึ้น storage ต้องมี Ghostscript"
+msgstr "ลดขนาด PDF ที่อัปโหลด สร้าง หรือคัดลอกเข้าโฟลเดอร์ที่เลือกผ่านหน้าจัดการไฟล์ ก่อนส่งขึ้น Storage ต้องติดตั้ง Ghostscript"
 
 #: includes/class-isxm-tools.php
 msgid "not shrunk: %s"
@@ -2254,7 +2254,7 @@ msgstr "ไฟล์หรือโฟลเดอร์นี้เป็นข
 
 #: includes/class-isxm-file-manager-admin.php
 msgid "Administrators can always do everything. Everyone else gets what their role allows."
-msgstr "ผู้ดูแลระบบทำได้ทุกอย่างเสมอ คนอื่นได้สิทธิ์ตาม role ของตัวเอง"
+msgstr "ผู้ดูแลระบบใช้ได้ทุกคำสั่งที่ระบบอนุญาต ผู้ใช้อื่นใช้งานตามสิทธิ์ของบทบาทที่กำหนดไว้"
 
 #: includes/class-isxm-file-manager.php
 #, php-format
@@ -2284,3 +2284,95 @@ msgstr "กำลังทำสำเนา"
 #: includes/class-isxm-file-manager-admin.php
 msgid "Renaming"
 msgstr "กำลังเปลี่ยนชื่อ"
+
+#: modules/backup/load.php
+msgid "Backup is now part of InsightX Offload (menu InsightX Offload → Backup). Deactivate and delete the separate InsightX Backup plugin — your backups, schedule and settings carry over."
+msgstr "ระบบสำรองข้อมูลรวมอยู่ใน InsightX Offload แล้ว (เมนู InsightX Offload → สำรองข้อมูล) ปิดและลบปลั๊กอิน InsightX Backup ตัวเดิมได้เลย ไฟล์สำรอง ตารางเวลา และการตั้งค่าเดิมใช้ต่อได้ทั้งหมด"
+
+
+#: includes/class-isxm-admin.php
+msgid "Access Key"
+msgstr "รหัสเข้าถึง (Access Key)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Add Object Version to Bucket Path"
+msgstr "เพิ่มเลขเวอร์ชันในเส้นทางไฟล์"
+
+
+#: includes/class-isxm-admin.php
+msgid "Add Prefix to Bucket Path"
+msgstr "เพิ่มเส้นทางนำหน้า (Prefix)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Add Year & Month to Bucket Path"
+msgstr "แยกโฟลเดอร์ตามปีและเดือน"
+
+
+#: includes/class-isxm-admin.php
+msgid "Assets Pull"
+msgstr "โหลด CSS และ JavaScript ผ่าน CDN"
+
+
+#: includes/class-isxm-admin.php
+msgid "CDN Domain (Assets)"
+msgstr "โดเมน CDN สำหรับ CSS และ JavaScript"
+
+
+#: includes/class-isxm-admin.php
+msgid "Custom Delivery Domain (CDN)"
+msgstr "โดเมน CDN สำหรับสื่อ"
+
+
+#: includes/class-isxm-admin.php
+msgid "Deliver Offloaded Media"
+msgstr "แสดงสื่อจาก Storage/CDN"
+
+
+#: includes/class-isxm-admin.php
+msgid "Endpoint URL"
+msgstr "ที่อยู่ API ของ Storage (Endpoint URL)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Force HTTPS"
+msgstr "ใช้ HTTPS เสมอ"
+
+
+#: includes/class-isxm-admin.php
+msgid "Offload Media"
+msgstr "ส่งสื่อขึ้น Storage อัตโนมัติ (Offload Media)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Path-style URL"
+msgstr "ใส่ชื่อ Bucket ในเส้นทาง URL (Path-style)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Region"
+msgstr "ภูมิภาค (Region)"
+
+
+#: includes/class-isxm-admin.php
+msgid "Remove Local Media"
+msgstr "ลบสำเนาบนเซิร์ฟเวอร์"
+
+
+#: includes/class-isxm-admin.php
+msgid "Rewrite Asset URLs"
+msgstr "ใช้ CDN สำหรับ CSS และ JavaScript"
+
+
+#: includes/class-isxm-admin.php
+msgid "Secret Key"
+msgstr "รหัสลับ (Secret Key)"
+
+
+#: includes/class-isxm-admin.php
+msgid "URL Preview"
+msgstr "ตัวอย่าง URL ของไฟล์"
+
+msgid "User Guide"
+msgstr "คู่มือการใช้งาน"

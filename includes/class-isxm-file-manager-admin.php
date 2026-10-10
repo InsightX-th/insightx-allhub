@@ -34,8 +34,9 @@ class ISXM_File_Manager_Admin {
 
     /** This user's file system: locked to their folder. */
     private function fs() {
-        return ( new ISXM_File_Manager( ABSPATH, null, ISXM_File_Manager_Access::rules()['root'], current_user_can( 'unfiltered_html' ) ) )
-            ->force_hidden( current_user_can( 'manage_options' ) );
+        $admin = current_user_can( 'manage_options' );
+        return ( new ISXM_File_Manager( ABSPATH, null, ISXM_File_Manager_Access::rules()['root'], current_user_can( 'unfiltered_html' ), $admin ) )
+            ->force_hidden( $admin );
     }
 
     public function enqueue_assets( $hook ) {

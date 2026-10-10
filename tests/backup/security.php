@@ -310,6 +310,7 @@ file_put_contents( "$dir/backups/shop-01012026-AbCdEfGhIjKlMnOp.wpress", "pkg" )
 function wp_mkdir_p( $d ) { return is_dir( $d ) || mkdir( $d, 0777, true ); }
 function isx_htaccess_deny_all() { return "x"; }
 function __( $t ) { return $t; }
+function apply_filters( $t, $v ) { return $v; }
 require ' . var_export( $MODULE . '/includes/class-isx-backups.php', true ) . ';
 $r = [];
 foreach ( [ "../secret.wpress", "..\\\\secret.wpress", "/etc/passwd", "%2e%2e/secret.wpress", "shop-01012026-AbCdEfGhIjKlMnOp.wpress", "x.wpress.php", "x.php", "" ] as $n ) {

@@ -685,6 +685,10 @@ file_put_contents( "$bdir/site-01012026-Abc.wpress", 'gz' );
 file_put_contents( "$bdir/site-01012026-Abc.wpress.peek", 'plain copy' );
 t( 'K3 backup and its .peek both removed', ISX_Backups::delete( 'site-01012026-Abc.wpress' ) && ! file_exists( "$bdir/site-01012026-Abc.wpress" ) && ! file_exists( "$bdir/site-01012026-Abc.wpress.peek" ) );
 t( 'K4 backups dir always gets an index.php', is_file( "$bdir/index.php" ) );
+file_put_contents( "$bdir/.htaccess", "Require all granted\n" ); // what earlier versions wrote
+ISX_Backups::dir();
+t( 'K5 backups dir is deny-all by default (old granting rule replaced)', file_get_contents( "$bdir/.htaccess" ) === isx_htaccess_deny_all() );
+t( 'K6 no direct link is handed out by default', ISX_Backups::base_url() === null && ISX_Backups::url( 'x.wpress' ) === null );
 
 // ---------- stubs used by the groups below (real classes, no WordPress) ----------
 if ( ! class_exists( 'WP_Error' ) ) {

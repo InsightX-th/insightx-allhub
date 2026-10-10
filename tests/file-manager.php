@@ -270,6 +270,24 @@ file_put_contents( $root . 'download/junk2/.DS_Store', 'x' );
 file_put_contents( $root . 'download/junk2/b.jpg', 'b' );
 check( '…nor emptying one', ! is_wp_error( $fs->empty_dir( 'download/junk2' ) ) && scandir( $root . 'download/junk2' ) === [ '.', '..' ] );
 
+group( 'Non-administrators: no scripts, nothing the web server denies' );
+$root = fresh_root();
+mkdir( $root . 'wp-content/uploads/woocommerce_uploads/2026', 0777, true );
+file_put_contents( $root . 'wp-content/uploads/woocommerce_uploads/.htaccess', "deny from all\n" );
+file_put_contents( $root . 'wp-content/uploads/woocommerce_uploads/2026/paid.zip', 'x' );
+mkdir( $root . 'wp-content/uploads/2026', 0777, true );
+file_put_contents( $root . 'wp-content/uploads/.htaccess', "<Files *.php>\nRequire all denied\n</Files>\n" );
+file_put_contents( $root . 'wp-content/uploads/2026/photo.jpg', 'x' );
+file_put_contents( $root . 'wp-content/object-cache.php', '<?php // redis password' );
+$user  = new ISXM_File_Manager( $root, false, '', false, false );
+$admin = new ISXM_File_Manager( $root, false );
+check( 'a .php file is unreadable', code_of( $user->readable( $root . 'wp-content/object-cache.php' ) ) === 'isxfm_secret' );
+check( '…and not listed', ! in_array( 'object-cache.php', array_column( $user->listing( 'wp-content' )['files'], 'name' ), true ) );
+check( 'a file under a deny-all .htaccess is unreadable', code_of( $user->readable( $root . 'wp-content/uploads/woocommerce_uploads/2026/paid.zip' ) ) === 'isxfm_secret' );
+check( '…nor its folder', code_of( $user->listing( 'wp-content/uploads/woocommerce_uploads' ) ) === 'isxfm_secret' );
+check( 'a <Files>-scoped deny does not hide the folder', $user->readable( $root . 'wp-content/uploads/2026/photo.jpg' ) === true );
+check( 'administrators still read both', $admin->readable( $root . 'wp-content/object-cache.php' ) === true && $admin->readable( $root . 'wp-content/uploads/woocommerce_uploads/2026/paid.zip' ) === true );
+
 group( 'Administrators delete folders holding dot-files' );
 $root = fresh_root();
 $afs  = ( new ISXM_File_Manager( $root, false ) )->force_hidden();

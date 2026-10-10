@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InsightX AllHub
  * Plugin URI:  https://insightx.in.th/
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      InsightX
  * Author URI:  https://www.insightx.in.th
  * Text Domain: insightx-allhub
@@ -55,7 +55,7 @@ if ( defined( 'ISXM_PLUGIN_DIR' ) || isxm_old_offload_active() ) {
 
 define( 'ISXM_PLUGIN_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
 define( 'ISXM_PLUGIN_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'ISXM_PLUGIN_VERSION', '1.0.1' );
+define( 'ISXM_PLUGIN_VERSION', '1.0.2' );
 
 /*
  * GitHub update checker.

@@ -27,17 +27,11 @@ class ISX_Backups {
 		if ( ! is_file( $dir . '/index.php' ) ) {
 			file_put_contents( $dir . '/index.php', "<?php // Silence is golden.\n" );
 		}
-		// This folder is deliberately *not* deny-all (unlike the rest of
-		// storage/): url() below hands out a direct link straight to the file
-		// here, served by the web server itself instead of streamed through
-		// PHP — the only way to make a large download immune to PHP-FPM's
-		// request_terminate_timeout / a host's memory limit / a proxy's edge
-		// timeout, all of which killed downloads that went through
-		// admin-ajax.php on a slow connection. All-in-One WP Migration protects
-		// its own backups the same way (AddType + no directory listing, not
-		// Deny), which is where this came from. What stands between a backup
-		// and anyone who can guess its URL is the filename's random suffix
-		// (see store()) — the .htaccess below only stops directory listing.
+		// Deny-all like the rest of storage/: a backup is the whole site, and a
+		// direct link leaks through browser history, access and CDN logs to
+		// anyone who sees it. Downloads go through ajax_download() (capability +
+		// nonce). Hosts where PHP cannot stream a large file to the end can
+		// switch the direct link back on — see direct_download().
 		$htaccess = $dir . '/.htaccess';
 		$expected = self::htaccess_contents();
 		if ( ! is_file( $htaccess ) || (string) @file_get_contents( $htaccess ) !== $expected ) { // phpcs:ignore
@@ -50,6 +44,9 @@ class ISX_Backups {
 	 * @return string
 	 */
 	private static function htaccess_contents() {
+		if ( ! self::direct_download() ) {
+			return isx_htaccess_deny_all();
+		}
 		// Apache applies a directory's .htaccess to every directory beneath it,
 		// so storage/.htaccess ("Require all denied", see
 		// isx_htaccess_deny_all()) reaches in here too and answers 403 for the
@@ -78,6 +75,18 @@ class ISX_Backups {
 	}
 
 	/**
+	 * Opt-in: let the web server hand out backups by direct link, protected
+	 * only by the filename's random suffix. For hosts where streaming a large
+	 * file through PHP times out:
+	 *   add_filter( 'isx_direct_download', '__return_true' );
+	 *
+	 * @return bool
+	 */
+	public static function direct_download() {
+		return (bool) apply_filters( 'isx_direct_download', false );
+	}
+
+	/**
 	 * Whether dir() sits somewhere the web server can reach directly — only
 	 * true for the default location (under this plugin, itself under
 	 * wp-content) or a custom path an admin pointed inside ABSPATH. A custom
@@ -99,7 +108,7 @@ class ISX_Backups {
 	 * @return string|null
 	 */
 	public static function base_url() {
-		if ( ! self::is_web_reachable() ) {
+		if ( ! self::direct_download() || ! self::is_web_reachable() ) {
 			return null;
 		}
 		$dir = untrailingslashit( self::dir() );

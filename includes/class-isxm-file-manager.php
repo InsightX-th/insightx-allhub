@@ -30,15 +30,19 @@ class ISXM_File_Manager {
     private $jail;
     private $read_only;
     private $allow_markup;
+    private $allow_private;
+    private $denied_dirs = [];
 
     /**
      * @param string    $root      The WordPress folder; every path in and out is relative to it.
      * @param bool|null $read_only Defaults to DISALLOW_FILE_MODS.
      * @param string    $jail      Folder (relative to $root) this user may not leave. "" = everything.
      * @param bool      $allow_markup May .html / .svg … be created (the unfiltered_html capability).
+     * @param bool      $allow_private May scripts and folders the web server denies be read (administrators).
      */
-    public function __construct( $root = ABSPATH, $read_only = null, $jail = '', $allow_markup = true ) {
-        $this->allow_markup = (bool) $allow_markup;
+    public function __construct( $root = ABSPATH, $read_only = null, $jail = '', $allow_markup = true, $allow_private = true ) {
+        $this->allow_markup  = (bool) $allow_markup;
+        $this->allow_private = (bool) $allow_private;
         $this->root      = rtrim( (string) realpath( $root ), '/' ) . '/';
         $this->read_only = $read_only ?? ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS );
         $this->jail      = $this->root;
@@ -215,8 +219,44 @@ class ISXM_File_Manager {
         if ( strpos( $name, 'wp-config' ) === 0 ) return $this->error( 'secret' );
         foreach ( array_slice( explode( '.', $name ), 1 ) as $ext ) {
             if ( in_array( $ext, self::SECRET_EXT, true ) ) return $this->error( 'secret' );
+            // Scripts hold credentials (object-cache.php, plugin configs).
+            if ( ! $this->allow_private && in_array( $ext, self::EXECUTABLE, true ) ) return $this->error( 'secret' );
         }
+        if ( ! $this->allow_private && $this->server_denied( is_dir( $absolute ) ? $absolute : dirname( $absolute ) ) ) return $this->error( 'secret' );
         return true;
+    }
+
+    /**
+     * Does this folder or one above it (up to the root) carry an .htaccess
+     * that denies all web access? That is how WooCommerce, Contact Form 7 &
+     * co. keep paid downloads and form attachments private.
+     */
+    private function server_denied( $dir ) {
+        $stop = rtrim( $this->root, '/' );
+        $dir  = rtrim( $dir, '/' );
+        $seen = [];
+        while ( strpos( $dir . '/', $this->root ) === 0 ) {
+            if ( isset( $this->denied_dirs[ $dir ] ) ) { $hit = $this->denied_dirs[ $dir ]; break; }
+            $seen[] = $dir;
+            if ( self::htaccess_denies_all( $dir . '/.htaccess' ) ) { $hit = true; break; }
+            if ( $dir === $stop ) { $hit = false; break; }
+            $dir = dirname( $dir );
+        }
+        $hit = $hit ?? false;
+        foreach ( $seen as $d ) $this->denied_dirs[ $d ] = $hit;
+        return $hit;
+    }
+
+    /** A folder-wide deny (not one scoped to <Files>, e.g. "no PHP in uploads"). */
+    private static function htaccess_denies_all( $file ) {
+        if ( ! is_file( $file ) ) return false;
+        $depth = 0;
+        foreach ( (array) @file( $file, FILE_IGNORE_NEW_LINES ) as $line ) {
+            if ( preg_match( '#^\s*<(Files|FilesMatch|Limit|LimitExcept)\b#i', $line ) ) { $depth++; continue; }
+            if ( preg_match( '#^\s*</(Files|FilesMatch|Limit|LimitExcept)\s*>#i', $line ) ) { $depth = max( 0, $depth - 1 ); continue; }
+            if ( $depth === 0 && preg_match( '#^\s*(Require\s+all\s+denied|Deny\s+from\s+all)\b#i', $line ) ) return true;
+        }
+        return false;
     }
 
     /**

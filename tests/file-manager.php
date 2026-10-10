@@ -244,6 +244,10 @@ check( 'database dumps are unreadable and not listed', code_of( $fs->readable( $
 check( 'a PDF with "backup" in its name is fine', $fs->readable( $root . 'download/backup-guide.pdf' ) === true && in_array( 'backup-guide.pdf', $names( $fs->listing( 'download' ) ), true ) );
 check( 'backup folders are not listed and cannot be opened', ! array_intersect( [ 'updraft', 'insightx-backup' ], $names( $fs->listing( 'wp-content' ) ) ) && code_of( $fs->listing( 'wp-content/insightx-backup' ) ) === 'isxfm_secret' && code_of( $fs->readable( $root . 'wp-content/updraft/db.gz' ) ) === 'isxfm_secret' );
 check( 'search does not find them', ! array_filter( array_column( $fs->search( '', 'db' )['items'], 'path' ), function ( $p ) { return strpos( $p, 'updraft' ) !== false; } ) && ! in_array( 'dump.sql', array_column( $fs->search( '', 'dump' )['items'], 'name' ), true ) );
+check( 'a file inside .git cannot be copied out into the open', code_of( $fs->copy( 'download/.git/config', 'download' ) ) === 'isxfm_secret' && ! file_exists( $root . 'download/config' ) );
+check( '…nor a backup archive', code_of( $fs->copy( 'wp-content/insightx-backup/site.zip', 'download' ) ) === 'isxfm_secret' && ! file_exists( $root . 'download/site.zip' ) );
+check( '…nor duplicated in place', code_of( $fs->duplicate( 'wp-content/updraft/db.gz' ) ) === 'isxfm_secret' && ! file_exists( $root . 'wp-content/updraft/db copy.gz' ) );
+check( '…nor a backup folder with its contents', code_of( $fs->copy( 'wp-content/insightx-backup', 'download' ) ) === 'isxfm_secret' && ! file_exists( $root . 'download/insightx-backup' ) );
 check( '.htaccess cannot be deleted', is_wp_error( $fs->delete( '.htaccess' ) ) && is_file( $root . '.htaccess' ) );
 check( '…renamed', is_wp_error( $fs->rename( '.htaccess', 'htaccess.txt' ) ) && is_file( $root . '.htaccess' ) );
 check( '…or moved', is_wp_error( $fs->move( '.htaccess', 'download' ) ) && is_file( $root . '.htaccess' ) );

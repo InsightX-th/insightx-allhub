@@ -456,9 +456,13 @@ class ISXM_File_Manager {
         return [ 'notes' => $this->removed( $files ) ];
     }
 
-    /** @return true|WP_Error Every name under $path could have been made here by hand. */
+    /** @return true|WP_Error Every name under $path could have been made here by hand, and may be read. */
     private function copyable( $path ) {
         $ok = $this->valid_name( basename( $path ) );
+        if ( is_wp_error( $ok ) ) return $ok;
+        // A copy lands somewhere readable: never copy what may not be read
+        // (.git/config, backup archives …) out into the open.
+        $ok = $this->readable( $path );
         if ( is_wp_error( $ok ) ) return $ok;
         if ( is_link( $path ) ) return $this->error( 'bad_path' );
         if ( ! is_dir( $path ) ) return true;

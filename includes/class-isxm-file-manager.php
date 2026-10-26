@@ -13,7 +13,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class ISXM_File_Manager {
 
     /** Visible, but nothing in them may be created, changed or removed: they are the site's code. */
-    const READ_ONLY_DIRS = [ 'wp-admin/', 'wp-includes/', 'wp-content/plugins/', 'wp-content/themes/', 'wp-content/mu-plugins/' ];
+    const READ_ONLY_DIRS = [ 'wp-admin/', 'wp-includes/' ];
+
+    /**
+     * Their contents may change (assets, not scripts), but the folders
+     * themselves and their parents may not be renamed or deleted.
+     */
+    const CODE_DIRS = [ 'wp-content/plugins/', 'wp-content/themes/', 'wp-content/mu-plugins/' ];
 
     const READ_ONLY_FILES = [ 'wp-config.php' ];
 
@@ -31,6 +37,7 @@ class ISXM_File_Manager {
     private $read_only;
     private $allow_markup;
     private $allow_private;
+    private $code_edit;
     private $denied_dirs = [];
 
     /**
@@ -39,8 +46,10 @@ class ISXM_File_Manager {
      * @param string    $jail      Folder (relative to $root) this user may not leave. "" = everything.
      * @param bool      $allow_markup May .html / .svg … be created (the unfiltered_html capability).
      * @param bool      $allow_private May scripts and folders the web server denies be read (administrators).
+     * @param bool|null $code_edit May files inside plugins/ and themes/ change (with $allow_private). Defaults to ! DISALLOW_FILE_EDIT.
      */
-    public function __construct( $root = ABSPATH, $read_only = null, $jail = '', $allow_markup = true, $allow_private = true ) {
+    public function __construct( $root = ABSPATH, $read_only = null, $jail = '', $allow_markup = true, $allow_private = true, $code_edit = null ) {
+        $this->code_edit     = $code_edit ?? ! ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT );
         $this->allow_markup  = (bool) $allow_markup;
         $this->allow_private = (bool) $allow_private;
         $this->root      = rtrim( (string) realpath( $root ), '/' ) . '/';
@@ -156,6 +165,13 @@ class ISXM_File_Manager {
         foreach ( self::READ_ONLY_DIRS as $dir ) {
             if ( strpos( $relative . '/', $dir ) === 0 || strpos( $dir, $relative . '/' ) === 0 ) return $this->error( 'protected' );
         }
+        // A plugin's or theme's .js runs in every administrator's browser:
+        // only administrators may change it, and not under DISALLOW_FILE_EDIT.
+        $code_ok = $this->allow_private && $this->code_edit;
+        foreach ( self::CODE_DIRS as $dir ) {
+            if ( strpos( $dir, $relative . '/' ) === 0 ) return $this->error( 'protected' );
+            if ( ! $code_ok && strpos( $relative . '/', $dir ) === 0 ) return $this->error( 'protected' );
+        }
         return true;
     }
 
@@ -175,6 +191,38 @@ class ISXM_File_Manager {
         // never renamed, moved or deleted from here.
         $name = $this->valid_name( basename( $absolute ) );
         if ( is_wp_error( $name ) && in_array( $name->get_error_code(), [ 'isxfm_executable', 'isxfm_hidden_name' ], true ) ) return $this->error( 'protected' );
+        return true;
+    }
+
+    /**
+     * A folder under plugins/ or themes/ with a script anywhere inside is a
+     * plugin or theme: it is not renamed, moved, deleted or emptied from
+     * here. Listings check it too, so such rows show as read-only.
+     *
+     * @return true|WP_Error
+     */
+    private function code_guard( $absolute ) {
+        if ( is_link( $absolute ) || ! is_dir( $absolute ) ) return true;
+        $relative = $this->relative( $absolute ) . '/';
+        $in_code  = false;
+        foreach ( self::CODE_DIRS as $dir ) {
+            if ( strpos( $relative, $dir ) === 0 ) $in_code = true;
+        }
+        if ( ! $in_code ) return true;
+        // Level by level: a plugin's main .php sits at its top, so the usual
+        // answer comes from one scandir instead of a walk through assets/.
+        // ponytail: an assets-only folder is still walked whole on every listing; cache per request if huge ones show up.
+        $queue = [ $absolute ];
+        while ( $queue ) {
+            $dir = array_shift( $queue );
+            foreach ( (array) @scandir( $dir ) as $name ) {
+                if ( $name === '.' || $name === '..' || $name === '' ) continue;
+                $path = $dir . '/' . $name;
+                if ( is_link( $path ) ) continue;
+                if ( is_dir( $path ) ) { $queue[] = $path; continue; }
+                if ( array_intersect( array_slice( explode( '.', strtolower( $name ) ), 1 ), self::EXECUTABLE ) ) return $this->error( 'protected' );
+            }
+        }
         return true;
     }
 
@@ -318,7 +366,7 @@ class ISXM_File_Manager {
 
     /** One row of a listing or of search results; folders have no size. */
     private function entry( $path, $name ) {
-        $entry = [ 'name' => $name, 'path' => $this->relative( $path ), 'mtime' => (int) @filemtime( $path ), 'writable' => $this->changeable( $path ) === true ];
+        $entry = [ 'name' => $name, 'path' => $this->relative( $path ), 'mtime' => (int) @filemtime( $path ), 'writable' => $this->changeable( $path ) === true && $this->code_guard( $path ) === true ];
         if ( ! is_dir( $path ) ) $entry['size'] = (int) @filesize( $path );
         return $entry;
     }
@@ -381,7 +429,8 @@ class ISXM_File_Manager {
     public function upload( $parent, $name, $tmp, $replace = false, $mover = null ) {
         $target = $this->target( $parent, $name );
         if ( is_wp_error( $target ) ) return $target;
-        if ( is_dir( $target ) ) return $this->error( 'exists' );
+        // A link is never written through (a cross-device move copies into its target).
+        if ( is_dir( $target ) || is_link( $target ) ) return $this->error( 'exists' );
         if ( file_exists( $target ) && ! $replace ) return $this->error( 'exists' );
         $mover = $mover ?? function ( $from, $to ) { return is_uploaded_file( $from ) && move_uploaded_file( $from, $to ); };
         if ( ! $mover( $tmp, $target ) ) return $this->error( 'failed' );
@@ -397,6 +446,8 @@ class ISXM_File_Manager {
         if ( is_wp_error( $from ) ) return $from;
         $ok = $this->changeable( $from );
         if ( is_wp_error( $ok ) ) return $ok;
+        $ok = $this->code_guard( $from );
+        if ( is_wp_error( $ok ) ) return $ok;
         return $this->relocate( $from, $this->target( $this->relative( dirname( $from ) ), $name ) );
     }
 
@@ -405,6 +456,8 @@ class ISXM_File_Manager {
         $from = $this->item( $relative );
         if ( is_wp_error( $from ) ) return $from;
         $ok = $this->changeable( $from );
+        if ( is_wp_error( $ok ) ) return $ok;
+        $ok = $this->code_guard( $from );
         if ( is_wp_error( $ok ) ) return $ok;
         $to = $this->target( $parent, basename( $from ) );
         if ( ! is_wp_error( $to ) && strpos( $to . '/', $from . '/' ) === 0 ) return $this->error( 'into_itself' );
@@ -416,6 +469,8 @@ class ISXM_File_Manager {
         $path = $this->item( $relative );
         if ( is_wp_error( $path ) ) return $path;
         $ok = $this->changeable( $path );
+        if ( is_wp_error( $ok ) ) return $ok;
+        $ok = $this->code_guard( $path );
         if ( is_wp_error( $ok ) ) return $ok;
         $guard = $this->force_hidden ? '' : $this->holds_hidden( $path );
         if ( $guard !== '' ) return $this->guarded( $guard );
@@ -486,6 +541,8 @@ class ISXM_File_Manager {
             }
             $ok = $this->changeable( $dir . '/' . $name );
             if ( is_wp_error( $ok ) ) return $ok;
+            $ok = $this->code_guard( $dir . '/' . $name );
+            if ( is_wp_error( $ok ) ) return $ok;
             $guard = $this->force_hidden ? '' : $this->holds_hidden( $dir . '/' . $name );
             if ( $guard !== '' ) return $this->guarded( $guard );
         }
@@ -537,6 +594,10 @@ class ISXM_File_Manager {
         if ( ! is_dir( $dir ) ) return $this->error( 'not_dir' );
         $target = rtrim( $dir, '/' ) . '/' . $name;
         $ok     = $this->writable( $target );
+        if ( is_wp_error( $ok ) ) return $ok;
+        // What may not be read may not be written either: no planting or
+        // overwriting files in backup folders or folders the server denies.
+        $ok = $this->readable( $target );
         return is_wp_error( $ok ) ? $ok : $target;
     }
 

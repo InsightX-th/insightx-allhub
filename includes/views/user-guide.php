@@ -153,7 +153,7 @@ $guide_figure = static function ( $file, $alt, $caption, $width, $height ) {
                 </ul>
                 <p>เมื่อเปิด Offload Media ไฟล์นอก Media Library ที่เพิ่มผ่าน File Manager จะถูกส่งขึ้น Storage ผู้ดูแลเพิ่มโฟลเดอร์เข้า Offload ได้อัตโนมัติตามข้อจำกัดของระบบ ส่วน role อื่นส่งขึ้นได้เฉพาะโฟลเดอร์ที่เลือกไว้แล้ว</p>
                 <p class="isxs-guide-note"><strong>การลบมีผลถึง Storage:</strong> ลบไฟล์ ลบโฟลเดอร์ หรือล้างโฟลเดอร์ จะลบสำเนาบน Storage ที่ปลั๊กอินติดตามด้วย การย้ายหรือเปลี่ยนชื่อจะเปลี่ยน path และ key ของไฟล์</p>
-                <p>ไฟล์สำคัญ เช่น <code>wp-config.php</code>, ไฟล์ที่ขึ้นต้นด้วยจุด, ฐานข้อมูล, log, key และโฟลเดอร์สำรองข้อมูลถูกซ่อนไว้ ส่วนโฟลเดอร์โค้ด WordPress, plugins และ themes เป็นแบบอ่านอย่างเดียว</p>
+                <p>ไฟล์สำคัญ เช่น <code>wp-config.php</code>, ไฟล์ที่ขึ้นต้นด้วยจุด, ฐานข้อมูล, log, key และโฟลเดอร์สำรองข้อมูลถูกซ่อนไว้ ส่วน <code>wp-admin</code> และ <code>wp-includes</code> เป็นแบบอ่านอย่างเดียว ใน plugins และ themes เฉพาะผู้ดูแลระบบที่เพิ่มหรือแก้ไฟล์ทั่วไป (css, js, รูป) ได้ และทำไม่ได้ถ้าเว็บตั้ง <code>DISALLOW_FILE_EDIT</code> ไว้ ส่วนไฟล์ .php และโฟลเดอร์ที่มีไฟล์ .php อยู่ข้างในจะเปลี่ยนชื่อ ย้าย หรือลบไม่ได้</p>
             </section>
 
             <section id="isxs-guide-images" aria-labelledby="isxs-guide-images-title">
